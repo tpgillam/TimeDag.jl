@@ -34,10 +34,6 @@ Block{T}() where {T} = Block{T}(DateTime[], T[])
 
 value_type(::Block{T}) where {T} = T
 
-# Could use either times or values -- they should always have the same length.
-Base.length(block::Block) = length(block.times)
-Base.isempty(block::Block) = length(block) == 0
-
 # TODO equality
 
 # Make a block behave like a table with two columns, primarily for printing purposes.
@@ -99,4 +95,21 @@ function Base.vcat(blocks::Block{T}...) where {T}
     end
 end
 
-# TODO implement iteration over knots, first, last etc.
+# Indexing, iteration, etc.
+Base.first(block::Block) = (first(block.times), first(block.values))
+Base.last(block::Block) = (last(block.times), last(block.values))
+
+Base.length(block::Block) = length(block.times)
+Base.isempty(block::Block) = length(block) == 0
+Base.firstindex(block::Block) = 1
+Base.lastindex(block::Block) = length(block)
+Base.getindex(block::Block, i::Int) = (block.times[i], block.values[i])
+
+Base.eltype(::Block{T}) where {T} = Tuple{DateTime, T}
+function Base.iterate(block::Block, state::Int=1)
+    return if (state > length(block))
+        nothing
+    else
+        (block[state], state + 1)
+    end
+end
