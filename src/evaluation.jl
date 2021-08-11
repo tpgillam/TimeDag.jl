@@ -77,7 +77,6 @@ function evaluate_many(
 ) where {T}
     state = start_at(nodes, time_start)
     # FIXME use batch_interval
-    # FIXME use batch_interval
     get_up_to!(state, time_end)
     # TODO Is using splatting a performance overhead over a vector if there are many blocks?
     return [vcat(state.evaluated_node_to_blocks[node]...) for node in nodes]

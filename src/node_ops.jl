@@ -3,7 +3,7 @@ struct BlockNode{T} <: NodeOp{T}
     block::Block{T}
 end
 
-create_evaluation_state(::BlockNode) = _EMPTY_NODE_STATE
+create_evaluation_state(::Tuple, ::BlockNode) = _EMPTY_NODE_STATE
 
 function run_node!(
     ::EmptyNodeEvaluationState,
@@ -19,8 +19,6 @@ end
 # really slow down identity mapping.
 
 
-# TODO This Lag type really shouldn't be type parameteised... we should store the
-# type information on a node some other way?
 
 """A node which lags its input by a fixed number of knots."""
 struct Lag{T} <: NodeOp{T}
@@ -33,7 +31,9 @@ struct LagState{T} <: NodeEvaluationState
     value_buffer::CircularBuffer{T}
 end
 
-create_evaluation_state(op::Lag{T}) where {T} = LagState(CircularBuffer{T}(op.n))
+function create_evaluation_state(::Tuple{Node}, op::Lag{T}) where {T}
+    return LagState(CircularBuffer{T}(op.n))
+end
 
 function run_node!(
     state::LagState{T},
@@ -61,11 +61,7 @@ function run_node!(
         @view(input.values[1:no])
     else
         # Merge values from the state and in the Block.
-        # TODO This is not necessarily a good constructor. See comment near definition of
-        #   Block regarding what to do if we're viewing a dense array.
-        #   The correct solution will probably involve dispatching based on the type of
-        #   input.values.
-        result = Vector{T}(undef, no)
+        result = _allocate_values(T, n)
         for i in 1:m
             result[i] = popfirst!(state.value_buffer)
         end
@@ -85,6 +81,12 @@ end
 
 
 
+"""A node which adds its inputs with a particular choice of alignment."""
+struct Add{T, A} <: BinaryAlignedNodeOp{T, A} end
+binary_operator(::Add) = +
+
+
+
 # API -- should go in another file, probably?
 
 block_node(block::Block) = obtain_node((), BlockNode(block))
@@ -99,3 +101,13 @@ function lag(node::Node, n::Integer)
         obtain_node((node,), Lag{value_type(node)}(n))
     end
 end
+
+function add(node_l::Node, node_r::Node, ::A=DEFAULT_ALIGNMENT) where {A}
+    # FIXME Need to figure out the promotion of types from combining left & right
+    T = value_type(node_l)
+    return obtain_node((node_l, node_r), Add{T, A}())
+end
+
+# Shorthand
+
+Base.:+(node_l::Node, node_r::Node) = add(node_l, node_r)

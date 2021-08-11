@@ -110,3 +110,16 @@ function Base.iterate(block::Block, state::Int=1)
         (block[state], state + 1)
     end
 end
+
+"""
+    _allocate_values(T, n::Int) -> AbstractVector{T}
+
+Allocate some uninitialized memory that looks like a vector{T} of length `n`.
+"""
+function _allocate_values(T, n::Int)
+    # TODO This is not necessarily optimal. See comment near definition of
+    #   Block regarding what to do if we're viewing a dense array.
+    #   The correct solution will probably involve dispatching based on the type of
+    #   input.values.
+    return Vector{T}(undef, n)
+end

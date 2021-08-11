@@ -15,7 +15,7 @@ Base.hash(a::Node, h::UInt) = hash(a.op, hash(a.parents, hash(:Node, h)))
 Base.:(==)(a::Node, b::Node) = a.parents == b.parents && a.op == b.op
 
 function Base.show(io::IO, node::Node)
-    return println(io, "$(typeof(node.op).name.name){$(value_type(node))}")
+    return print(io, "$(typeof(node.op).name.name){$(value_type(node))}")
 end
 
 """The type of each value emitted for this node."""
@@ -39,14 +39,13 @@ parents(node::Node) = node.parents
 
 """
     create_evaluation_state(node::Node) -> NodeEvaluationState
-    create_evaluation_state(node::NodeOp) -> NodeEvaluationState
+    create_evaluation_state(parents, node::NodeOp) -> NodeEvaluationState
 
 Create an empty evaluation state for the given node, when starting evaluation at the
 specified time.
 """
-create_evaluation_state(node::Node) = create_evaluation_state(node.op)
+create_evaluation_state(node::Node) = create_evaluation_state(node.parents, node.op)
 
-# TODO This may need to be given parents.
 """
     run_node!(
         state::NodeEvaluationState,
