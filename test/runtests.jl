@@ -1,9 +1,9 @@
 using Dates
+using LightGraphs
 using TimeDag
 using Test
 
 @testset "TimeDag.jl" begin
     include("block.jl")
-    @testset "simple" begin
-    end
+    include("graph.jl")
 end

@@ -223,5 +223,12 @@ end
 # This is the single instance of the graph that we want
 const _GLOBAL_GRAPH = NodeGraph()
 
+"""
+    global_graph() -> NodeGraph
+
+Get the global NodeGraph instance used in TimeDag.
+"""
+global_graph() = _GLOBAL_GRAPH
+
 obtain_node(parents, op::NodeOp) = obtain_node(_GLOBAL_GRAPH, parents, op)
 ancestors(nodes::Node...) = ancestors(_GLOBAL_GRAPH, nodes...)

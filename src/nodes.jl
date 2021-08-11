@@ -14,6 +14,10 @@ function run_node!(
     return _slice(op.block, time_start, time_end)
 end
 
+# TODO Need to think about equality for BlockNode. It is used in equality testing for node,
+# so we do *not* really want to do full equality checking on block's values since this could
+# really slow down identity mapping.
+
 
 # TODO This Lag type really shouldn't be type parameteised... we should store the
 # type information on a node some other way?
