@@ -96,9 +96,6 @@ function Base.vcat(blocks::Block{T}...) where {T}
 end
 
 # Indexing, iteration, etc.
-Base.first(block::Block) = (first(block.times), first(block.values))
-Base.last(block::Block) = (last(block.times), last(block.values))
-
 Base.length(block::Block) = length(block.times)
 Base.isempty(block::Block) = length(block) == 0
 Base.firstindex(block::Block) = 1
