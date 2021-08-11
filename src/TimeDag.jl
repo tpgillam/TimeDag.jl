@@ -13,6 +13,6 @@ include("graph.jl")
 include("evaluation.jl")
 
 # Node implementations
-include("nodes.jl")
+include("node_ops.jl")
 
 end

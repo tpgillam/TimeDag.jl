@@ -62,7 +62,9 @@ function run_node!(
     else
         # Merge values from the state and in the Block.
         # TODO This is not necessarily a good constructor. See comment near definition of
-        #   Block.
+        #   Block regarding what to do if we're viewing a dense array.
+        #   The correct solution will probably involve dispatching based on the type of
+        #   input.values.
         result = Vector{T}(undef, no)
         for i in 1:m
             result[i] = popfirst!(state.value_buffer)
@@ -79,56 +81,6 @@ function run_node!(
     # FIXME There is AT LEAST one bug in the above, as we're currently returning more
     # values than times in a block :-(
     # TODO This needs lots of tests!
-
-
-
-    # elseif isempty(state.value_buffer)
-    #     # Optimisation - just need to deal with input block in this case & populate state.
-    #     # FIXME This can go out-of-bounds.
-    #     append!(state.value_buffer, @view(input.values[max(1, end - node.n + 1):end]))
-    #     return Block(
-    #         @view(input.times[1 + node.n:end]),
-    #         @view(input.values[1:end - node.n]),
-    #     )
-    # else
-    #     # We need to consume one or more values from the state.
-    #     # The output size will be the same as the input size, less any history that we're
-    #     # missing in the current state.
-    #     out_length = length(input) - node.n + length(state.value_buffer)
-    #     values = Vector{T}(undef, out_length)
-
-    #     num_to_drop = node.n - length(state.value_buffer)
-    #     times = @view(input.times[1 + num_to_drop:end])
-
-
-
-    # end
-
-
-
-    # n_history = length(state.value_buffer)
-    # n_available = length(input)
-
-
-
-
-
-
-    # num_to_reset =
-
-
-
-    # if (out_length <= 0)
-    #     # The output will be empty, but we may need to reset some state.
-    #     # TODO
-    #     # TODO
-    #     # TODO
-    #     # TODO
-    # end
-
-    # # TODO
-    # # TODO
-    # # TODO
 end
 
 
