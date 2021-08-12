@@ -102,7 +102,11 @@ function lag(node::Node, n::Integer)
     end
 end
 
-function add(node_l::Node, node_r::Node, ::A=DEFAULT_ALIGNMENT) where {A}
+function add(
+    node_l::Node,
+    node_r::Node;
+    alignment::Type{A}=DEFAULT_ALIGNMENT,
+) where {A <: Alignment}
     # FIXME Need to figure out the promotion of types from combining left & right
     T = value_type(node_l)
     return obtain_node((node_l, node_r), Add{T, A}())
@@ -111,3 +115,6 @@ end
 # Shorthand
 
 Base.:+(node_l::Node, node_r::Node) = add(node_l, node_r)
+
+# TODO Identity mapping... probably just want a cache of empty blocks somewhere?
+empty_node(T) = block_node(Block{T}())

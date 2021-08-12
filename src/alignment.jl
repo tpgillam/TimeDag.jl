@@ -11,7 +11,7 @@ struct UnionAlignment <: Alignment end
 struct IntersectAlignment <: Alignment end
 
 """The default alignment for operators when not specified."""
-const DEFAULT_ALIGNMENT = UnionAlignment()
+const DEFAULT_ALIGNMENT = UnionAlignment
 
 
 # TODO There should be optimisations for constant nodes somewhere.
@@ -27,44 +27,6 @@ Get the binary operator that should be used for this node.
 """
 function binary_operator end
 
-# FIXME Add initial_values, and support for this.
-
-# TODO This should be refactored, as it will be shared for all binary nodes.
-
-# FIXME Instead of Nothing, use a custom marker type. Otherwise we need to make sure that
-#   !(Nothing <: T).
-#   Alternatively we could additionally store boolean sentinels to mark when each input is
-#   active.
-
-mutable struct BinaryAlignmentState{L, R} <: NodeEvaluationState
-    latest_l::Union{L, Nothing}
-    latest_r::Union{R, Nothing}
-end
-
-function create_evaluation_state(
-    parents::Tuple{Node, Node},
-    ::BinaryAlignedNodeOp{T, A},
-) where {T, A <: Alignment}
-    return BinaryAlignmentState{value_type(parents[1]), value_type(parents[2])}(
-        nothing,
-        nothing,
-    )
-end
-
-function create_evaluation_state(
-    ::Tuple{Node, Node},
-    ::BinaryAlignedNodeOp{T, IntersectAlignment},
-) where {T}
-    # Intersect alignment doesn't require remembering any previous state.
-    return _EMPTY_NODE_STATE
-end
-
-function _equal_times(a::Block, b::Block)::Bool
-    # FIXME This doesn't account for the case where e.g. a.times is a vector, and b.times is
-    #   a view of the entirety of a.times.
-    return a.times === b.times
-end
-
 """Apply, assuming `input_l` and `input_r` have identical alignment."""
 function _apply_fast_align_binary(T, f, input_l::Block, input_r::Block)
     n = length(input_l)
@@ -77,8 +39,30 @@ function _apply_fast_align_binary(T, f, input_l::Block, input_r::Block)
     return Block(input_l.times, values)
 end
 
+# FIXME Add initial_values, and support for this.
+
+# FIXME Instead of Nothing, use a custom marker type. Otherwise we need to make sure that
+#   !(Nothing <: T).
+#   Alternatively we could additionally store boolean sentinels to mark when each input is
+#   active.
+
+mutable struct UnionAlignmentState{L, R} <: NodeEvaluationState
+    latest_l::Union{L, Nothing}
+    latest_r::Union{R, Nothing}
+end
+
+function create_evaluation_state(
+    parents::Tuple{Node, Node},
+    ::BinaryAlignedNodeOp{T, UnionAlignment},
+) where {T}
+    return UnionAlignmentState{value_type(parents[1]), value_type(parents[2])}(
+        nothing,
+        nothing,
+    )
+end
+
 function run_node!(
-    state::BinaryAlignmentState{L, R},
+    state::UnionAlignmentState{L, R},
     node_op::BinaryAlignedNodeOp{T, UnionAlignment},
     ::DateTime,  # time_start
     ::DateTime,  # time_end
@@ -88,12 +72,15 @@ function run_node!(
     if isempty(input_l) && isempty(input_r)
         # Nothing to do, since neither input has ticked.
         return Block{T}()
-    elseif isempty(input_l) && isnothing(state.latest_r)
-        # We won't emit any knots, but should update the state.
-        state.latest_r = last(input_r.values)
+    elseif isempty(input_l) && isnothing(state.latest_l)
+        # Left is inactive and won't tick, so nothing gets emitted. But make sure we update
+        # the state on the right.
+        state.latest_r = @inbounds last(input_r.values)
         return Block{T}()
-    elseif isnothing(state.latest_l) && isempty(input_l)
-        state.latest_l = last(input_l.values)
+    elseif isempty(input_r) && isnothing(state.latest_r)
+        # Right is inactive and won't tick, so nothing gets emitted. But make sure we update
+        # the state on the left.
+        state.latest_l = @inbounds last(input_l.values)
         return Block{T}()
     end
 
@@ -103,8 +90,8 @@ function run_node!(
     if _equal_times(input_l, input_r)
         # Times are indistinguishable
         # Update the alignment state.
-        state.latest_l = last(input_l.values)
-        state.latest_r = last(input_r.values)
+        state.latest_l = @inbounds last(input_l.values)
+        state.latest_r = @inbounds last(input_r.values)
         return _apply_fast_align_binary(T, f, input_l, input_r)
     end
 
@@ -175,6 +162,14 @@ function run_node!(
     return Block(times, values)
 end
 
+function create_evaluation_state(
+    ::Tuple{Node, Node},
+    ::BinaryAlignedNodeOp{T, IntersectAlignment},
+) where {T}
+    # Intersect alignment doesn't require remembering any previous state.
+    return _EMPTY_NODE_STATE
+end
+
 function run_node!(
     ::EmptyNodeEvaluationState,
     node_op::BinaryAlignedNodeOp{T, IntersectAlignment},
@@ -199,7 +194,7 @@ function run_node!(
     # Create our outputs as the maximum possible size.
     nl = length(input_l)
     nr = length(input_r)
-    max_size = max(nl, nr)
+    max_size = nl
     times = Vector{DateTime}(undef, max_size)
     values = _allocate_values(T, max_size)
 
@@ -238,5 +233,105 @@ function run_node!(
     # Package the outputs into a block, resizing the outputs as necessary.
     resize!(times, j - 1)
     resize!(values, j - 1)
+    return Block(times, values)
+end
+
+mutable struct LeftAlignmentState{R} <: NodeEvaluationState
+    latest_r::Union{R, Nothing}
+end
+
+function create_evaluation_state(
+    parents::Tuple{Node, Node},
+    ::BinaryAlignedNodeOp{T, LeftAlignment},
+) where {T}
+    return LeftAlignmentState{value_type(parents[2])}(nothing)
+end
+
+function run_node!(
+    state::LeftAlignmentState,
+    node_op::BinaryAlignedNodeOp{T, LeftAlignment},
+    ::DateTime,  # time_start
+    ::DateTime,  # time_end
+    input_l::Block{L},
+    input_r::Block{R},
+) where {T, L, R}
+    have_initial_r = !isnothing(state.latest_r)
+
+    if isempty(input_l)
+        # We will not tick, but update state if necessary.
+        if !isempty(input_r)
+            state.latest_r = @inbounds last(input_r.values)
+        end
+        return Block{T}()
+    elseif isempty(input_r) && !have_initial_r
+        # We cannot tick, since we have no values on the right. No state to update either.
+        return Block{T}()
+    end
+
+    # This is the binary operator that we will be applying to input values.
+    f = binary_operator(node_op)
+
+    if _equal_times(input_l, input_r)
+        # Times are indistinguishable.
+        return _apply_fast_align_binary(T, f, input_l, input_r)
+    end
+
+    # The most we can emit is one knot for every knot in input_l.
+    nl = length(input_l)
+    nr = length(input_r)
+    values = _allocate_values(T, nl)
+
+    # Start with 0, indicating that input_r hasn't started ticking yet.
+    ir = 0
+
+    # The index of the first knot we emit from input_l. Note that if we have an initial
+    # value for r, then we know it will be index 1. Otherwise use 0 as a placeholder to
+    # indicate that we don't know.
+    first_emitted_index_l = have_initial_r ? 1 : 0
+
+    # The index into the output.
+    j = 1
+
+    for il in 1:nl
+        # Consume r while it would leave us before the current time in l, or until we reach
+        # the end of r.
+        # TODO Check these conditions, add @inbounds when happy.
+        # while (ir < nr && @inbounds(input_r.times[ir + 1] <= input_l.times[il]))
+        while (ir < nr && input_r.times[ir + 1] <= input_l.times[il])
+            ir += 1
+        end
+
+        if ir > 0
+            if first_emitted_index_l == 0
+                # Record the point where we have started ticking.
+                first_emitted_index_l = il
+            end
+            @inbounds values[j] = f(input_l.values[il], input_r.values[ir])
+            j += 1
+        elseif have_initial_r
+            # R hasn't ticked in this batch, but we have an initial value. In this case
+            # we know that `first_emitted_index_l` will have already been set correctly.
+            @inbounds values[j] = f(input_l.values[il], state.latest_r)
+            j += 1
+        end
+    end
+
+    # TODO we should be able to remove this assertion, since we deal with the cases where
+    #   the output will be empty early on in the function.
+    @assert first_emitted_index_l > 0
+
+    # Update state
+    if !isempty(input_r)
+        state.latest_r = @inbounds last(input_r.values)
+    end
+
+    # Package results into a new block.
+    times = if first_emitted_index_l > 1
+        resize!(values, j - 1)  # Truncate the values array, as we haven't used all of it.
+        @view input_l.times[first_emitted_index_l:end]
+    else
+        input_l.times
+    end
+
     return Block(times, values)
 end

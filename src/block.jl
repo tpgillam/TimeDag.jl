@@ -30,7 +30,7 @@ struct Block{T}
     end
 end
 
-Block{T}() where {T} = Block{T}(DateTime[], T[])
+Block{T}() where {T} = Block(DateTime[], T[])
 
 value_type(::Block{T}) where {T} = T
 
@@ -64,7 +64,7 @@ function Base.show(io::IO, block::Block)
 end
 
 """Slice the block so we contain values in the interval [time_start, time_end)."""
-function _slice(block::Block, time_start::DateTime, time_end::DateTime)
+function _slice(block::Block{T}, time_start::DateTime, time_end::DateTime) where {T}
     i_first = searchsortedfirst(block.times, time_start)
     i_last = searchsortedfirst(block.times, time_end) - 1
 
@@ -75,8 +75,8 @@ function _slice(block::Block, time_start::DateTime, time_end::DateTime)
         return block
     else
         return Block(
-            @view(block.times[i_first:i_last]),
-            @view(block.values[i_first:i_last]),
+            @inbounds(@view(block.times[i_first:i_last])),
+            @inbounds(@view(block.values[i_first:i_last])),
         )
     end
 end
@@ -122,4 +122,19 @@ function _allocate_values(T, n::Int)
     #   The correct solution will probably involve dispatching based on the type of
     #   input.values.
     return Vector{T}(undef, n)
+end
+
+"""
+    _equal_times(a::Block, b::Block) -> Bool
+
+true => the times in blocks `a` and `b` are the same.
+false => the times in blocks `a` and `b` may be different, or the same.
+
+This function will try to return true for as many cases as possible, with the guarantee
+that it will always run in constant time; i.e. it will never explicitly compare time values.
+"""
+function _equal_times(a::Block, b::Block)::Bool
+    # FIXME This doesn't account for the case where e.g. a.times is a vector, and b.times is
+    #   a view of the entirety of a.times.
+    return a.times === b.times
 end
