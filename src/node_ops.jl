@@ -80,11 +80,11 @@ function run_node!(
 end
 
 
-
-"""A node which adds its inputs with a particular choice of alignment."""
 struct Add{T, A} <: BinaryAlignedNodeOp{T, A} end
 binary_operator(::Add) = +
 
+struct Subtract{T, A} <: BinaryAlignedNodeOp{T, A} end
+binary_operator(::Subtract) = -
 
 
 # API -- should go in another file, probably?
@@ -109,12 +109,23 @@ function add(
 ) where {A <: Alignment}
     # FIXME Need to figure out the promotion of types from combining left & right
     T = value_type(node_l)
-    return obtain_node((node_l, node_r), Add{T, A}())
+    return obtain_node((node_l, node_r), Add{T, alignment}())
+end
+
+function subtract(
+    node_l::Node,
+    node_r::Node;
+    alignment::Type{A}=DEFAULT_ALIGNMENT,
+) where {A <: Alignment}
+    # FIXME Need to figure out the promotion of types from combining left & right
+    T = value_type(node_l)
+    return obtain_node((node_l, node_r), Subtract{T, alignment}())
 end
 
 # Shorthand
 
 Base.:+(node_l::Node, node_r::Node) = add(node_l, node_r)
+Base.:-(node_l::Node, node_r::Node) = subtract(node_l, node_r)
 
 # TODO Identity mapping... probably just want a cache of empty blocks somewhere?
 empty_node(T) = block_node(Block{T}())
