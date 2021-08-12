@@ -74,8 +74,6 @@ function run_node!(
 
     return Block(times, values)
 
-    # FIXME There is AT LEAST one bug in the above, as we're currently returning more
-    # values than times in a block :-(
     # TODO This needs lots of tests!
 end
 
