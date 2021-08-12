@@ -74,10 +74,20 @@ function evaluate_many(
     time_start::DateTime=typemin(DateTime),
     time_end::DateTime=typemax(DateTime);
     batch_interval::Union{Nothing, TimePeriod}=nothing,
-) where {T}
+)
     state = start_at(nodes, time_start)
-    # FIXME use batch_interval
-    get_up_to!(state, time_end)
+    if isnothing(batch_interval)
+        # Evaluate in one go.
+        get_up_to!(state, time_end)
+    else
+        t = time_start
+        while true
+            t = min(time_end, t + batch_interval)
+            get_up_to!(state, t)
+            # Break when we have evaluated up to the end of the interval.
+            t < time_end || break
+        end
+    end
     # TODO Is using splatting a performance overhead over a vector if there are many blocks?
     return [vcat(state.evaluated_node_to_blocks[node]...) for node in nodes]
 end
