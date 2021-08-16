@@ -13,19 +13,46 @@ struct IntersectAlignment <: Alignment end
 """The default alignment for operators when not specified."""
 const DEFAULT_ALIGNMENT = UnionAlignment
 
-
-# TODO There should be optimisations for constant nodes somewhere.
-#   How should constant nodes work? Presumably some subtype of a NodeOp?
-
+abstract type UnaryNodeOp{T} <: NodeOp{T} end
 
 abstract type BinaryAlignedNodeOp{T, A <: Alignment} <: NodeOp{T} end
 
-"""
-    binary_operator(::BinaryAlignedNodeOp) -> callable
+# FIXME We need to ensure that the callable returned is stateless; this isn't built for
+#   a stateful operator.
+#   (Either that, or we need to know whether it is stateful, and know how the state is
+#   encapsulated so it can be copied in the right places.)
 
-Get the binary operator that should be used for this node.
+# TODO Some mechanism to describe whether the callable should be given the time of the knot
+#   it is about to emit.
+
+# TODO Some mechanism for the callable to prevent a knot being emitted.
 """
-function binary_operator end
+    operator(::UnaryNodeOp) -> callable
+    operator(::BinaryAlignedNodeOp) -> callable
+
+Get the operator that should be used for this node.
+It should be stateless callable.
+"""
+function operator end
+
+
+create_evaluation_state(::Tuple{Node}, ::UnaryNodeOp{T}) where {T} = _EMPTY_NODE_STATE
+
+function run_node!(
+    ::EmptyNodeEvaluationState,
+    node_op::UnaryNodeOp{T},
+    ::DateTime,  # time_start
+    ::DateTime,  # time_end
+    input::Block{L},
+) where {T, L}
+    n = length(input)
+    values = _allocate_values(T, n)
+    f = operator(node_op)
+    for i in 1:n
+        @inbounds values[i] = f(input.values[i])
+    end
+    return Block(input.times, values)
+end
 
 """Apply, assuming `input_l` and `input_r` have identical alignment."""
 function _apply_fast_align_binary(T, f, input_l::Block, input_r::Block)
@@ -85,7 +112,7 @@ function run_node!(
     end
 
     # This is the binary operator that we will be applying to input values.
-    f = binary_operator(node_op)
+    f = operator(node_op)
 
     if _equal_times(input_l, input_r)
         # Times are indistinguishable
@@ -184,7 +211,7 @@ function run_node!(
     end
 
     # This is the binary operator that we will be applying to input values.
-    f = binary_operator(node_op)
+    f = operator(node_op)
 
     if _equal_times(input_l, input_r)
         # Times are indistinguishable.
@@ -269,7 +296,7 @@ function run_node!(
     end
 
     # This is the binary operator that we will be applying to input values.
-    f = binary_operator(node_op)
+    f = operator(node_op)
 
     if _equal_times(input_l, input_r)
         # Times are indistinguishable.

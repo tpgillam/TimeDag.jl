@@ -115,12 +115,14 @@ function run_node!(
     # TODO This needs lots of tests!
 end
 
+struct Negate{T} <: UnaryNodeOp{T} end
+operator(::Negate) = -
 
 struct Add{T, A} <: BinaryAlignedNodeOp{T, A} end
-binary_operator(::Add) = +
+operator(::Add) = +
 
 struct Subtract{T, A} <: BinaryAlignedNodeOp{T, A} end
-binary_operator(::Subtract) = -
+operator(::Subtract) = -
 
 
 # API -- should go in another file, probably?
@@ -143,6 +145,15 @@ function lag(node::Node, n::Integer)
     else
         obtain_node((node,), Lag{value_type(node)}(n))
     end
+end
+
+function negate(node::Node)
+    if _is_constant(node)
+        return constant(-node.op.value)
+    end
+
+    T = value_type(node)
+    return obtain_node((node,), Negate{T}())
 end
 
 function add(node_l, node_r; alignment::Type{A}=DEFAULT_ALIGNMENT) where {A <: Alignment}
@@ -175,6 +186,8 @@ function subtract(
 end
 
 # Shorthand
+
+Base.:-(node::Node) = negate(node)
 
 Base.:+(node_l::Node, node_r::Node) = add(node_l, node_r)
 Base.:+(node_l::Node, node_r) = add(node_l, node_r)
