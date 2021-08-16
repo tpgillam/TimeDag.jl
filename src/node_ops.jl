@@ -3,7 +3,7 @@ struct BlockNode{T} <: NodeOp{T}
     block::Block{T}
 end
 
-create_evaluation_state(::Tuple, ::BlockNode) = _EMPTY_NODE_STATE
+create_evaluation_state(::Tuple{}, ::BlockNode) = _EMPTY_NODE_STATE
 
 function run_node!(
     ::EmptyNodeEvaluationState,
@@ -18,6 +18,44 @@ end
 # so we do *not* really want to do full equality checking on block's values since this could
 # really slow down identity mapping.
 
+"""A node which fundamentally represents a constant available over all time."""
+struct Constant{T} <: NodeOp{T}
+    value::T
+end
+
+function Base.show(io::IO, op::Constant)
+    return print(io, "$(typeof(op).name.name){$(value_type(op))}($(op.value))")
+end
+
+mutable struct ConstantState <: NodeEvaluationState
+    ticked::Bool
+    ConstantState() = new(false)
+end
+
+create_evaluation_state(::Tuple{}, ::Constant) = ConstantState()
+
+_is_constant(::NodeOp) = false
+_is_constant(::Constant) = true
+_is_constant(node::Node) = _is_constant(node.op)
+
+"""Identity if the argument is a node, otherwise wrap it in a constant node."""
+_ensure_node(node::Node) = node
+_ensure_node(value::Any) = obtain_node((), Constant(value))
+
+function run_node!(
+    state::ConstantState,
+    op::Constant{T},
+    time_start::DateTime,
+    ::DateTime,  # time_end
+) where {T}
+    # The convention is that we emit a single knot at the start of the evaluation interval.
+    return if state.ticked
+        Block{T}()
+    else
+        state.ticked = true
+        Block([time_start], [op.value])
+    end
+end
 
 
 """A node which lags its input by a fixed number of knots."""
@@ -87,7 +125,11 @@ binary_operator(::Subtract) = -
 
 # API -- should go in another file, probably?
 
+# TODO all these need documentation!
+
 block_node(block::Block) = obtain_node((), BlockNode(block))
+
+constant(value::T) where {T} = obtain_node((), Constant(value))
 
 function lag(node::Node, n::Integer)
     return if n == 0
@@ -95,26 +137,38 @@ function lag(node::Node, n::Integer)
         node
     elseif n < 0
         throw(ArgumentError("Cannot lag by $n."))
+    elseif _is_constant(node)
+        # Constant nodes shouldn't be affected by lagging.
+        node
     else
         obtain_node((node,), Lag{value_type(node)}(n))
     end
 end
 
-function add(
-    node_l::Node,
-    node_r::Node;
-    alignment::Type{A}=DEFAULT_ALIGNMENT,
-) where {A <: Alignment}
+function add(node_l, node_r; alignment::Type{A}=DEFAULT_ALIGNMENT) where {A <: Alignment}
+    node_l = _ensure_node(node_l)
+    node_r = _ensure_node(node_r)
+    if _is_constant(node_l) && _is_constant(node_r)
+        # Constant propagation.
+        return constant(node_l.op.value + node_r.op.value)
+    end
     # FIXME Need to figure out the promotion of types from combining left & right
     T = value_type(node_l)
     return obtain_node((node_l, node_r), Add{T, alignment}())
 end
 
 function subtract(
-    node_l::Node,
-    node_r::Node;
+    node_l,
+    node_r;
     alignment::Type{A}=DEFAULT_ALIGNMENT,
 ) where {A <: Alignment}
+    node_l = _ensure_node(node_l)
+    node_r = _ensure_node(node_r)
+    if _is_constant(node_l) && _is_constant(node_r)
+        # Constant propagation.
+        return constant(node_l.op.value - node_r.op.value)
+    end
+
     # FIXME Need to figure out the promotion of types from combining left & right
     T = value_type(node_l)
     return obtain_node((node_l, node_r), Subtract{T, alignment}())
@@ -123,7 +177,12 @@ end
 # Shorthand
 
 Base.:+(node_l::Node, node_r::Node) = add(node_l, node_r)
-Base.:-(node_l::Node, node_r::Node) = subtract(node_l, node_r)
+Base.:+(node_l::Node, node_r) = add(node_l, node_r)
+Base.:+(node_l, node_r::Node) = add(node_l, node_r)
 
-# TODO Identity mapping... probably just want a cache of empty blocks somewhere?
+Base.:-(node_l::Node, node_r::Node) = subtract(node_l, node_r)
+Base.:-(node_l::Node, node_r) = subtract(node_l, node_r)
+Base.:-(node_l, node_r::Node) = subtract(node_l, node_r)
+
+# TODO Identity mapping... probably just want a cache of empty blocks by T somewhere?
 empty_node(T) = block_node(Block{T}())
