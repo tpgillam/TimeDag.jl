@@ -20,6 +20,12 @@ function Base.show(io::IO, op::NodeOp)
     return print(io, "$(typeof(op).name.name){$(value_type(op))}")
 end
 
+# Enable AbstractTrees to understand the graph.
+# TODO It might be nice to elide repeated subtrees. This would require modifying the
+#   iteration procedure within AbstractTrees, so ostriching for now.
+AbstractTrees.children(node::TimeDag.Node) = TimeDag.parents(node)
+AbstractTrees.nodetype(::TimeDag.Node) = TimeDag.Nod
+
 """The type of each value emitted for this node."""
 value_type(node::Node) = value_type(node.op)
 value_type(::NodeOp{T}) where {T} = T

@@ -1,5 +1,6 @@
 module TimeDag
 
+using AbstractTrees
 using DataStructures
 using Dates
 using LightGraphs
