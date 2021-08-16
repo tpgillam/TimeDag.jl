@@ -318,6 +318,9 @@ function run_node!(
 
     # TODO we should be able to remove this assertion, since we deal with the cases where
     #   the output will be empty early on in the function.
+    # FIXME we hit this assertion error
+    #   input_l ticks once at start of interval
+    #   input_r ticks several times after this
     @assert first_emitted_index_l > 0
 
     # Update state
