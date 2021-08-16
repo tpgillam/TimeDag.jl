@@ -152,8 +152,8 @@ function add(node_l, node_r; alignment::Type{A}=DEFAULT_ALIGNMENT) where {A <: A
         # Constant propagation.
         return constant(node_l.op.value + node_r.op.value)
     end
-    # FIXME Need to figure out the promotion of types from combining left & right
-    T = value_type(node_l)
+    # Figure out the promotion of types from combining left & right.
+    T = promomte_type(value_type(node_l), value_type(node_r))
     return obtain_node((node_l, node_r), Add{T, alignment}())
 end
 
@@ -169,8 +169,8 @@ function subtract(
         return constant(node_l.op.value - node_r.op.value)
     end
 
-    # FIXME Need to figure out the promotion of types from combining left & right
-    T = value_type(node_l)
+    # Figure out the promotion of types from combining left & right.
+    T = promomte_type(value_type(node_l), value_type(node_r))
     return obtain_node((node_l, node_r), Subtract{T, alignment}())
 end
 
