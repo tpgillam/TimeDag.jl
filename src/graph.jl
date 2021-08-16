@@ -14,8 +14,10 @@ end
 Base.hash(a::Node, h::UInt) = hash(a.op, hash(a.parents, hash(:Node, h)))
 Base.:(==)(a::Node, b::Node) = a.parents == b.parents && a.op == b.op
 
-function Base.show(io::IO, node::Node)
-    return print(io, "$(typeof(node.op).name.name){$(value_type(node))}")
+Base.show(io::IO, node::Node) = show(io, node.op)
+
+function Base.show(io::IO, op::NodeOp)
+    return print(io, "$(typeof(op).name.name){$(value_type(op))}")
 end
 
 """The type of each value emitted for this node."""
