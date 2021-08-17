@@ -12,8 +12,13 @@
         DateTime(2000, 1, 5) => 8,
     ])
 
+    b3 = Block([
+        DateTime(2000, 1, 1) => -5,
+    ])
+
     n1 = block_node(b1)
     n2 = block_node(b2)
+    n3 = block_node(b3)
 
     _eval(n) = _evaluate(n, DateTime(2000, 1, 1), DateTime(2000, 1, 10))
 
@@ -47,4 +52,13 @@
         DateTime(2000, 1, 3) => 9,
         DateTime(2000, 1, 4) => 10,
     ])
+
+    # Catch edge-case in which there was a bug.
+    @test _eval(TimeDag.add(n2, n3; alignment=TimeDag.LeftAlignment)) == Block([
+        DateTime(2000, 1, 2) => 0,
+        DateTime(2000, 1, 3) => 1,
+        DateTime(2000, 1, 5) => 3,
+    ])
+    @test _eval(TimeDag.add(n3, n2; alignment=TimeDag.LeftAlignment)) == Block{Int64}()
+
 end
