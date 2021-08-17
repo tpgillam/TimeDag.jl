@@ -8,12 +8,12 @@ using PrettyTables
 using Tables
 
 include("core.jl")
+include("constant.jl")  # Constant nodes are special, so we need to know about them first.
 
 include("block.jl")
 include("graph.jl")
 include("evaluation.jl")
 
-include("constant.jl")  # Constant nodes are special, so we need to know about them first.
 include("alignment.jl")
 
 include("ops/arithmetic.jl")

@@ -12,22 +12,12 @@ operator(::Right, x, y) = y
 function left(x, y; alignment::Type{A}=DEFAULT_ALIGNMENT) where {A <: Alignment}
     x = _ensure_node(x)
     y = _ensure_node(y)
-    if _is_constant(x) && _is_constant(y)
-        # TODO refactor constant propagation into obtain_node
-        # Constant propagation.
-        return x
-    end
     return obtain_node((x, y), Left{value_type(x), A}())
 end
 
 function right(x, y; alignment::Type{A}=DEFAULT_ALIGNMENT) where {A <: Alignment}
     x = _ensure_node(x)
     y = _ensure_node(y)
-    if _is_constant(x) && _is_constant(y)
-        # TODO refactor constant propagation into obtain_node
-        # Constant propagation.
-        return y
-    end
     return obtain_node((x, y), Right{value_type(y), A}())
 end
 

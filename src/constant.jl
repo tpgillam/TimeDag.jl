@@ -18,6 +18,9 @@ _is_constant(::NodeOp) = false
 _is_constant(::Constant) = true
 _is_constant(node::Node) = _is_constant(node.op)
 
+value(op::Constant) = op.value
+value(node::Node) = value(node.op)
+
 """Identity if the argument is a node, otherwise wrap it in a constant node."""
 _ensure_node(node::Node) = node
 _ensure_node(value::Any) = obtain_node((), Constant(value))

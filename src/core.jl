@@ -1,3 +1,80 @@
+"""Represent a time-series operation."""
+abstract type NodeOp{T} end
+
+# Note that a Node is only declared mutable so as to force it to live on the heap, which
+# (importantly) means that we can attach finalizers to node instances.
+# Nodes should NEVER actually be mutated!
+mutable struct Node
+    parents::NTuple{N, Node} where {N}
+    op::NodeOp
+end
+
+# Node & NodeOps are immutable for duplication purposes.
+duplicate_internal(x::Node, ::IdDict) = x
+duplicate_internal(x::NodeOp, ::IdDict) = x
+
+# Nodes need to have hash & equality defined such that nodes with equal parents and op
+# compare equal. This will be relied upon in `obtain_node` later.
+Base.hash(a::Node, h::UInt) = hash(a.op, hash(a.parents, hash(:Node, h)))
+Base.:(==)(a::Node, b::Node) = a.parents == b.parents && a.op == b.op
+
+Base.show(io::IO, node::Node) = show(io, node.op)
+
+function Base.show(io::IO, op::NodeOp)
+    return print(io, "$(typeof(op).name.name){$(value_type(op))}")
+end
+
+# Enable AbstractTrees to understand the graph.
+# TODO It might be nice to elide repeated subtrees. This would require modifying the
+#   iteration procedure within AbstractTrees, so ostriching for now.
+AbstractTrees.children(node::Node) = parents(node)
+AbstractTrees.nodetype(::Node) = Node
+
+"""The type of each value emitted for this node."""
+value_type(node::Node) = value_type(node.op)
+value_type(::NodeOp{T}) where {T} = T
+
+abstract type NodeEvaluationState end
+
+"""An evaluation state which has no contents."""
+struct EmptyNodeEvaluationState <: NodeEvaluationState end
+
+# Can have a singleton instance, since it is just a placeholder.
+_EMPTY_NODE_STATE = EmptyNodeEvaluationState()
+
+"""
+    parents(node::Node) -> NTuple{N, Node} where {N}
+
+Get immediate parents of the given node.
+"""
+parents(node::Node) = node.parents
+
+"""
+    create_evaluation_state(node::Node) -> NodeEvaluationState
+    create_evaluation_state(parents, node::NodeOp) -> NodeEvaluationState
+
+Create an empty evaluation state for the given node, when starting evaluation at the
+specified time.
+"""
+create_evaluation_state(node::Node) = create_evaluation_state(node.parents, node.op)
+
+"""
+    run_node!(
+        state::NodeEvaluationState,
+        op::NodeOp{T},
+        time_start::DateTime,
+        time_end::DateTime,
+        input_blocks::Block...
+    ) -> Block{T}
+
+Evaluate the given node from `time_start` to `time_end`, with the initial `state`.
+Zero or more blocks will be passed as an input; these correspond to the parents of a node,
+and are passed in the same order as that returned by `parents(node)`.
+
+We return a new Block of output knots from this node.
+"""
+function run_node! end
+
 """
     duplicate(x)
 
