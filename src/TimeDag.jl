@@ -7,6 +7,8 @@ using LightGraphs
 using PrettyTables
 using Tables
 
+include("core.jl")
+
 include("block.jl")
 include("graph.jl")
 include("evaluation.jl")

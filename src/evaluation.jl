@@ -16,6 +16,23 @@ mutable struct EvaluationState
     evaluated_node_to_blocks::Dict{Node, Vector{Block}}
 end
 
+function duplicate_internal(x::EvaluationState, stackdict::IdDict)
+    y = EvaluationState(
+        x.evaluation_order,
+        Dict([
+            node => duplicate_internal(state, stackdict)
+            for (node, state) in x.node_to_state
+        ]),
+        x.current_time,
+        Dict([
+            node => copy(blocks)
+            for (node, blocks) in x.evaluated_node_to_blocks
+        ]),
+    )
+    stackdict[x] = y
+    return y
+end
+
 function start_at(nodes, time_start::DateTime)::EvaluationState
     # Create empty evaluation state for all these, and return in some suitable pacakge.
     evaluation_order = ancestors(nodes...)

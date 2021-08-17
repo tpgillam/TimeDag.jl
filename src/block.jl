@@ -32,9 +32,25 @@ end
 
 Block{T}() where {T} = Block(DateTime[], T[])
 
+function Block(knots::Union{AbstractVector{Tuple{DateTime, T}},AbstractVector{Pair{DateTime, T}}}) where {T}
+    n = length(knots)
+    times = Vector{DateTime}(undef, n)
+    values = _allocate_values(T, n)
+    for (i, (time, value)) in enumerate(knots)
+        @inbounds times[i] = time
+        @inbounds values[i] = value
+    end
+    return Block(times, values)
+end
+
 value_type(::Block{T}) where {T} = T
 
-# TODO equality
+# Blocks are considered immutable from the point of view of `duplicate`.
+duplicate_internal(x::Block, ::IdDict) = x
+
+# Equality & hash need to be defined, since we have defined an internal constructor.
+Base.hash(a::Block, h::UInt) = hash(a.values, hash(a.times, hash(:Block, h)))
+Base.:(==)(a::Block, b::Block) = a.times == b.times && a.values == b.values
 
 # Make a block behave like a table with two columns, primarily for printing purposes.
 Tables.istable(::Block) = true

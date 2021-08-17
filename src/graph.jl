@@ -9,6 +9,10 @@ mutable struct Node
     op::NodeOp
 end
 
+# Node & NodeOps are immutable for duplication purposes.
+duplicate_internal(x::Node, ::IdDict) = x
+duplicate_internal(x::NodeOp, ::IdDict) = x
+
 # Nodes need to have hash & equality defined such that nodes with equal parents and op
 # compare equal. This will be relied upon in `obtain_node` later.
 Base.hash(a::Node, h::UInt) = hash(a.op, hash(a.parents, hash(:Node, h)))
