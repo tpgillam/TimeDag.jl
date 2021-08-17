@@ -1,19 +1,26 @@
+# Unary operators
+
 struct Negate{T} <: UnaryNodeOp{T} end
 operator(::Negate, x) = -x
+Base.:-(node::Node) = obtain_node((node,), Negate{value_type(node)}())
+
+struct Exp{T} <: UnaryNodeOp{T} end
+operator(::Exp, x) = exp(x)
+# TODO Nicer way to encode the type promotion?
+Base.exp(node::Node) = obtain_node((node,), Exp{typeof(log(one(value_type(node))))}())
+
+struct Log{T} <: UnaryNodeOp{T} end
+operator(::Log, x) = log(x)
+# TODO Nicer way to encode the type promotion?
+Base.log(node::Node) = obtain_node((node,), Log{typeof(log(one(value_type(node))))}())
+
+# Binary operators
 
 struct Add{T, A} <: BinaryAlignedNodeOp{T, A} end
 operator(::Add, x, y) = x + y
 
 struct Subtract{T, A} <: BinaryAlignedNodeOp{T, A} end
 operator(::Subtract, x, y) = x - y
-
-
-# API.
-
-function negate(node::Node)
-    T = value_type(node)
-    return obtain_node((node,), Negate{T}())
-end
 
 function add(x, y; alignment::Type{A}=DEFAULT_ALIGNMENT) where {A <: Alignment}
     x = _ensure_node(x)
@@ -32,8 +39,6 @@ function subtract(x, y; alignment::Type{A}=DEFAULT_ALIGNMENT) where {A <: Alignm
 end
 
 # Shorthand
-
-Base.:-(node::Node) = negate(node)
 
 Base.:+(x::Node, y::Node) = add(x, y)
 Base.:+(x::Node, y) = add(x, y)

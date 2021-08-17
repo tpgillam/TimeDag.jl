@@ -21,6 +21,16 @@ n3 = block_node(b3)
 
 _eval(n) = _evaluate(n, DateTime(2000, 1, 1), DateTime(2000, 1, 10))
 
+_mapvalues(f, block::Block) = Block([time => f(value) for (time, value) in block])
+
+@testset "unary" begin
+    for op in [-, exp, log]
+        @testset "$op" begin
+            @test _eval(op(n1)) == _mapvalues(op, b1)
+        end
+    end
+end
+
 @testset "add" begin
     # Union alignment.
     n = n1 + n2
