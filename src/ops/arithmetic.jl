@@ -1,11 +1,12 @@
 struct Negate{T} <: UnaryNodeOp{T} end
-operator(::Negate) = -
+operator(::Negate, x) = -x
 
 struct Add{T, A} <: BinaryAlignedNodeOp{T, A} end
-operator(::Add) = +
+operator(::Add, x, y) = x + y
 
 struct Subtract{T, A} <: BinaryAlignedNodeOp{T, A} end
-operator(::Subtract) = -
+operator(::Subtract, x, y) = x - y
+
 
 # API.
 
@@ -18,43 +19,41 @@ function negate(node::Node)
     return obtain_node((node,), Negate{T}())
 end
 
-function add(node_l, node_r; alignment::Type{A}=DEFAULT_ALIGNMENT) where {A <: Alignment}
-    node_l = _ensure_node(node_l)
-    node_r = _ensure_node(node_r)
-    if _is_constant(node_l) && _is_constant(node_r)
+function add(x, y; alignment::Type{A}=DEFAULT_ALIGNMENT) where {A <: Alignment}
+    x = _ensure_node(x)
+    y = _ensure_node(y)
+    if _is_constant(x) && _is_constant(y)
+        # TODO refactor constant propagation into obtain_node
         # Constant propagation.
-        return constant(node_l.op.value + node_r.op.value)
+        return constant(x.op.value + y.op.value)
     end
     # Figure out the promotion of types from combining left & right.
-    T = promote_type(value_type(node_l), value_type(node_r))
-    return obtain_node((node_l, node_r), Add{T, alignment}())
+    T = promote_type(value_type(x), value_type(y))
+    return obtain_node((x, y), Add{T, A}())
 end
 
-function subtract(
-    node_l,
-    node_r;
-    alignment::Type{A}=DEFAULT_ALIGNMENT,
-) where {A <: Alignment}
-    node_l = _ensure_node(node_l)
-    node_r = _ensure_node(node_r)
-    if _is_constant(node_l) && _is_constant(node_r)
+function subtract(x, y; alignment::Type{A}=DEFAULT_ALIGNMENT) where {A <: Alignment}
+    x = _ensure_node(x)
+    y = _ensure_node(y)
+    if _is_constant(x) && _is_constant(y)
+        # TODO refactor constant propagation into obtain_node
         # Constant propagation.
-        return constant(node_l.op.value - node_r.op.value)
+        return constant(x.op.value - y.op.value)
     end
 
     # Figure out the promotion of types from combining left & right.
-    T = promote_type(value_type(node_l), value_type(node_r))
-    return obtain_node((node_l, node_r), Subtract{T, alignment}())
+    T = promote_type(value_type(x), value_type(y))
+    return obtain_node((x, y), Subtract{T, A}())
 end
 
 # Shorthand
 
 Base.:-(node::Node) = negate(node)
 
-Base.:+(node_l::Node, node_r::Node) = add(node_l, node_r)
-Base.:+(node_l::Node, node_r) = add(node_l, node_r)
-Base.:+(node_l, node_r::Node) = add(node_l, node_r)
+Base.:+(x::Node, y::Node) = add(x, y)
+Base.:+(x::Node, y) = add(x, y)
+Base.:+(x, y::Node) = add(x, y)
 
-Base.:-(node_l::Node, node_r::Node) = subtract(node_l, node_r)
-Base.:-(node_l::Node, node_r) = subtract(node_l, node_r)
-Base.:-(node_l, node_r::Node) = subtract(node_l, node_r)
+Base.:-(x::Node, y::Node) = subtract(x, y)
+Base.:-(x::Node, y) = subtract(x, y)
+Base.:-(x, y::Node) = subtract(x, y)

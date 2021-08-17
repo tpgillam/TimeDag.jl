@@ -17,21 +17,15 @@ abstract type UnaryNodeOp{T} <: NodeOp{T} end
 
 abstract type BinaryAlignedNodeOp{T, A <: Alignment} <: NodeOp{T} end
 
-# FIXME We need to ensure that the callable returned is stateless; this isn't built for
-#   a stateful operator.
-#   (Either that, or we need to know whether it is stateful, and know how the state is
-#   encapsulated so it can be copied in the right places.)
-
 # TODO Some mechanism to describe whether the callable should be given the time of the knot
 #   it is about to emit.
 
 # TODO Some mechanism for the callable to prevent a knot being emitted.
 """
-    operator(::UnaryNodeOp) -> callable
-    operator(::BinaryAlignedNodeOp) -> callable
+    operator(::UnaryNodeOp, x)
+    operator(::BinaryAlignedNodeOp, x, y)
 
-Get the operator that should be used for this node.
-It should be stateless callable.
+Perform the operation for this node.
 """
 function operator end
 
@@ -47,20 +41,24 @@ function run_node!(
 ) where {T, L}
     n = length(input)
     values = _allocate_values(T, n)
-    f = operator(node_op)
     for i in 1:n
-        @inbounds values[i] = f(input.values[i])
+        @inbounds values[i] = operator(node_op, input.values[i])
     end
     return Block(input.times, values)
 end
 
 """Apply, assuming `input_l` and `input_r` have identical alignment."""
-function _apply_fast_align_binary(T, f, input_l::Block, input_r::Block)
+function _apply_fast_align_binary(
+    T,
+    op::BinaryAlignedNodeOp,
+    input_l::Block,
+    input_r::Block,
+)
     n = length(input_l)
     values = _allocate_values(T, n)
     # We shouldn't assume that it is valid to broadcast f over the inputs, so loop manually.
     for i in 1:n
-        @inbounds values[i] = f(input_l.values[i], input_r.values[i])
+        @inbounds values[i] = operator(op, input_l.values[i], input_r.values[i])
     end
 
     return Block(input_l.times, values)
@@ -111,15 +109,12 @@ function run_node!(
         return Block{T}()
     end
 
-    # This is the binary operator that we will be applying to input values.
-    f = operator(node_op)
-
     if _equal_times(input_l, input_r)
         # Times are indistinguishable
         # Update the alignment state.
         state.latest_l = @inbounds last(input_l.values)
         state.latest_r = @inbounds last(input_r.values)
-        return _apply_fast_align_binary(T, f, input_l, input_r)
+        return _apply_fast_align_binary(T, node_op, input_l, input_r)
     end
 
     # Create our outputs as the maximum possible size.
@@ -176,7 +171,7 @@ function run_node!(
 
         # Output a knot.
         @inbounds times[j] = new_time
-        @inbounds values[j] = f(state.latest_l, state.latest_r)
+        @inbounds values[j] = operator(node_op, state.latest_l, state.latest_r)
         j += 1
     end
 
@@ -210,12 +205,9 @@ function run_node!(
         return Block{T}()
     end
 
-    # This is the binary operator that we will be applying to input values.
-    f = operator(node_op)
-
     if _equal_times(input_l, input_r)
         # Times are indistinguishable.
-        return _apply_fast_align_binary(T, f, input_l, input_r)
+        return _apply_fast_align_binary(T, node_op, input_l, input_r)
     end
 
     # Create our outputs as the maximum possible size.
@@ -250,7 +242,7 @@ function run_node!(
         else  # time_l == time_r
             # Shared time point, so emit a knot.
             @inbounds times[j] = time_l
-            @inbounds values[j] = f(input_l.values[il], input_r.values[ir])
+            @inbounds values[j] = operator(node_op, input_l.values[il], input_r.values[ir])
             j += 1
             il += 1
             ir += 1
@@ -295,12 +287,9 @@ function run_node!(
         return Block{T}()
     end
 
-    # This is the binary operator that we will be applying to input values.
-    f = operator(node_op)
-
     if _equal_times(input_l, input_r)
         # Times are indistinguishable.
-        return _apply_fast_align_binary(T, f, input_l, input_r)
+        return _apply_fast_align_binary(T, node_op, input_l, input_r)
     end
 
     # The most we can emit is one knot for every knot in input_l.
@@ -333,12 +322,12 @@ function run_node!(
                 # Record the point where we have started ticking.
                 first_emitted_index_l = il
             end
-            @inbounds values[j] = f(input_l.values[il], input_r.values[ir])
+            @inbounds values[j] = operator(node_op, input_l.values[il], input_r.values[ir])
             j += 1
         elseif have_initial_r
             # R hasn't ticked in this batch, but we have an initial value. In this case
             # we know that `first_emitted_index_l` will have already been set correctly.
-            @inbounds values[j] = f(input_l.values[il], state.latest_r)
+            @inbounds values[j] = operator(node_op, input_l.values[il], state.latest_r)
             j += 1
         end
     end
