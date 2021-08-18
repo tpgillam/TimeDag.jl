@@ -40,6 +40,18 @@ Base.:-(x::Node, y::Node) = subtract(x, y)
 Base.:-(x::Node, y) = subtract(x, y)
 Base.:-(x, y::Node) = subtract(x, y)
 
+struct Divide{T, A} <: BinaryAlignedNodeOp{T, A} end
+operator(::Divide, x, y) = x / y
+function divide(x, y; alignment::Type{A}=DEFAULT_ALIGNMENT) where {A <: Alignment}
+    x = _ensure_node(x)
+    y = _ensure_node(y)
+    T = promote_type(value_type(x), value_type(y))
+    return obtain_node((x, y), Divide{T, A}())
+end
+Base.:/(x::Node, y::Node) = divide(x, y)
+Base.:/(x::Node, y) = divide(x, y)
+Base.:/(x, y::Node) = divide(x, y)
+
 # Stateful operators (from inception)
 
 # TODO Sum would be better implemented *not* with this generic stateful form, but rather in
