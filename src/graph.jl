@@ -73,6 +73,21 @@ function insert_node!(graph::NodeGraph, node::Node)
 end
 
 """
+    _can_propagate_constant(::NodeOp) -> Bool
+
+Return true for ops which can propagate constant values if all their parents are constant.
+"""
+_can_propagate_constant(::NodeOp) = false
+
+"""
+    _propagate_constant_value(op::NodeOp{T}, parents::NTuple{N, Node}) -> T
+
+Given that all parents are constants, get the value of the constant node we should output.
+This assumes that `_can_propagate_constant(op)` is true.
+"""
+function _propagate_constant_value end
+
+"""
     obtain_node(graph::NodeGraph, parents, op::NodeOp) -> Node
     obtain_node(parents, op) -> Node
 
@@ -82,11 +97,9 @@ graph, use that one, otherwise create a new node, add to the graph, and return i
 If the graph is not specified, the global graph is used.
 """
 function obtain_node(graph::NodeGraph, parents::NTuple{N, Node}, op::NodeOp) where {N}
-    if !isempty(parents) && all(_is_constant, parents)
-        # Constant propagation, since all inputs are constants.
-        # TODO What about nodes that don't have operators that could have constant
-        #   inputs?
-        return constant(operator(op, map(value, parents)...))
+    if !isempty(parents) && _can_propagate_constant(op) && all(_is_constant, parents)
+        # Constant propagation, since all inputs are constants & the op supports it.
+        return constant(_propagate_constant_value(op, parents))
     end
     node = Node(parents, op)
     return if haskey(graph, node)

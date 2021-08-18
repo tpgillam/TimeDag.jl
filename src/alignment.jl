@@ -23,6 +23,7 @@ abstract type BinaryAlignedNodeOp{T, A <: Alignment} <: NodeOp{T} end
 #   it is about to emit.
 """
     operator(::StatelessUnaryNodeOp{T, true}, x) -> value
+    operator(::StatelessUnaryNodeOp{T, false}, x) -> (value, should_tick)
     operator(::StatefulUnaryNodeOp{T, true}, state, x) -> value
     operator(::StatefulUnaryNodeOp{T, false}, state, x) -> (value, should_tick)
     operator(::BinaryAlignedNodeOp, x, y) -> value
@@ -36,6 +37,21 @@ For operations where `AlwaysTicks` type parameter is `false`, this should return
 """
 function operator end
 
+_can_propagate_constant(::StatelessUnaryNodeOp{T, true}) where {T} = true
+function _propagate_constant_value(
+    op::StatelessUnaryNodeOp{T, true},
+    parents::Tuple{Node}
+) where {T}
+    return operator(op, value(@inbounds(parents[1])))
+end
+
+_can_propagate_constant(::BinaryAlignedNodeOp{T}) where {T} = true
+function _propagate_constant_value(
+    op::BinaryAlignedNodeOp{T},
+    parents::Tuple{Node, Node}
+) where {T}
+    return operator(op, map(value, parents)...)
+end
 
 function create_evaluation_state(::Tuple{Node}, ::StatelessUnaryNodeOp{T}) where {T}
     return _EMPTY_NODE_STATE
@@ -54,6 +70,30 @@ function run_node!(
         @inbounds values[i] = operator(node_op, input.values[i])
     end
     return Block(input.times, values)
+end
+
+function run_node!(
+    ::EmptyNodeEvaluationState,
+    node_op::StatelessUnaryNodeOp{T, false},
+    ::DateTime,  # time_start
+    ::DateTime,  # time_end
+    input::Block{L},
+) where {T, L}
+    n = length(input)
+    times = _allocate_times(n)
+    values = _allocate_values(T, n)
+    j = 1
+    for i in 1:n
+        (value, should_tick) = operator(node_op, @inbounds(input.values[i]))
+        if should_tick
+            @inbounds times[j] = input.times[i]
+            @inbounds values[j] = value
+            j += 1
+        end
+    end
+    _trim!(times, j - 1)
+    _trim!(values, j - 1)
+    return Block(times, values)
 end
 
 function run_node!(

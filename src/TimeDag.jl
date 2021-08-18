@@ -19,6 +19,7 @@ include("alignment.jl")
 
 include("ops/align.jl")
 include("ops/arithmetic.jl")
+include("ops/conditional.jl")
 include("ops/lagging.jl")
 include("ops/sources.jl")
 include("ops/window.jl")

@@ -3,7 +3,9 @@ using LightGraphs
 using TimeDag
 using Test
 
-using TimeDag: Block, Node, block_node, constant, duplicate, get_up_to!, evaluate, start_at
+using TimeDag: Block, Node
+using TimeDag: duplicate, evaluate, get_up_to!, start_at, value_type
+using TimeDag: block_node, constant, empty_node
 
 include("common.jl")
 
@@ -14,6 +16,7 @@ include("common.jl")
 
     @testset "ops" begin
         @testset "arithmetic" begin include("ops_arithmetic.jl") end
+        @testset "conditional" begin include("ops_conditional.jl") end
         @testset "window" begin include("ops_window.jl") end
     end
 end
