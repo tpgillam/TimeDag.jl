@@ -80,16 +80,20 @@ function get_up_to!(state::EvaluationState, time_end::DateTime)::EvaluationState
     return state
 end
 
+"""
+    evaluate(nodes::Vector{Node}, t0, t1; (batch_interval)) -> Vector{Block}
+    evaluate(node::Node, t0, t1; (batch_interval)) -> Block
 
+Evaluate the specified node(s) over the specified time range [t0, t1), and return the
+corresponding Block(s).
 
-# TODO Maybe we shouldn't have a default for time_start & time_end? They are *large*, and
-# so if we accidentally evaluate a graph with unfortunate alignment over all time then we
-# could do a massive amount of work.
-
-function evaluate_many(
-    nodes,
-    time_start::DateTime=typemin(DateTime),
-    time_end::DateTime=typemax(DateTime);
+If `nodes` have common dependencies, work will not be repeated when performing this
+evaluation.
+"""
+function evaluate(
+    nodes::AbstractVector{Node},
+    time_start::DateTime,
+    time_end::DateTime;
     batch_interval::Union{Nothing, TimePeriod}=nothing,
 )
     state = start_at(nodes, time_start)
@@ -111,9 +115,9 @@ end
 
 function evaluate(
     node::Node,
-    time_start=typemin(DateTime),
-    time_end=typemax(DateTime);
+    time_start::DateTime,
+    time_end::DateTime;
     batch_interval=nothing
 )
-    return only(evaluate_many([node], time_start, time_end; batch_interval))
+    return only(evaluate([node], time_start, time_end; batch_interval))
 end
