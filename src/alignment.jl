@@ -15,6 +15,8 @@ const DEFAULT_ALIGNMENT = UnionAlignment
 
 abstract type UnaryNodeOp{T} <: NodeOp{T} end
 
+abstract type StatefulUnaryNodeOp{T} <: NodeOp{T} end
+
 abstract type BinaryAlignedNodeOp{T, A <: Alignment} <: NodeOp{T} end
 
 # TODO Some mechanism to describe whether the callable should be given the time of the knot
@@ -25,7 +27,11 @@ abstract type BinaryAlignedNodeOp{T, A <: Alignment} <: NodeOp{T} end
     operator(::UnaryNodeOp, x)
     operator(::BinaryAlignedNodeOp, x, y)
 
+    operator(::StatefulUnaryNodeOp, state, x)
+
 Perform the operation for this node.
+
+For stateful operations, this operator should mutate the state as required.
 """
 function operator end
 
@@ -43,6 +49,21 @@ function run_node!(
     values = _allocate_values(T, n)
     for i in 1:n
         @inbounds values[i] = operator(node_op, input.values[i])
+    end
+    return Block(input.times, values)
+end
+
+function run_node!(
+    state::NodeEvaluationState,
+    node_op::StatefulUnaryNodeOp{T},
+    ::DateTime,  # time_start
+    ::DateTime,  # time_end
+    input::Block{L},
+) where {T, L}
+    n = length(input)
+    values = _allocate_values(T, n)
+    for i in 1:n
+        @inbounds values[i] = operator(node_op, state, input.values[i])
     end
     return Block(input.times, values)
 end
