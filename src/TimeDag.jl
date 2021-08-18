@@ -1,6 +1,7 @@
 module TimeDag
 
 using AbstractTrees
+using AssociativeWindowAggregation
 using DataStructures
 using Dates
 using LightGraphs
@@ -16,9 +17,10 @@ include("evaluation.jl")
 
 include("alignment.jl")
 
+include("ops/align.jl")
 include("ops/arithmetic.jl")
 include("ops/lagging.jl")
 include("ops/sources.jl")
-include("ops/align.jl")
+include("ops/window.jl")
 
 end

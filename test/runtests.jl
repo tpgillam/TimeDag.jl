@@ -13,6 +13,7 @@ include("common.jl")
     include("constants.jl")
 
     @testset "ops" begin
-        include("ops_arithmetic.jl")
+        @testset "arithmetic" begin include("ops_arithmetic.jl") end
+        @testset "window" begin include("ops_window.jl") end
     end
 end

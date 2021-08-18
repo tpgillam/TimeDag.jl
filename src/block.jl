@@ -34,7 +34,7 @@ Block{T}() where {T} = Block(DateTime[], T[])
 
 function Block(knots::Union{AbstractVector{Tuple{DateTime, T}},AbstractVector{Pair{DateTime, T}}}) where {T}
     n = length(knots)
-    times = Vector{DateTime}(undef, n)
+    times = _allocate_times(n)
     values = _allocate_values(T, n)
     for (i, (time, value)) in enumerate(knots)
         @inbounds times[i] = time
@@ -127,6 +127,8 @@ function Base.iterate(block::Block, state::Int=1)
     end
 end
 
+_allocate_times(n::Int) = Vector{DateTime}(undef, n)
+
 """
     _allocate_values(T, n::Int) -> AbstractVector{T}
 
@@ -138,6 +140,13 @@ function _allocate_values(T, n::Int)
     #   The correct solution will probably involve dispatching based on the type of
     #   input.values.
     return Vector{T}(undef, n)
+end
+
+"""Resize the vector to length `n` and attempt to reclaim unused space."""
+function _trim!(x::AbstractVector, n::Int)
+    # TODO It sounds like this currently doesn't actually free any of the buffer, which
+    #   could be a bit inefficient. Maybe sizehint! is required too?
+    resize!(x, n)
 end
 
 """

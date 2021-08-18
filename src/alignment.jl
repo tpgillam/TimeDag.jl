@@ -13,34 +13,37 @@ struct IntersectAlignment <: Alignment end
 """The default alignment for operators when not specified."""
 const DEFAULT_ALIGNMENT = UnionAlignment
 
-abstract type UnaryNodeOp{T} <: NodeOp{T} end
-
-abstract type StatefulUnaryNodeOp{T} <: NodeOp{T} end
+abstract type UnaryNodeOp{T, Stateful, AlwaysTicks} <: NodeOp{T} end
+abstract type StatelessUnaryNodeOp{T, AlwaysTicks} <: UnaryNodeOp{T, false, AlwaysTicks} end
+abstract type StatefulUnaryNodeOp{T, AlwaysTicks} <: UnaryNodeOp{T, true, AlwaysTicks} end
 
 abstract type BinaryAlignedNodeOp{T, A <: Alignment} <: NodeOp{T} end
 
 # TODO Some mechanism to describe whether the callable should be given the time of the knot
 #   it is about to emit.
-
-# TODO Some mechanism for the callable to prevent a knot being emitted.
 """
-    operator(::UnaryNodeOp, x)
-    operator(::BinaryAlignedNodeOp, x, y)
-
-    operator(::StatefulUnaryNodeOp, state, x)
+    operator(::StatelessUnaryNodeOp{T, true}, x) -> value
+    operator(::StatefulUnaryNodeOp{T, true}, state, x) -> value
+    operator(::StatefulUnaryNodeOp{T, false}, state, x) -> (value, should_tick)
+    operator(::BinaryAlignedNodeOp, x, y) -> value
 
 Perform the operation for this node.
 
 For stateful operations, this operator should mutate the state as required.
+For operations where `AlwaysTicks` type parameter is `false`, this should return a tuple
+    of `(value, should_tick)`. If `should_tick` is `false`, we ignore `value` and do not
+    emit a knot at this time.
 """
 function operator end
 
 
-create_evaluation_state(::Tuple{Node}, ::UnaryNodeOp{T}) where {T} = _EMPTY_NODE_STATE
+function create_evaluation_state(::Tuple{Node}, ::StatelessUnaryNodeOp{T}) where {T}
+    return _EMPTY_NODE_STATE
+end
 
 function run_node!(
     ::EmptyNodeEvaluationState,
-    node_op::UnaryNodeOp{T},
+    node_op::StatelessUnaryNodeOp{T, true},
     ::DateTime,  # time_start
     ::DateTime,  # time_end
     input::Block{L},
@@ -55,7 +58,7 @@ end
 
 function run_node!(
     state::NodeEvaluationState,
-    node_op::StatefulUnaryNodeOp{T},
+    node_op::StatefulUnaryNodeOp{T, true},
     ::DateTime,  # time_start
     ::DateTime,  # time_end
     input::Block{L},
@@ -66,6 +69,30 @@ function run_node!(
         @inbounds values[i] = operator(node_op, state, input.values[i])
     end
     return Block(input.times, values)
+end
+
+function run_node!(
+    state::NodeEvaluationState,
+    node_op::StatefulUnaryNodeOp{T, false},
+    ::DateTime,  # time_start
+    ::DateTime,  # time_end
+    input::Block{L},
+) where {T, L}
+    n = length(input)
+    times = _allocate_times(n)
+    values = _allocate_values(T, n)
+    j = 1
+    for i in 1:n
+        (value, should_tick) = operator(node_op, state, @inbounds(input.values[i]))
+        if should_tick
+            @inbounds times[j] = input.times[i]
+            @inbounds values[j] = value
+            j += 1
+        end
+    end
+    _trim!(times, j - 1)
+    _trim!(values, j - 1)
+    return Block(times, values)
 end
 
 """Apply, assuming `input_l` and `input_r` have identical alignment."""
@@ -142,7 +169,7 @@ function run_node!(
     nl = length(input_l)
     nr = length(input_r)
     max_size = nl + nr
-    times = Vector{DateTime}(undef, max_size)
+    times = _allocate_times(max_size)
     values = _allocate_values(T, max_size)
 
     # Store indices into the inputs. The index represents the next time point for
@@ -197,10 +224,8 @@ function run_node!(
     end
 
     # Package the outputs into a block, resizing the outputs as necessary.
-    # TODO It sounds like this currently doesn't actually free any of the buffer, which
-    #   could be a bit inefficient. Maybe sizehint! is required too?
-    resize!(times, j - 1)
-    resize!(values, j - 1)
+    _trim!(times, j - 1)
+    _trim!(values, j - 1)
 
     return Block(times, values)
 end
@@ -235,7 +260,7 @@ function run_node!(
     nl = length(input_l)
     nr = length(input_r)
     max_size = nl
-    times = Vector{DateTime}(undef, max_size)
+    times = _allocate_times(max_size)
     values = _allocate_values(T, max_size)
 
     # Store indices into the inputs. The index represents the next time point for
@@ -271,8 +296,8 @@ function run_node!(
     end
 
     # Package the outputs into a block, resizing the outputs as necessary.
-    resize!(times, j - 1)
-    resize!(values, j - 1)
+    _trim!(times, j - 1)
+    _trim!(values, j - 1)
     return Block(times, values)
 end
 
@@ -368,7 +393,7 @@ function run_node!(
 
     # Package results into a new block.
     times = if first_emitted_index_l > 1
-        resize!(values, j - 1)  # Truncate the values array, as we haven't used all of it.
+        _trim!(values, j - 1)  # Truncate the values array, as we haven't used all of it.
         @view input_l.times[first_emitted_index_l:end]
     else
         input_l.times
