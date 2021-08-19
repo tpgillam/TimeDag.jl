@@ -51,30 +51,3 @@ end
 Base.:/(x::Node, y::Node) = divide(x, y)
 Base.:/(x::Node, y) = divide(x, y)
 Base.:/(x, y::Node) = divide(x, y)
-
-# Stateful operators (from inception)
-
-# TODO Sum would be better implemented *not* with this generic stateful form, but rather in
-# a way that lets us use cumsum! internally. This would be faster.
-struct Sum{T} <: StatefulUnaryNodeOp{T, true} end
-mutable struct SumState{T} <: NodeEvaluationState
-    initialised::Bool
-    total::T
-    # `total` will be uninitialised until the first call.
-    SumState{T}() where {T} = new{T}(false)
-end
-create_evaluation_state(::Tuple{Node}, ::Sum{T}) where {T} = SumState{T}()
-function operator(::Sum{T}, state::SumState{T}, x::T) where {T}
-    if !state.initialised
-        state.total = x
-        state.initialised = true
-    else
-        state.total += x
-    end
-
-    return state.total
-end
-function sum(x::Node)
-    _is_constant(x) && return x
-    return obtain_node((x,), Sum{value_type(x)}())
-end

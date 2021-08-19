@@ -22,7 +22,6 @@ n3 = block_node(b3)
 _eval(n) = _evaluate(n, DateTime(2000, 1, 1), DateTime(2000, 1, 10))
 
 _mapvalues(f, block::Block) = Block([time => f(value) for (time, value) in block])
-_mapallvalues(f, block::Block) = Block(block.times, f(block.values))
 
 @testset "unary" begin
     for op in [-, exp, log]
@@ -108,8 +107,4 @@ end
         DateTime(2000, 1, 5) => 13,
     ])
     @test _eval(TimeDag.subtract(n3, n2; alignment=TimeDag.LeftAlignment)) == Block{Int64}()
-end
-
-@testset "sum" begin
-    @test _eval(TimeDag.sum(n1)) == _mapallvalues(cumsum, b1)
 end

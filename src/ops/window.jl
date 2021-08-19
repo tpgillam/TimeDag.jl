@@ -1,3 +1,40 @@
+# Operator accumulated from inception
+struct InceptionOp{T, Op} <: StatefulUnaryNodeOp{T, true} end
+
+function Base.show(io::IO, op::InceptionOp{T, Op}) where {T, Op}
+    return print(io, "$(typeof(op).name.name){$T, $Op}")
+end
+
+mutable struct InceptionOpState{T} <: NodeEvaluationState
+    initialised::Bool
+    total::T
+    # `total` will be uninitialised until the first call.
+    InceptionOpState{T}() where {T} = new{T}(false)
+end
+
+create_evaluation_state(::Tuple{Node}, ::InceptionOp{T}) where {T} = InceptionOpState{T}()
+
+function operator(::InceptionOp{T, Op}, state::InceptionOpState{T}, x::T) where {T, Op}
+    if !state.initialised
+        state.total = x
+        state.initialised = true
+    else
+        state.total = Op(state.total, x)
+    end
+
+    return state.total
+end
+
+function sum(x::Node)
+    _is_constant(x) && return x
+    return obtain_node((x,), InceptionOp{value_type(x), +}())
+end
+
+function prod(x::Node)
+    _is_constant(x) && return x
+    return obtain_node((x,), InceptionOp{value_type(x), *}())
+end
+
 # Windowed associative binary operator.
 # Note that we are equating the `AlwaysTicks` parameter with the `emit_early` kwarg in the
 #   `sum` function below.
