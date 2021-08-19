@@ -1,16 +1,17 @@
 # Windowed sum.
 # Note that we are equating the `AlwaysTicks` parameter with the `emit_early` kwarg in the
 #   `sum` function below.
+# TODO this logic can be made generic for anny associative window op
 struct WindowSum{T, AlwaysTicks} <: StatefulUnaryNodeOp{T, AlwaysTicks}
     window::Int64
 end
 
 struct WindowSumState{T} <: NodeEvaluationState
-    window_state::FixedWindowAssociativeOp{T}
+    window_state::FixedWindowAssociativeOp{T, +}
 end
 
 function create_evaluation_state(::Tuple{Node}, op::WindowSum{T}) where {T}
-    return WindowSumState(FixedWindowAssociativeOp{T}(+, op.window))
+    return WindowSumState(FixedWindowAssociativeOp{T, +}(op.window))
 end
 
 # emit_early = true
