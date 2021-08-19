@@ -21,7 +21,7 @@ operator(::Add, x, y) = x + y
 function add(x, y; alignment::Type{A}=DEFAULT_ALIGNMENT) where {A <: Alignment}
     x = _ensure_node(x)
     y = _ensure_node(y)
-    T = promote_type(value_type(x), value_type(y))
+    T = output_type(+, value_type(x), value_type(y))
     return obtain_node((x, y), Add{T, A}())
 end
 Base.:+(x::Node, y::Node) = add(x, y)
@@ -33,7 +33,7 @@ operator(::Subtract, x, y) = x - y
 function subtract(x, y; alignment::Type{A}=DEFAULT_ALIGNMENT) where {A <: Alignment}
     x = _ensure_node(x)
     y = _ensure_node(y)
-    T = promote_type(value_type(x), value_type(y))
+    T = output_type(-, value_type(x), value_type(y))
     return obtain_node((x, y), Subtract{T, A}())
 end
 Base.:-(x::Node, y::Node) = subtract(x, y)
@@ -45,7 +45,7 @@ operator(::Divide, x, y) = x / y
 function divide(x, y; alignment::Type{A}=DEFAULT_ALIGNMENT) where {A <: Alignment}
     x = _ensure_node(x)
     y = _ensure_node(y)
-    T = promote_type(value_type(x), value_type(y))
+    T = output_type(/, value_type(x), value_type(y))
     return obtain_node((x, y), Divide{T, A}())
 end
 Base.:/(x::Node, y::Node) = divide(x, y)

@@ -11,6 +11,8 @@ using Tables
 include("core.jl")
 include("constant.jl")  # Constant nodes are special, so we need to know about them first.
 
+include("output_type.jl")
+
 include("block.jl")
 include("graph.jl")
 include("evaluation.jl")
