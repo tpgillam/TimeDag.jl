@@ -36,3 +36,25 @@ _mapallvalues(f, block::Block) = Block(block.times, f(block.values))
     @test block_ee_false == Block(expected.times[3:end], expected.values[3:end])
     @test block_ee_true == expected
 end
+
+@testset "prod" begin
+    n = TimeDag.prod(n1, 3)
+    block = _eval(n)
+    block_ee_false = _eval(TimeDag.prod(n1, 3; emit_early=false))
+    block_ee_true = _eval(TimeDag.prod(n1, 3; emit_early=true))
+    @test block == block_ee_false
+
+    expected = Block([
+        DateTime(2000, 1, 1) => 1,
+        DateTime(2000, 1, 2) => 1 * 2,
+        DateTime(2000, 1, 3) => 1 * 2 * 3,
+        DateTime(2000, 1, 4) => 2 * 3 * 4,
+        DateTime(2000, 1, 5) => 3 * 4 * 5,
+        DateTime(2000, 1, 6) => 4 * 5 * 6,
+        DateTime(2000, 1, 7) => 5 * 6 * 7,
+    ])
+
+    # TODO implement 'slice' indexing on Block
+    @test block_ee_false == Block(expected.times[3:end], expected.values[3:end])
+    @test block_ee_true == expected
+end

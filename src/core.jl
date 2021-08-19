@@ -20,8 +20,8 @@ Base.:(==)(a::Node, b::Node) = a.parents == b.parents && a.op == b.op
 
 Base.show(io::IO, node::Node) = show(io, node.op)
 
-function Base.show(io::IO, op::NodeOp)
-    return print(io, "$(typeof(op).name.name){$(value_type(op))}")
+function Base.show(io::IO, op::NodeOp{T}) where {T}
+    return print(io, "$(typeof(op).name.name){$T}")
 end
 
 # Enable AbstractTrees to understand the graph.
