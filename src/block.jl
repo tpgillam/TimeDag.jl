@@ -6,14 +6,14 @@
 #   Possibly we need a more general type here which can package other representations?
 #   See Stheno ColVecs / RowVecs - they have the same problem.
 
-struct Block{T}
-    times::AbstractVector{DateTime}
-    values::AbstractVector{T}
+struct Block{T, VTimes <: AbstractVector{DateTime}, VValues <: AbstractVector{T}}
+    times::VTimes
+    values::VValues
 
     function Block(
-        times::AbstractVector{DateTime},
-        values::AbstractVector{T}
-    ) where {T}
+        times::VTimes,
+        values::VValues
+    ) where {T, VTimes <: AbstractVector{DateTime}, VValues <: AbstractVector{T}}
         # TODO Need some way of skipping checks if we're confident they're unnecessary...?
         if length(times) != length(values)
             throw(ArgumentError(
@@ -26,7 +26,7 @@ struct Block{T}
         #   -> same length of times & values
         #   -> How make times & values immutable? Subclass of AbstractVector that doesn't
         #       implement setindex! ?
-        return new{T}(times, values)
+        return new{T, VTimes, VValues}(times, values)
     end
 end
 
@@ -112,8 +112,9 @@ function Base.vcat(blocks::Block{T}...) where {T}
 end
 
 # Indexing, iteration, etc.
-Base.length(block::Block) = length(block.times)
-Base.isempty(block::Block) = length(block) == 0
+# NB: constraining length to return an Int here is very important for performance!
+Base.length(block::Block)::Int = length(block.times)
+Base.isempty(block::Block)::Bool = length(block) == 0
 Base.firstindex(block::Block) = 1
 Base.lastindex(block::Block) = length(block)
 Base.getindex(block::Block, i::Int) = (block.times[i], block.values[i])
