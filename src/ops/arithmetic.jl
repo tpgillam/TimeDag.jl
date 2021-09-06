@@ -40,6 +40,18 @@ Base.:-(x::Node, y::Node) = subtract(x, y)
 Base.:-(x::Node, y) = subtract(x, y)
 Base.:-(x, y::Node) = subtract(x, y)
 
+struct Multiply{T, A} <: BinaryAlignedNodeOp{T, A} end
+operator(::Multiply, x, y) = x * y
+function multiply(x, y; alignment::Type{A}=DEFAULT_ALIGNMENT) where {A <: Alignment}
+    x = _ensure_node(x)
+    y = _ensure_node(y)
+    T = output_type(*, value_type(x), value_type(y))
+    return obtain_node((x, y), Multiply{T, A}())
+end
+Base.:*(x::Node, y::Node) = multiply(x, y)
+Base.:*(x::Node, y) = multiply(x, y)
+Base.:*(x, y::Node) = multiply(x, y)
+
 struct Divide{T, A} <: BinaryAlignedNodeOp{T, A} end
 operator(::Divide, x, y) = x / y
 function divide(x, y; alignment::Type{A}=DEFAULT_ALIGNMENT) where {A <: Alignment}
