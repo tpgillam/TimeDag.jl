@@ -5,6 +5,9 @@ Return the output type of the specified function. Tries to be fast where possibl
 """
 output_type(f, arg_types...) = only(Base.return_types(f, arg_types))
 
+output_type(::typeof(-), x) = x
+# TODO more efficient versions for common exp & log cases
+
 output_type(::typeof(+), x, y) = promote_type(x, y)
 output_type(::typeof(-), x, y) = promote_type(x, y)
 output_type(::typeof(*), x, y) = promote_type(x, y)

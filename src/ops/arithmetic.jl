@@ -1,18 +1,13 @@
 # Unary operators
+struct UnaryArithmeticOp{T, Op} <: StatelessUnaryNodeOp{T, true} end
+operator(::UnaryArithmeticOp{T, Op}, x) where {T, Op} = Op(x)
 
-struct Negate{T} <: StatelessUnaryNodeOp{T, true} end
-operator(::Negate, x) = -x
-Base.:-(x::Node) = obtain_node((x,), Negate{value_type(x)}())
-
-struct Exp{T} <: StatelessUnaryNodeOp{T, true} end
-operator(::Exp, x) = exp(x)
-# FIXME Use output_type
-Base.exp(x::Node) = obtain_node((x,), Exp{typeof(exp(one(value_type(x))))}())
-
-struct Log{T} <: StatelessUnaryNodeOp{T, true} end
-operator(::Log, x) = log(x)
-# FIXME Use output_type
-Base.log(x::Node) = obtain_node((x,), Log{typeof(log(one(value_type(x))))}())
+for (alias, op) in [(:Negate, :-), (:Exp, :exp), (:Log, :log)]
+    @eval begin
+        const $alias{T} = UnaryArithmeticOp{T, $op}
+        Base.$op(x::Node) = obtain_node((x,), $alias{output_type($op, value_type(x))}())
+    end
+end
 
 # Binary operators
 struct BinaryArithmeticOp{T, A, Op} <: BinaryAlignedNodeOp{T, A} end
