@@ -1,22 +1,18 @@
 # Unary operators
-struct UnaryArithmeticOp{T, Op} <: StatelessUnaryNodeOp{T, true} end
-operator(::UnaryArithmeticOp{T, Op}, x) where {T, Op} = Op(x)
-
 for (alias, op) in [(:Negate, :-), (:Exp, :exp), (:Log, :log)]
     @eval begin
-        const $alias{T} = UnaryArithmeticOp{T, $op}
+        struct $alias{T} <: StatelessUnaryNodeOp{T, true} end
+        operator(::$alias{T}, x) where {T} = $op(x)
         Base.$op(x::Node) = obtain_node((x,), $alias{output_type($op, value_type(x))}())
     end
 end
 
 # Binary operators
-struct BinaryArithmeticOp{T, A, Op} <: BinaryAlignedNodeOp{T, A} end
-operator(::BinaryArithmeticOp{T, A, Op}, x, y) where {T, A, Op} = Op(x, y)
-
 for (long, short) in [(:add, :+), (:subtract, :-), (:multiply, :*), (:divide, :/)]
     alias_sym = Symbol(titlecase(string(long)))
     @eval begin
-        const $alias_sym{T, A} = BinaryArithmeticOp{T, A, $short}
+        struct $alias_sym{T, A} <: BinaryAlignedNodeOp{T, A} end
+        operator(::$alias_sym{T, A}, x, y) where {T, A} = $short(x, y)
 
         function $long(x, y; alignment::Type{A}=DEFAULT_ALIGNMENT) where {A <: Alignment}
             x = _ensure_node(x)
