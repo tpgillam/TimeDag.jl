@@ -12,7 +12,7 @@ b2 = Block([
 ])
 
 b3 = Block([
-    DateTime(2000, 1, 1) => -5,
+    DateTime(2000, 1, 1) => 15,
 ])
 
 n1 = block_node(b1)
@@ -24,7 +24,7 @@ _eval(n) = _evaluate(n, DateTime(2000, 1, 1), DateTime(2000, 1, 10))
 _mapvalues(f, block::Block) = Block([time => f(value) for (time, value) in block])
 
 @testset "unary" begin
-    for op in [-, exp, log]
+    for op in [-, exp, log, log10, log2, sqrt, cbrt]
         @testset "$op" begin
             @test _eval(op(n1)) == _mapvalues(op, b1)
         end
@@ -32,7 +32,9 @@ _mapvalues(f, block::Block) = Block([time => f(value) for (time, value) in block
 end
 
 @testset "binary" begin
-    for (symbol, op) in [(:add, +), (:subtract, -), (:multiply, *), (:divide, /)]
+    for (symbol, op) in [
+            (:add, +), (:subtract, -), (:multiply, *), (:divide, /), (:power, ^)
+        ]
         @testset "$symbol" begin
             f = getproperty(TimeDag, symbol)
 
@@ -65,9 +67,9 @@ end
 
             # Catch edge-case in which there was a bug.
             @test _eval(f(n2, n3; alignment=TimeDag.LeftAlignment)) == Block([
-                DateTime(2000, 1, 2) => op(5, -5),
-                DateTime(2000, 1, 3) => op(6, -5),
-                DateTime(2000, 1, 5) => op(8, -5),
+                DateTime(2000, 1, 2) => op(5, 15),
+                DateTime(2000, 1, 3) => op(6, 15),
+                DateTime(2000, 1, 5) => op(8, 15),
             ])
             @test _eval(f(n3, n2; alignment=TimeDag.LeftAlignment)) == Block{Int64}()
         end

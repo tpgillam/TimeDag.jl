@@ -1,4 +1,3 @@
-
 """A node which just wraps a block."""
 struct BlockNode{T} <: NodeOp{T}
     block::Block{T}
