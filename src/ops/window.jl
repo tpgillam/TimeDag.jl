@@ -96,7 +96,7 @@ end
 
 
 # Product, cumulative over time.
-Prod{T} = InceptionOp{T, T, *, identity}
+const Prod{T} = InceptionOp{T, T, *, identity}
 Base.show(io::IO, ::Prod{T}) where {T} = print(io, "Prod{$T}")
 function prod(x::Node)
     _is_constant(x) && return x
@@ -113,7 +113,7 @@ end
 
 # Mean, cumulative over time.
 # In order to be numerically stable, use a generalisation of Welford's algorithm.
-const MeanData = @NamedTuple{n::Int64, mean::T} where {T}
+const MeanData{T} = @NamedTuple{n::Int64, mean::T} where {T}
 _wrap(::Type{MeanData{T}}, x) where {T} = MeanData{T}((1, x))
 function _combine(state_a::MeanData{T}, state_b::MeanData{T})::MeanData{T} where {T}
     na = state_a.n
@@ -125,7 +125,7 @@ function _combine(state_a::MeanData{T}, state_b::MeanData{T})::MeanData{T} where
     ))
 end
 _extract(data::MeanData) = data.mean
-Mean{T} = InceptionOp{T, MeanData{T}, _combine, _extract}
+const Mean{T} = InceptionOp{T, MeanData{T}, _combine, _extract}
 Base.show(io::IO, ::Mean{T}) where {T} = print(io, "Mean{$T}")
 function mean(x::Node)
     _is_constant(x) && return x
