@@ -1,5 +1,6 @@
 using Dates
 using LightGraphs
+using Statistics
 using TimeDag
 using Test
 

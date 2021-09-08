@@ -70,3 +70,14 @@ end
         @test block_ee_true == expected
     end
 end
+
+"""Simple implementation of mean-from-inception, suitable for testing purposes."""
+function _inception_mean(values)
+    return [x / i for (i, x) in enumerate(cumsum(values))]
+end
+
+@testset "mean" begin
+    @testset "inception" begin
+        @test _eval(TimeDag.mean(n1)) == _mapallvalues(_inception_mean, b1)
+    end
+end
