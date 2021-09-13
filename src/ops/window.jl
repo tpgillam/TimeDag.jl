@@ -132,3 +132,9 @@ function mean(x::Node)
     T = output_type(/, value_type(x), Int)
     return obtain_node((x,), Mean{T}())
 end
+
+const WindowMean{T, AlwaysTicks} = WindowOp{T, MeanData{T}, _combine, _extract, AlwaysTicks}
+Base.show(io::IO, op::WindowMean{T}) where {T} = print(io, "WindowMean{$T}($(op.window))")
+function mean(x::Node, window::Int; emit_early::Bool=false)
+    return obtain_node((x,), WindowMean{value_type(x), emit_early}(window))
+end
