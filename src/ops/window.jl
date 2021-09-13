@@ -82,8 +82,7 @@ end
 # Sum, cumulative over time.
 const Sum{T} = InceptionOp{T, T, +, identity}
 Base.show(io::IO, ::Sum{T}) where {T} = print(io, "Sum{$T}")
-# FIXME should this be Base.sum?
-function sum(x::Node)
+function Base.sum(x::Node)
     _is_constant(x) && return x
     return obtain_node((x,), Sum{value_type(x)}())
 end
@@ -91,8 +90,7 @@ end
 # Sum over fixed window.
 const WindowSum{T, AlwaysTicks} = WindowOp{T, T, +, identity, AlwaysTicks}
 Base.show(io::IO, op::WindowSum{T}) where {T} = print(io, "WindowSum{$T}($(op.window))")
-# FIXME should this be Base.sum?
-function sum(x::Node, window::Int; emit_early::Bool=false)
+function Base.sum(x::Node, window::Int; emit_early::Bool=false)
     return obtain_node((x,), WindowSum{value_type(x), emit_early}(window))
 end
 
@@ -100,8 +98,7 @@ end
 # Product, cumulative over time.
 const Prod{T} = InceptionOp{T, T, *, identity}
 Base.show(io::IO, ::Prod{T}) where {T} = print(io, "Prod{$T}")
-# FIXME should this be Base.prod?
-function prod(x::Node)
+function Base.prod(x::Node)
     _is_constant(x) && return x
     return obtain_node((x,), Prod{value_type(x)}())
 end
@@ -109,8 +106,7 @@ end
 # Product over fixed window.
 const WindowProd{T, AlwaysTicks} = WindowOp{T, T, *, identity, AlwaysTicks}
 Base.show(io::IO, op::WindowProd{T}) where {T} = print(io, "WindowProd{$T}($(op.window))")
-# FIXME should this be Base.prod?
-function prod(x::Node, window::Int; emit_early::Bool=false)
+function Base.prod(x::Node, window::Int; emit_early::Bool=false)
     return obtain_node((x,), WindowProd{value_type(x), emit_early}(window))
 end
 
@@ -131,8 +127,7 @@ end
 _extract(data::MeanData) = data.mean
 const Mean{T} = InceptionOp{T, MeanData{T}, _combine, _extract}
 Base.show(io::IO, ::Mean{T}) where {T} = print(io, "Mean{$T}")
-# FIXME should this be Statistics.mean?
-function mean(x::Node)
+function Statistics.mean(x::Node)
     _is_constant(x) && return x
     T = output_type(/, value_type(x), Int)
     return obtain_node((x,), Mean{T}())
@@ -140,8 +135,7 @@ end
 
 const WindowMean{T, AlwaysTicks} = WindowOp{T, MeanData{T}, _combine, _extract, AlwaysTicks}
 Base.show(io::IO, op::WindowMean{T}) where {T} = print(io, "WindowMean{$T}($(op.window))")
-# FIXME should this be Statistics.mean?
-function mean(x::Node, window::Int; emit_early::Bool=false)
+function Statistics.mean(x::Node, window::Int; emit_early::Bool=false)
     T = output_type(/, value_type(x), Int)
     return obtain_node((x,), WindowMean{T, emit_early}(window))
 end

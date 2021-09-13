@@ -33,7 +33,7 @@ function _naive_window_reduce(T, f::Function, block::Block, window::Int, emit_ea
     return Block(times, values)
 end
 
-function _test_window_op(T, f_normal::Function, f_timedag::Function)
+function _test_window_op(T, f_normal::Function, f_timedag::Function=f_normal)
     node_in = TimeDag.block_node(b1)
 
     for window in 1:(length(b1) + 2)
@@ -55,7 +55,7 @@ end
     end
 
     @testset "window" begin
-        _test_window_op(Int64, sum, TimeDag.sum)
+        _test_window_op(Int64, sum)
     end
 end
 
@@ -65,7 +65,7 @@ end
     end
 
     @testset "window" begin
-        _test_window_op(Int64, prod, TimeDag.prod)
+        _test_window_op(Int64, prod)
     end
 end
 
@@ -80,6 +80,6 @@ end
     end
 
     @testset "window" begin
-        _test_window_op(Float64, mean, TimeDag.mean)
+        _test_window_op(Float64, mean)
     end
 end

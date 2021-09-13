@@ -12,23 +12,22 @@ for (alias, op) in [
 end
 
 # Binary operators
-for (long, short) in [
-        (:add, :+), (:subtract, :-), (:multiply, :*), (:divide, :/), (:power, :^)
+for (alias, op) in [
+        (:Add, :+), (:Subtract, :-), (:Multiply, :*), (:Divide, :/), (:Power, :^)
     ]
-    alias_sym = Symbol(titlecase(string(long)))
     @eval begin
-        struct $alias_sym{T, A} <: BinaryAlignedNodeOp{T, A} end
-        operator(::$alias_sym{T, A}, x, y) where {T, A} = $short(x, y)
+        struct $alias{T, A} <: BinaryAlignedNodeOp{T, A} end
+        operator(::$alias{T, A}, x, y) where {T, A} = $op(x, y)
 
-        function $long(x, y; alignment::Type{A}=DEFAULT_ALIGNMENT) where {A <: Alignment}
+        function Base.$op(x, y, ::Type{A}) where {A <: Alignment}
             x = _ensure_node(x)
             y = _ensure_node(y)
-            T = output_type($short, value_type(x), value_type(y))
-            return obtain_node((x, y), $alias_sym{T, A}())
+            T = output_type($op, value_type(x), value_type(y))
+            return obtain_node((x, y), $alias{T, A}())
         end
 
-        Base.$short(x::Node, y::Node) = $long(x, y)
-        Base.$short(x::Node, y) = $long(x, y)
-        Base.$short(x, y::Node) = $long(x, y)
+        Base.$op(x::Node, y::Node) = $op(x, y, DEFAULT_ALIGNMENT)
+        Base.$op(x::Node, y) = $op(x, y, DEFAULT_ALIGNMENT)
+        Base.$op(x, y::Node) = $op(x, y, DEFAULT_ALIGNMENT)
     end
 end

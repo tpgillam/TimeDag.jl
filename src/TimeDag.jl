@@ -6,6 +6,7 @@ using DataStructures
 using Dates
 using LightGraphs
 using PrettyTables
+using Statistics
 using Tables
 
 include("core.jl")

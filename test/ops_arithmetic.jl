@@ -32,15 +32,11 @@ _mapvalues(f, block::Block) = Block([time => f(value) for (time, value) in block
 end
 
 @testset "binary" begin
-    for (symbol, op) in [
-            (:add, +), (:subtract, -), (:multiply, *), (:divide, /), (:power, ^)
-        ]
-        @testset "$symbol" begin
-            f = getproperty(TimeDag, symbol)
-
+    for op in (+, -, *, /, ^)
+        @testset "$op" begin
             # Union alignment.
             n = op(n1, n2)
-            @test n === f(n1, n2; alignment=TimeDag.UnionAlignment)
+            @test n === op(n1, n2, TimeDag.UnionAlignment)
             block = _eval(n)
             @test block == Block([
                 DateTime(2000, 1, 2) => op(2, 5),
@@ -50,7 +46,7 @@ end
             ])
 
             # Intersect alignment.
-            n = f(n1, n2; alignment=TimeDag.IntersectAlignment)
+            n = op(n1, n2, TimeDag.IntersectAlignment)
 
             @test _eval(n) == Block([
                 DateTime(2000, 1, 2) => op(2, 5),
@@ -58,7 +54,7 @@ end
             ])
 
             # Left alignment
-            n = f(n1, n2; alignment=TimeDag.LeftAlignment)
+            n = op(n1, n2, TimeDag.LeftAlignment)
             @test _eval(n) == Block([
                 DateTime(2000, 1, 2) => op(2, 5),
                 DateTime(2000, 1, 3) => op(3, 6),
@@ -66,12 +62,12 @@ end
             ])
 
             # Catch edge-case in which there was a bug.
-            @test _eval(f(n2, n3; alignment=TimeDag.LeftAlignment)) == Block([
+            @test _eval(op(n2, n3, TimeDag.LeftAlignment)) == Block([
                 DateTime(2000, 1, 2) => op(5, 15),
                 DateTime(2000, 1, 3) => op(6, 15),
                 DateTime(2000, 1, 5) => op(8, 15),
             ])
-            @test _eval(f(n3, n2; alignment=TimeDag.LeftAlignment)) == Block{Int64}()
+            @test _eval(op(n3, n2, TimeDag.LeftAlignment)) == Block{Int64}()
         end
     end
 end
