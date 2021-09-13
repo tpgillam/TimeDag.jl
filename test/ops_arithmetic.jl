@@ -21,8 +21,6 @@ n3 = block_node(b3)
 
 _eval(n) = _evaluate(n, DateTime(2000, 1, 1), DateTime(2000, 1, 10))
 
-_mapvalues(f, block::Block) = Block([time => f(value) for (time, value) in block])
-
 @testset "unary" begin
     for op in [-, exp, log, log10, log2, sqrt, cbrt]
         @testset "$op" begin
@@ -32,7 +30,8 @@ _mapvalues(f, block::Block) = Block([time => f(value) for (time, value) in block
 end
 
 @testset "binary" begin
-    for op in (+, -, *, /, ^)
+    # TODO Refactor >, <, >=, <= to ops_logical.jl
+    for op in (+, -, *, /, ^, >, <, >=, <=)
         @testset "$op" begin
             # Union alignment.
             n = op(n1, n2)

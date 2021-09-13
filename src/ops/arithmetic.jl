@@ -2,7 +2,10 @@
 for (alias, op) in [
         (:Negate, :-),
         (:Exp, :exp), (:Log, :log), (:Log10, :log10), (:Log2, :log2),
-        (:Sqrt, :sqrt), (:Cbrt, :cbrt)
+        (:Sqrt, :sqrt), (:Cbrt, :cbrt),
+        # TODO This should probably live in e.g. logical.jl, but to avoid copy-pasta
+        #   rewrite this code generation as a macro?
+        (:Not, :!),
     ]
     @eval begin
         struct $alias{T} <: StatelessUnaryNodeOp{T, true} end
@@ -13,7 +16,10 @@ end
 
 # Binary operators
 for (alias, op) in [
-        (:Add, :+), (:Subtract, :-), (:Multiply, :*), (:Divide, :/), (:Power, :^)
+        (:Add, :+), (:Subtract, :-), (:Multiply, :*), (:Divide, :/), (:Power, :^),
+        # TODO These should probably live in e.g. logical.jl, but to avoid copy-pasta
+        #   rewrite this code generation as a macro?
+        (:Greater, :>), (:Less, :<), (:GreaterEqual, :>=), (:LessEqual, :<=)
     ]
     @eval begin
         struct $alias{T, A} <: BinaryAlignedNodeOp{T, A} end

@@ -36,3 +36,8 @@ function _evaluate(node::Node, t0::DateTime, t1::DateTime)
 
     return block
 end
+
+"""
+Map the given function over each of the block's values.
+"""
+_mapvalues(f, block::Block) = Block([time => f(value) for (time, value) in block])

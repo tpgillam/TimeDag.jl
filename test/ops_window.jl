@@ -12,7 +12,6 @@ n1 = block_node(b1)
 
 _eval(n) = _evaluate(n, DateTime(2000, 1, 1), DateTime(2000, 1, 10))
 
-_mapvalues(f, block::Block) = Block([time => f(value) for (time, value) in block])
 _mapallvalues(f, block::Block) = Block(block.times, f(block.values))
 
 function _naive_window_reduce(T, f::Function, block::Block, window::Int, emit_early::Bool)
