@@ -15,10 +15,10 @@ _eval(n) = _evaluate(n, DateTime(2000, 1, 1), DateTime(2000, 1, 10))
 _mapvalues(f, block::Block) = Block([time => f(value) for (time, value) in block])
 _mapallvalues(f, block::Block) = Block(block.times, f(block.values))
 
-function _naive_window_reduce(f::Function, block::Block, window::Int, emit_early::Bool)
+function _naive_window_reduce(T, f::Function, block::Block, window::Int, emit_early::Bool)
     @assert window > 0
     times = emit_early ? block.times : block.times[window:end]
-    values = []
+    values = T[]
     buffer = CircularBuffer{value_type(block)}(window)
     for value in block.values
         # Push a new value onto the buffer. This will overwrite the previous value.
@@ -30,11 +30,10 @@ function _naive_window_reduce(f::Function, block::Block, window::Int, emit_early
         push!(values, f(buffer))
     end
 
-    # Apply the 'identity.' trick to get a vector of the appropriate type.
-    return Block(times, identity.(values))
+    return Block(times, values)
 end
 
-function _test_window_op(f_normal::Function, f_timedag::Function)
+function _test_window_op(T, f_normal::Function, f_timedag::Function)
     node_in = TimeDag.block_node(b1)
 
     for window in 1:(length(b1) + 2)
@@ -44,8 +43,8 @@ function _test_window_op(f_normal::Function, f_timedag::Function)
         block_ee_true = _eval(f_timedag(n1, window; emit_early=true))
         @test block == block_ee_false
 
-        @test block_ee_false == _naive_window_reduce(f_normal, b1, window, false)
-        @test block_ee_true == _naive_window_reduce(f_normal, b1, window, true)
+        @test block_ee_false ≈ _naive_window_reduce(T, f_normal, b1, window, false)
+        @test block_ee_true ≈ _naive_window_reduce(T, f_normal, b1, window, true)
     end
     return nothing
 end
@@ -56,7 +55,7 @@ end
     end
 
     @testset "window" begin
-        _test_window_op(sum, TimeDag.sum)
+        _test_window_op(Int64, sum, TimeDag.sum)
     end
 end
 
@@ -66,7 +65,7 @@ end
     end
 
     @testset "window" begin
-        _test_window_op(prod, TimeDag.prod)
+        _test_window_op(Int64, prod, TimeDag.prod)
     end
 end
 
@@ -81,6 +80,6 @@ end
     end
 
     @testset "window" begin
-        _test_window_op(mean, TimeDag.mean)
+        _test_window_op(Float64, mean, TimeDag.mean)
     end
 end

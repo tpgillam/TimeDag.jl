@@ -52,6 +52,13 @@ duplicate_internal(x::Block, ::IdDict) = x
 Base.hash(a::Block, h::UInt) = hash(a.values, hash(a.times, hash(:Block, h)))
 Base.:(==)(a::Block, b::Block) = a.times == b.times && a.values == b.values
 
+# Implement approximate equality in terms of exact equality for timestamps, but approximate
+# for values.
+function Base.isapprox(a::Block, b::Block; kwargs...)
+    a.times == b.times || return false
+    return isapprox(a.values, b.values; kwargs...)
+end
+
 # Make a block behave like a table with two columns, primarily for printing purposes.
 Tables.istable(::Block) = true
 Tables.columnaccess(::Block) = true
