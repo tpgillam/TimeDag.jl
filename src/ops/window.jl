@@ -3,8 +3,23 @@ Wrap a value into a data object of the given type, for use with associative comb
 """
 _wrap(::Type{T}, x::T) where {T} = x
 
+
+"""
+    _should_tick(op, data) -> Bool
+
+This should be defined for any op that does not have AlwaysActive = true.
+The return value determines whether a knot should be emitted for this value.
+"""
+function _should_tick end
+
 # Operator accumulated from inception.
-struct InceptionOp{T, Data, CombineOp, ExtractOp} <: StatefulUnaryNodeOp{T, true}
+struct InceptionOp{
+    T,
+    Data,
+    CombineOp,
+    ExtractOp,
+    AlwaysTicks
+} <: StatefulUnaryNodeOp{T, AlwaysTicks}
 end
 
 mutable struct InceptionOpState{Data} <: NodeEvaluationState
@@ -14,12 +29,14 @@ mutable struct InceptionOpState{Data} <: NodeEvaluationState
     InceptionOpState{Data}() where {Data} = new{Data}(false)
 end
 
+# TODO Could have more than one parent.
 function create_evaluation_state(::Tuple{Node}, ::InceptionOp{T, Data}) where {T, Data}
     return InceptionOpState{Data}()
 end
 
+# AlwaysTicks = true
 function operator(
-    ::InceptionOp{T, Data, CombineOp, ExtractOp},
+    ::InceptionOp{T, Data, CombineOp, ExtractOp, true},
     state::InceptionOpState{Data},
     x
 ) where {T, Data, CombineOp, ExtractOp}
@@ -32,6 +49,22 @@ function operator(
     return ExtractOp(state.data)
 end
 
+# AlwaysTicks = false
+function operator(
+    op::InceptionOp{T, Data, CombineOp, ExtractOp, false},
+    state::InceptionOpState{Data},
+    x
+) where {T, Data, CombineOp, ExtractOp}
+    if !state.initialised
+        state.data = _wrap(Data, x)
+        state.initialised = true
+    else
+        state.data = CombineOp(state.data, _wrap(Data, x))
+    end
+    return (ExtractOp(state.data), _should_tick(op, state.data))
+end
+
+
 # Windowed associative binary operator, potentially emitting early before the window is
 # full.
 # Note that we are equating the `AlwaysTicks` parameter with the `emit_early` kwarg in the
@@ -41,8 +74,18 @@ struct WindowOp{
     Data,
     CombineOp,
     ExtractOp,
-    AlwaysTicks
-} <: StatefulUnaryNodeOp{T, AlwaysTicks}
+    EmitEarly
+} <: StatefulUnaryNodeOp{T, EmitEarly}
+    window::Int64
+end
+
+struct SporadicWindowOp{
+    T,
+    Data,
+    CombineOp,
+    ExtractOp,
+    EmitEarly
+} <: StatefulUnaryNodeOp{T, false}
     window::Int64
 end
 
@@ -57,7 +100,14 @@ function create_evaluation_state(
     return WindowOpState{Data}(FixedWindowAssociativeOp{Data, CombineOp}(op.window))
 end
 
-# emit_early = true
+function create_evaluation_state(
+    ::Tuple{Node},
+    op::SporadicWindowOp{T, Data, CombineOp}
+) where {T, Data, CombineOp}
+    return WindowOpState{Data}(FixedWindowAssociativeOp{Data, CombineOp}(op.window))
+end
+
+# EmitEarly = true
 function operator(
     ::WindowOp{T, Data, CombineOp, ExtractOp, true},
     state::WindowOpState{Data},
@@ -67,7 +117,7 @@ function operator(
     return ExtractOp(window_value(state.window_state))
 end
 
-# emit_early = false
+# EmitEarly = false
 function operator(
     ::WindowOp{T, Data, CombineOp, ExtractOp, false},
     state::WindowOpState{Data},
@@ -78,9 +128,34 @@ function operator(
     return (ExtractOp(window_value(state.window_state)), should_tick)
 end
 
+# EmitEarly = true
+function operator(
+    op::SporadicWindowOp{T, Data, CombineOp, ExtractOp, true},
+    state::WindowOpState{Data},
+    x
+) where {T, Data, CombineOp, ExtractOp}
+    update_state!(state.window_state, _wrap(Data, x))
+    data = window_value(state.window_state)
+    return (ExtractOp(data), _should_tick(op, data))
+end
+
+# EmitEarly = false
+function operator(
+    op::SporadicWindowOp{T, Data, CombineOp, ExtractOp, false},
+    state::WindowOpState{Data},
+    x
+) where {T, Data, CombineOp, ExtractOp}
+    update_state!(state.window_state, _wrap(Data, x))
+    # We need to check both that the window is full and that we satisfy other emission
+    # requirements.
+    data = window_value(state.window_state)
+    should_tick = window_full(state.window_state) && _should_tick(op, data)
+    return (ExtractOp(data), should_tick)
+end
+
 
 # Sum, cumulative over time.
-const Sum{T} = InceptionOp{T, T, +, identity}
+const Sum{T} = InceptionOp{T, T, +, identity, true}
 Base.show(io::IO, ::Sum{T}) where {T} = print(io, "Sum{$T}")
 function Base.sum(x::Node)
     _is_constant(x) && return x
@@ -88,7 +163,7 @@ function Base.sum(x::Node)
 end
 
 # Sum over fixed window.
-const WindowSum{T, AlwaysTicks} = WindowOp{T, T, +, identity, AlwaysTicks}
+const WindowSum{T, EmitEarly} = WindowOp{T, T, +, identity, EmitEarly}
 Base.show(io::IO, op::WindowSum{T}) where {T} = print(io, "WindowSum{$T}($(op.window))")
 function Base.sum(x::Node, window::Int; emit_early::Bool=false)
     return obtain_node((x,), WindowSum{value_type(x), emit_early}(window))
@@ -96,7 +171,7 @@ end
 
 
 # Product, cumulative over time.
-const Prod{T} = InceptionOp{T, T, *, identity}
+const Prod{T} = InceptionOp{T, T, *, identity, true}
 Base.show(io::IO, ::Prod{T}) where {T} = print(io, "Prod{$T}")
 function Base.prod(x::Node)
     _is_constant(x) && return x
@@ -104,7 +179,7 @@ function Base.prod(x::Node)
 end
 
 # Product over fixed window.
-const WindowProd{T, AlwaysTicks} = WindowOp{T, T, *, identity, AlwaysTicks}
+const WindowProd{T, EmitEarly} = WindowOp{T, T, *, identity, EmitEarly}
 Base.show(io::IO, op::WindowProd{T}) where {T} = print(io, "WindowProd{$T}($(op.window))")
 function Base.prod(x::Node, window::Int; emit_early::Bool=false)
     return obtain_node((x,), WindowProd{value_type(x), emit_early}(window))
@@ -125,7 +200,7 @@ function _combine(state_a::MeanData{T}, state_b::MeanData{T})::MeanData{T} where
     ))
 end
 _extract(data::MeanData) = data.mean
-const Mean{T} = InceptionOp{T, MeanData{T}, _combine, _extract}
+const Mean{T} = InceptionOp{T, MeanData{T}, _combine, _extract, true}
 Base.show(io::IO, ::Mean{T}) where {T} = print(io, "Mean{$T}")
 function Statistics.mean(x::Node)
     _is_constant(x) && return x
@@ -133,9 +208,53 @@ function Statistics.mean(x::Node)
     return obtain_node((x,), Mean{T}())
 end
 
-const WindowMean{T, AlwaysTicks} = WindowOp{T, MeanData{T}, _combine, _extract, AlwaysTicks}
+# Mean over fixed window.
+const WindowMean{T, EmitEarly} = WindowOp{T, MeanData{T}, _combine, _extract, EmitEarly}
 Base.show(io::IO, op::WindowMean{T}) where {T} = print(io, "WindowMean{$T}($(op.window))")
 function Statistics.mean(x::Node, window::Int; emit_early::Bool=false)
     T = output_type(/, value_type(x), Int)
     return obtain_node((x,), WindowMean{T, emit_early}(window))
+end
+
+
+# Variance, cumulative over time.
+# In order to be numerically stable, use a generalisation of Welford's algorithm.
+const VarData{T} = @NamedTuple{n::Int64, mean::T, s::T} where {T}
+_wrap(::Type{VarData{T}}, x) where {T} = VarData{T}((1, x, 0))
+function _combine(state_a::VarData{T}, state_b::VarData{T})::VarData{T} where {T}
+    na = state_a.n
+    nb = state_b.n
+    nc = na + nb
+
+    μa = state_a.mean
+    μb = state_b.mean
+    μc = state_a.mean * (na / nc) + state_b.mean * (nb / nc)
+
+    sa = state_a.s
+    sb = state_b.s
+
+    return VarData{T}((
+        n=nc,
+        mean=μc,
+        s=(sa + sb) + nb * (μb - μa) * (μb - μc),
+    ))
+end
+_extract(data::VarData) = data.s / (data.n - 1)
+const Var{T} = InceptionOp{T, VarData{T}, _combine, _extract, false}
+_should_tick(::Var, data::VarData) = data.n > 1
+Base.show(io::IO, ::Var{T}) where {T} = print(io, "Var{$T}")
+function Statistics.var(x::Node)
+    _is_constant(x) && return x
+    T = output_type(/, value_type(x), Int)
+    return obtain_node((x,), Var{T}())
+end
+
+# Variance over fixed window.
+const WindowVar{T, EmitEarly} = SporadicWindowOp{T, VarData{T}, _combine, _extract, EmitEarly}
+_should_tick(::WindowVar, data::VarData) = data.n > 1
+Base.show(io::IO, op::WindowVar{T}) where {T} = print(io, "WindowVar{$T}($(op.window))")
+function Statistics.var(x::Node, window::Int; emit_early::Bool=false)
+    window >= 2 || throw(ArgumentError("Got window=$window, but should be at least 2"))
+    T = output_type(/, value_type(x), Int)
+    return obtain_node((x,), WindowVar{T, emit_early}(window))
 end
