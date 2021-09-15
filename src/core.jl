@@ -76,6 +76,25 @@ We return a new Block of output knots from this node.
 function run_node! end
 
 """
+    stateless(node) -> Bool
+    stateless(op) -> Bool
+
+Returns true iff `op` can be assumed to be stateless; that is, if the node evaluation state
+is _EMPTY_NODE_STATE.
+"""
+stateless(node::Node) = stateless(node.op)
+stateless(::NodeOp) = false
+
+"""
+    time_agnostic(node) -> Bool
+    time_agnostic(op) -> Bool
+
+Returns true iff `op` does not care about the time of the input knot(s), but just the value.
+"""
+time_agnostic(node::Node) = time_agnostic(node.op)
+time_agnostic(::NodeOp) = false
+
+"""
     duplicate(x)
 
 Return an object that is equal to x, but fully independent of it.

@@ -1,5 +1,5 @@
 # Unary operators
-for (alias, op) in [
+for (node_op, op) in [
         (:Negate, :-),
         (:Exp, :exp), (:Log, :log), (:Log10, :log10), (:Log2, :log2),
         (:Sqrt, :sqrt), (:Cbrt, :cbrt),
@@ -8,28 +8,49 @@ for (alias, op) in [
         (:Not, :!),
     ]
     @eval begin
-        struct $alias{T} <: StatelessUnaryNodeOp{T, true} end
-        operator(::$alias{T}, x) where {T} = $op(x)
-        Base.$op(x::Node) = obtain_node((x,), $alias{output_type($op, value_type(x))}())
+        struct $node_op{T} <: UnaryNodeOp{T} end
+
+        create_operator_evaluation_state(::Tuple{Node}, ::$node_op) = _EMPTY_NODE_STATE
+
+        always_ticks(::$node_op) = true
+        stateless(::$node_op) = true
+        time_agnostic(::$node_op) = true
+
+        function operator(::$node_op, out::Ref, x)
+            @inbounds out[] = $op(x)
+            return true
+        end
+
+        Base.$op(x::Node) = obtain_node((x,), $node_op{output_type($op, value_type(x))}())
     end
 end
 
 # Binary operators
-for (alias, op) in [
+for (node_op, op) in [
         (:Add, :+), (:Subtract, :-), (:Multiply, :*), (:Divide, :/), (:Power, :^),
         # TODO These should probably live in e.g. logical.jl, but to avoid copy-pasta
         #   rewrite this code generation as a macro?
         (:Greater, :>), (:Less, :<), (:GreaterEqual, :>=), (:LessEqual, :<=)
     ]
     @eval begin
-        struct $alias{T, A} <: BinaryAlignedNodeOp{T, A} end
-        operator(::$alias{T, A}, x, y) where {T, A} = $op(x, y)
+        struct $node_op{T, A} <: BinaryAlignedNodeOp{T, A} end
+
+        create_operator_evaluation_state(::Tuple{Node,Node}, ::$node_op) = _EMPTY_NODE_STATE
+
+        always_ticks(::$node_op) = true
+        stateless_operator(::$node_op) = true
+        time_agnostic(::$node_op) = true
+
+        function operator(::$node_op, out::Ref, x, y)
+            @inbounds out[] = $op(x, y)
+            return true
+        end
 
         function Base.$op(x, y, ::Type{A}) where {A <: Alignment}
             x = _ensure_node(x)
             y = _ensure_node(y)
             T = output_type($op, value_type(x), value_type(y))
-            return obtain_node((x, y), $alias{T, A}())
+            return obtain_node((x, y), $node_op{T, A}())
         end
 
         Base.$op(x::Node, y::Node) = $op(x, y, DEFAULT_ALIGNMENT)

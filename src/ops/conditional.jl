@@ -1,12 +1,20 @@
-struct ZapMissing{T} <: StatelessUnaryNodeOp{T, false} end
-function operator(::ZapMissing{T}, x::Union{Missing, T}) where {T}
+struct ZapMissing{T} <: UnaryNodeOp{T} end
+
+create_operator_evaluation_state(::Tuple{Node}, ::ZapMissing) = _EMPTY_NODE_STATE
+
+stateless(::ZapMissing) = true
+time_agnostic(::ZapMissing) = true
+
+function operator(::ZapMissing{T}, out::Ref{T}, x::Union{Missing, T}) where {T}
     return if ismissing(x)
-        # FIXME Having to come up with a value here is fragile. Is there a better API?
-        (zero(x), false)
+        false
     else
-        (x, true)
+        @inbounds out[] = x
+        true
     end
+
 end
+
 function zap_missing(x::Node)
     if !(Missing <: value_type(x))
         # There are provably no missing values in the input, so return the same node.

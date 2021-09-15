@@ -13,143 +13,171 @@ struct IntersectAlignment <: Alignment end
 """The default alignment for operators when not specified."""
 const DEFAULT_ALIGNMENT = UnionAlignment
 
-abstract type UnaryNodeOp{T, Stateful, AlwaysTicks} <: NodeOp{T} end
-abstract type StatelessUnaryNodeOp{T, AlwaysTicks} <: UnaryNodeOp{T, false, AlwaysTicks} end
-abstract type StatefulUnaryNodeOp{T, AlwaysTicks} <: UnaryNodeOp{T, true, AlwaysTicks} end
-
+abstract type UnaryNodeOp{T} <: NodeOp{T} end
 abstract type BinaryAlignedNodeOp{T, A <: Alignment} <: NodeOp{T} end
 
-# TODO Some mechanism to describe whether the callable should be given the time of the knot
-#   it is about to emit.
 """
-    operator(::StatelessUnaryNodeOp{T, true}, x) -> value
-    operator(::StatelessUnaryNodeOp{T, false}, x) -> (value, should_tick)
-    operator(::StatefulUnaryNodeOp{T, true}, state, x) -> value
-    operator(::StatefulUnaryNodeOp{T, false}, state, x) -> (value, should_tick)
-    operator(::BinaryAlignedNodeOp, x, y) -> value
+    operator(op::UnaryNodeOp{T}, (state,) out::Ref{T}, (time,) x) -> should_tick
+    operator(op::BinaryAlignedNodeOp{T}, (state,) out::Ref{T}, (time,) x, y) -> should_tick
 
 Perform the operation for this node.
 
+`state` should be omitted from the definition iff the node is stateless.
+`time` should be omitted from the definition iff the node is time_agnostic.
+
 For stateful operations, this operator should mutate the state as required.
-For operations where `AlwaysTicks` type parameter is `false`, this should return a tuple
-    of `(value, should_tick)`. If `should_tick` is `false`, we ignore `value` and do not
-    emit a knot at this time.
+If `should_tick` is `false`, we ignore the value placed into `ref_out`, and do not emit a
+knot at this time.
 """
 function operator end
 
-_can_propagate_constant(::StatelessUnaryNodeOp{T, true}) where {T} = true
-function _propagate_constant_value(
-    op::StatelessUnaryNodeOp{T, true},
-    parents::Tuple{Node}
-) where {T}
-    return operator(op, value(@inbounds(parents[1])))
+"""
+    always_ticks(node) -> Bool
+    always_ticks(op) -> Bool
+
+Returns true iff the `should_tick` return value from `operator` can be assumed to always
+be true.
+"""
+always_ticks(node::Node) = always_ticks(node.op)
+always_ticks(::NodeOp) = false
+
+"""
+    stateless_operator(node) -> Bool
+    stateless_operator(op) -> Bool
+
+Returns true iff `operator(op, ...)` would never look at or modify the evaluation state.
+
+If this returns true, `create_operator_evaluation_state` should return _EMPTY_NODE_STATE.
+
+Note that if an `op` has `stateless(op)` returning true, then it necessarily should also
+return true here. The default implementation is to return `stateless(op)`, meaning that if
+one is creating a node that is fully stateless, one need only define `stateless`.
+"""
+stateless_operator(node::Node) = stateless_operator(node.op)
+stateless_operator(op::NodeOp) = stateless(op)
+
+
+"""
+    create_operator_evaluation_state(parents, op::NodeOp) -> NodeEvaluationState
+
+Create an empty evaluation state for the given node, when starting evaluation at the
+specified time.
+
+Note that this is state that will be passed to `operator`. The overall node may additionally
+wrap this state with further state, if this is necessary for e.g. alignment.
+"""
+function create_operator_evaluation_state end
+
+function operator(
+    op::NodeOp,
+    state::NodeEvaluationState,
+    out::Ref,
+    time::DateTime,
+    values...
+)
+    return if stateless_operator(op) && time_agnostic(op)
+        operator(op, out, values...)
+    elseif stateless_operator(op) && !time_agnostic(op)
+        operator(op, out, time, values...)
+    elseif !stateless_operator(op) && time_agnostic(op)
+        operator(op, state, out, values...)
+    else
+        error("Error! We should have dispatched to a more specialised method.")
+    end
 end
 
-_can_propagate_constant(::BinaryAlignedNodeOp{T}) where {T} = true
+function _can_propagate_constant(op::UnaryNodeOp)
+    return always_ticks(op) && stateless_operator(op) && time_agnostic(op)
+end
+function _propagate_constant_value(op::UnaryNodeOp{T}, parents::Tuple{Node}) where {T}
+    out = Ref{T}()
+    # NB, we know that time & state is ignored (due to _can_propagate_constant), therefore
+    # we pass in garbage.
+    # We also know that should_tick will end up being true, as the node always ticks.
+    operator(op, out, value(@inbounds(parents[1])))
+    return @inbounds out[]
+end
+
+function _can_propagate_constant(op::BinaryAlignedNodeOp)
+    always_ticks(op) && stateless_operator(op) && time_agnostic(op)
+end
 function _propagate_constant_value(
     op::BinaryAlignedNodeOp{T},
     parents::Tuple{Node, Node}
 ) where {T}
-    return operator(op, map(value, parents)...)
+    out = Ref{T}()
+    # NB, we know that time & state is ignored (due to _can_propagate_constant), therefore
+    # we pass in garbage.
+    # We also know that should_tick will end up being true, as the node always ticks.
+    operator(op, out, value(@inbounds(parents[1])), value(@inbounds(parents[2])))
+    return @inbounds out[]
 end
 
-function create_evaluation_state(::Tuple{Node}, ::StatelessUnaryNodeOp{T}) where {T}
-    return _EMPTY_NODE_STATE
-end
 
-function run_node!(
-    ::EmptyNodeEvaluationState,
-    node_op::StatelessUnaryNodeOp{T, true},
-    ::DateTime,  # time_start
-    ::DateTime,  # time_end
-    input::Block{L},
-) where {T, L}
-    n = length(input)
-    values = _allocate_values(T, n)
-    for i in 1:n
-        @inbounds values[i] = operator(node_op, input.values[i])
-    end
-    return Block(input.times, values)
-end
-
-function run_node!(
-    ::EmptyNodeEvaluationState,
-    node_op::StatelessUnaryNodeOp{T, false},
-    ::DateTime,  # time_start
-    ::DateTime,  # time_end
-    input::Block{L},
-) where {T, L}
-    n = length(input)
-    times = _allocate_times(n)
-    values = _allocate_values(T, n)
-    j = 1
-    for i in 1:n
-        (value, should_tick) = operator(node_op, @inbounds(input.values[i]))
-        if should_tick
-            @inbounds times[j] = input.times[i]
-            @inbounds values[j] = value
-            j += 1
-        end
-    end
-    _trim!(times, j - 1)
-    _trim!(values, j - 1)
-    return Block(times, values)
+# An unary node has no alignment state, so any state comes purely from the operator.
+function create_evaluation_state(parents::Tuple{Node}, op::UnaryNodeOp)
+    return create_operator_evaluation_state(parents, op)
 end
 
 function run_node!(
     state::NodeEvaluationState,
-    node_op::StatefulUnaryNodeOp{T, true},
+    node_op::UnaryNodeOp{T},
     ::DateTime,  # time_start
     ::DateTime,  # time_end
     input::Block{L},
 ) where {T, L}
     n = length(input)
     values = _allocate_values(T, n)
-    for i in 1:n
-        @inbounds values[i] = operator(node_op, state, input.values[i])
-    end
-    return Block(input.times, values)
-end
-
-function run_node!(
-    state::NodeEvaluationState,
-    node_op::StatefulUnaryNodeOp{T, false},
-    ::DateTime,  # time_start
-    ::DateTime,  # time_end
-    input::Block{L},
-) where {T, L}
-    n = length(input)
-    times = _allocate_times(n)
-    values = _allocate_values(T, n)
-    j = 1
-    for i in 1:n
-        (value, should_tick) = operator(node_op, state, @inbounds(input.values[i]))
-        if should_tick
-            @inbounds times[j] = input.times[i]
-            @inbounds values[j] = value
-            j += 1
+    return if always_ticks(node_op)
+        # We can ignore the return value of the operator, since we have been promised that
+        # it will always tick. Hence we can use a for loop too.
+        for i in 1:n
+            time = input.times[i]
+            operator(node_op, state, Ref(values, i), time, input.values[i])
         end
+        Block(input.times, values)
+    else
+        times = _allocate_times(n)
+        j = 1
+        for i in 1:n
+            time = input.times[i]
+            should_tick = operator(node_op, state, Ref(values, j), time, input.values[i])
+            if should_tick
+                @inbounds times[j] = input.times[i]
+                j += 1
+            end
+        end
+        _trim!(times, j - 1)
+        _trim!(values, j - 1)
+        Block(times, values)
     end
-    _trim!(times, j - 1)
-    _trim!(values, j - 1)
-    return Block(times, values)
 end
 
 """Apply, assuming `input_l` and `input_r` have identical alignment."""
-function _apply_fast_align_binary(
+function _apply_fast_align_binary!(
     T,
     op::BinaryAlignedNodeOp,
+    operator_state::NodeEvaluationState,
     input_l::Block,
     input_r::Block,
 )
     n = length(input_l)
     values = _allocate_values(T, n)
-    # We shouldn't assume that it is valid to broadcast f over the inputs, so loop manually.
-    for i in 1:n
-        @inbounds values[i] = operator(op, input_l.values[i], input_r.values[i])
+    return if always_ticks(node_op)
+        # We shouldn't assume that it is valid to broadcast f over the inputs, so loop
+        # manually.
+        for i in 1:n
+            time = input_l.times[i]
+            operator(
+                op, operator_state, Ref(values, i),
+                time, input_l.values[i], input_r.values[i]
+            )
+        end
+        Block(input_l.times, values)
+    else
+        # FIXME Implement this branch!
+        error("Not implemented!")
     end
-
-    return Block(input_l.times, values)
 end
 
 # FIXME Add initial_values, and support for this.
@@ -159,18 +187,26 @@ end
 #   Alternatively we could additionally store boolean sentinels to mark when each input is
 #   active.
 
-mutable struct UnionAlignmentState{L, R} <: NodeEvaluationState
+mutable struct UnionAlignmentState{L, R, OperatorState} <: NodeEvaluationState
     latest_l::Union{L, Nothing}
     latest_r::Union{R, Nothing}
+    # TODO If OperatorState == EmptyNodeEvaluationState, it'd be nice not to store an extra
+    # pointer here. Can we skip the field on the struct entirely? (Maybe just a different
+    # struct is required.)
+    operator_state::OperatorState
 end
 
 function create_evaluation_state(
     parents::Tuple{Node, Node},
-    ::BinaryAlignedNodeOp{T, UnionAlignment},
+    op::BinaryAlignedNodeOp{T, UnionAlignment},
 ) where {T}
-    return UnionAlignmentState{value_type(parents[1]), value_type(parents[2])}(
+    operator_state = create_operator_evaluation_state(parents, op)
+    L = value_type(parents[1])
+    R = value_type(parents[2])
+    return UnionAlignmentState{L, R, typeof(operator_state)}(
         nothing,
         nothing,
+        operator_state,
     )
 end
 
@@ -202,7 +238,7 @@ function run_node!(
         # Update the alignment state.
         state.latest_l = @inbounds last(input_l.values)
         state.latest_r = @inbounds last(input_r.values)
-        return _apply_fast_align_binary(T, node_op, input_l, input_r)
+        return _apply_fast_align_binary!(T, node_op, state.operator_state, input_l, input_r)
     end
 
     # Create our outputs as the maximum possible size.
@@ -258,9 +294,14 @@ function run_node!(
         end
 
         # Output a knot.
-        @inbounds times[j] = new_time
-        @inbounds values[j] = operator(node_op, state.latest_l, state.latest_r)
-        j += 1
+        should_tick = operator(
+            node_op, state.operator_state, Ref(values, j),
+            new_time, state.latest_l, state.latest_r
+        )
+        if always_ticks(node_op) || should_tick
+            @inbounds times[j] = new_time
+            j += 1
+        end
     end
 
     # Package the outputs into a block, resizing the outputs as necessary.
@@ -271,15 +312,16 @@ function run_node!(
 end
 
 function create_evaluation_state(
-    ::Tuple{Node, Node},
-    ::BinaryAlignedNodeOp{T, IntersectAlignment},
+    parents::Tuple{Node, Node},
+    op::BinaryAlignedNodeOp{T, IntersectAlignment},
 ) where {T}
-    # Intersect alignment doesn't require remembering any previous state.
-    return _EMPTY_NODE_STATE
+    # Intersect alignment doesn't require remembering any previous state, so just return
+    # the operator state.
+    return create_operator_evaluation_state(parents, op)
 end
 
 function run_node!(
-    ::EmptyNodeEvaluationState,
+    operator_state::NodeEvaluationState,
     node_op::BinaryAlignedNodeOp{T, IntersectAlignment},
     ::DateTime,  # time_start
     ::DateTime,  # time_end
@@ -293,7 +335,7 @@ function run_node!(
 
     if _equal_times(input_l, input_r)
         # Times are indistinguishable.
-        return _apply_fast_align_binary(T, node_op, input_l, input_r)
+        return _apply_fast_align_binary!(T, node_op, operator_state, input_l, input_r)
     end
 
     # Create our outputs as the maximum possible size.
@@ -327,9 +369,14 @@ function run_node!(
             ir += 1
         else  # time_l == time_r
             # Shared time point, so emit a knot.
-            @inbounds times[j] = time_l
-            @inbounds values[j] = operator(node_op, input_l.values[il], input_r.values[ir])
-            j += 1
+            should_tick = operator(
+                node_op, operator_state, Ref(values, j),
+                time_l, input_l.values[il], input_r.values[ir]
+            )
+            if always_ticks(node_op) || should_tick
+                @inbounds times[j] = time_l
+                j += 1
+            end
             il += 1
             ir += 1
         end
@@ -341,15 +388,19 @@ function run_node!(
     return Block(times, values)
 end
 
-mutable struct LeftAlignmentState{R} <: NodeEvaluationState
+mutable struct LeftAlignmentState{R, OperatorState} <: NodeEvaluationState
     latest_r::Union{R, Nothing}
+    # TODO As for UnionAlignmentState, would be nice to omit this field when not needed.
+    operator_state::OperatorState
 end
 
 function create_evaluation_state(
     parents::Tuple{Node, Node},
-    ::BinaryAlignedNodeOp{T, LeftAlignment},
+    op::BinaryAlignedNodeOp{T, LeftAlignment},
 ) where {T}
-    return LeftAlignmentState{value_type(parents[2])}(nothing)
+    operator_state = create_operator_evaluation_state(parents, op)
+    R = value_type(parents[2])
+    return LeftAlignmentState{R, typeof(operator_state)}(nothing, operator_state)
 end
 
 function run_node!(
@@ -375,21 +426,17 @@ function run_node!(
 
     if _equal_times(input_l, input_r)
         # Times are indistinguishable.
-        return _apply_fast_align_binary(T, node_op, input_l, input_r)
+        return _apply_fast_align_binary!(T, node_op, state.operator_state, input_l, input_r)
     end
 
     # The most we can emit is one knot for every knot in input_l.
     nl = length(input_l)
     nr = length(input_r)
+    times = _allocate_times(nl)
     values = _allocate_values(T, nl)
 
     # Start with 0, indicating that input_r hasn't started ticking yet.
     ir = 0
-
-    # The index of the first knot we emit from input_l. Note that if we have an initial
-    # value for r, then we know it will be index 1. Otherwise use 0 as a placeholder to
-    # indicate that we don't know.
-    first_emitted_index_l = have_initial_r ? 1 : 0
 
     # The index into the output.
     j = 1
@@ -404,17 +451,28 @@ function run_node!(
         end
 
         if ir > 0
-            if first_emitted_index_l == 0
-                # Record the point where we have started ticking.
-                first_emitted_index_l = il
+            # FIXME should `operator` be renamed `operator!`. Mutates state & out.
+            time = input_l.times[il]
+            should_tick = operator(
+                node_op, state.operator_state, Ref(values, j),
+                time, input_l.values[il], input_r.values[ir]
+            )
+            if always_ticks(node_op) || should_tick
+                @inbounds times[j] = time
+                j += 1
             end
-            @inbounds values[j] = operator(node_op, input_l.values[il], input_r.values[ir])
-            j += 1
+
         elseif have_initial_r
-            # R hasn't ticked in this batch, but we have an initial value. In this case
-            # we know that `first_emitted_index_l` will have already been set correctly.
-            @inbounds values[j] = operator(node_op, input_l.values[il], state.latest_r)
-            j += 1
+            # R hasn't ticked in this batch, but we have an initial value.
+            time = input_l.times[il]
+            should_tick = operator(
+                node_op, state.operator_state, Ref(values, j),
+                time, input_l.values[il], state.latest_r
+            )
+            if always_ticks(node_op) || should_tick
+                @inbounds times[j] = time
+                j += 1
+            end
         end
     end
 
@@ -423,21 +481,8 @@ function run_node!(
         state.latest_r = @inbounds last(input_r.values)
     end
 
-    if (first_emitted_index_l == 0)
-        # We expect this to happen when:
-        #   * input_l ticks once at start of interval
-        #   * input_r ticks several times after this
-        # The output will be empty in this case.
-        return Block{T}()
-    end
-
-    # Package results into a new block.
-    times = if first_emitted_index_l > 1
-        _trim!(values, j - 1)  # Truncate the values array, as we haven't used all of it.
-        @view input_l.times[first_emitted_index_l:end]
-    else
-        input_l.times
-    end
-
+    # Package the outputs into a block, resizing the outputs as necessary.
+    _trim!(times, j - 1)
+    _trim!(values, j - 1)
     return Block(times, values)
 end
