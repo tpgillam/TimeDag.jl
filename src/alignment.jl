@@ -17,8 +17,8 @@ abstract type UnaryNodeOp{T} <: NodeOp{T} end
 abstract type BinaryAlignedNodeOp{T, A <: Alignment} <: NodeOp{T} end
 
 """
-    operator(op::UnaryNodeOp{T}, (state,) out::Ref{T}, (time,) x) -> should_tick
-    operator(op::BinaryAlignedNodeOp{T}, (state,) out::Ref{T}, (time,) x, y) -> should_tick
+    operator!(op::UnaryNodeOp{T}, (state,) out::Ref{T}, (time,) x) -> should_tick
+    operator!(op::BinaryAlignedNodeOp{T}, (state,) out::Ref{T}, (time,) x, y) -> should_tick
 
 Perform the operation for this node.
 
@@ -29,7 +29,7 @@ For stateful operations, this operator should mutate the state as required.
 If `should_tick` is `false`, we ignore the value placed into `ref_out`, and do not emit a
 knot at this time.
 """
-function operator end
+function operator! end
 
 """
     always_ticks(node) -> Bool
@@ -68,7 +68,7 @@ wrap this state with further state, if this is necessary for e.g. alignment.
 """
 function create_operator_evaluation_state end
 
-function operator(
+function operator!(
     op::NodeOp,
     state::NodeEvaluationState,
     out::Ref,
@@ -76,11 +76,11 @@ function operator(
     values...
 )
     return if stateless_operator(op) && time_agnostic(op)
-        operator(op, out, values...)
+        operator!(op, out, values...)
     elseif stateless_operator(op) && !time_agnostic(op)
-        operator(op, out, time, values...)
+        operator!(op, out, time, values...)
     elseif !stateless_operator(op) && time_agnostic(op)
-        operator(op, state, out, values...)
+        operator!(op, state, out, values...)
     else
         error("Error! We should have dispatched to a more specialised method.")
     end
@@ -94,7 +94,7 @@ function _propagate_constant_value(op::UnaryNodeOp{T}, parents::Tuple{Node}) whe
     # NB, we know that time & state is ignored (due to _can_propagate_constant), therefore
     # we pass in garbage.
     # We also know that should_tick will end up being true, as the node always ticks.
-    operator(op, out, value(@inbounds(parents[1])))
+    operator!(op, out, value(@inbounds(parents[1])))
     return @inbounds out[]
 end
 
@@ -109,7 +109,7 @@ function _propagate_constant_value(
     # NB, we know that time & state is ignored (due to _can_propagate_constant), therefore
     # we pass in garbage.
     # We also know that should_tick will end up being true, as the node always ticks.
-    operator(op, out, value(@inbounds(parents[1])), value(@inbounds(parents[2])))
+    operator!(op, out, value(@inbounds(parents[1])), value(@inbounds(parents[2])))
     return @inbounds out[]
 end
 
@@ -133,7 +133,7 @@ function run_node!(
         # it will always tick. Hence we can use a for loop too.
         for i in 1:n
             time = input.times[i]
-            operator(node_op, state, Ref(values, i), time, input.values[i])
+            operator!(node_op, state, Ref(values, i), time, input.values[i])
         end
         Block(input.times, values)
     else
@@ -141,7 +141,7 @@ function run_node!(
         j = 1
         for i in 1:n
             time = input.times[i]
-            should_tick = operator(node_op, state, Ref(values, j), time, input.values[i])
+            should_tick = operator!(node_op, state, Ref(values, j), time, input.values[i])
             if should_tick
                 @inbounds times[j] = input.times[i]
                 j += 1
@@ -168,7 +168,7 @@ function _apply_fast_align_binary!(
         # manually.
         for i in 1:n
             time = input_l.times[i]
-            operator(
+            operator!(
                 op, operator_state, Ref(values, i),
                 time, input_l.values[i], input_r.values[i]
             )
@@ -294,7 +294,7 @@ function run_node!(
         end
 
         # Output a knot.
-        should_tick = operator(
+        should_tick = operator!(
             node_op, state.operator_state, Ref(values, j),
             new_time, state.latest_l, state.latest_r
         )
@@ -369,7 +369,7 @@ function run_node!(
             ir += 1
         else  # time_l == time_r
             # Shared time point, so emit a knot.
-            should_tick = operator(
+            should_tick = operator!(
                 node_op, operator_state, Ref(values, j),
                 time_l, input_l.values[il], input_r.values[ir]
             )
@@ -451,9 +451,8 @@ function run_node!(
         end
 
         if ir > 0
-            # FIXME should `operator` be renamed `operator!`. Mutates state & out.
             time = input_l.times[il]
-            should_tick = operator(
+            should_tick = operator!(
                 node_op, state.operator_state, Ref(values, j),
                 time, input_l.values[il], input_r.values[ir]
             )
@@ -465,7 +464,7 @@ function run_node!(
         elseif have_initial_r
             # R hasn't ticked in this batch, but we have an initial value.
             time = input_l.times[il]
-            should_tick = operator(
+            should_tick = operator!(
                 node_op, state.operator_state, Ref(values, j),
                 time, input_l.values[il], state.latest_r
             )

@@ -39,7 +39,7 @@ function create_operator_evaluation_state(
     return InceptionOpState{Data}()
 end
 
-function operator(
+function operator!(
     op::InceptionOp{T, Data, CombineOp, ExtractOp},
     state::InceptionOpState{Data},
     out::Ref{T},
@@ -84,7 +84,7 @@ function create_operator_evaluation_state(
     return WindowOpState{Data}(FixedWindowAssociativeOp{Data, CombineOp}(op.window))
 end
 
-function operator(
+function operator!(
     op::WindowOp{T, Data, CombineOp, ExtractOp},
     state::WindowOpState{Data},
     out::Ref{T},

@@ -16,7 +16,7 @@ for (node_op, op) in [
         stateless(::$node_op) = true
         time_agnostic(::$node_op) = true
 
-        function operator(::$node_op, out::Ref, x)
+        function operator!(::$node_op, out::Ref, x)
             @inbounds out[] = $op(x)
             return true
         end
@@ -41,7 +41,7 @@ for (node_op, op) in [
         stateless_operator(::$node_op) = true
         time_agnostic(::$node_op) = true
 
-        function operator(::$node_op, out::Ref, x, y)
+        function operator!(::$node_op, out::Ref, x, y)
             @inbounds out[] = $op(x, y)
             return true
         end

@@ -5,7 +5,7 @@ create_operator_evaluation_state(::Tuple{Node}, ::ZapMissing) = _EMPTY_NODE_STAT
 stateless(::ZapMissing) = true
 time_agnostic(::ZapMissing) = true
 
-function operator(::ZapMissing{T}, out::Ref{T}, x::Union{Missing, T}) where {T}
+function operator!(::ZapMissing{T}, out::Ref{T}, x::Union{Missing, T}) where {T}
     return if ismissing(x)
         false
     else

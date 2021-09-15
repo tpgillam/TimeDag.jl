@@ -1,8 +1,8 @@
 struct Left{T, A} <: BinaryAlignedNodeOp{T, A} end
-operator(::Left, x, y) = x
+operator!(::Left, x, y) = x
 
 struct Right{T, A} <: BinaryAlignedNodeOp{T, A} end
-operator(::Right, x, y) = y
+operator!(::Right, x, y) = y
 
 # API
 
