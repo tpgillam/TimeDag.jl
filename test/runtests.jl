@@ -17,6 +17,7 @@ include("common.jl")
     include("constants.jl")
 
     @testset "ops" begin
+        @testset "align" begin include("ops_align.jl") end
         @testset "arithmetic" begin include("ops_arithmetic.jl") end
         @testset "conditional" begin include("ops_conditional.jl") end
         @testset "logical" begin include("ops_logical.jl") end

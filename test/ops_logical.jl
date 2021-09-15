@@ -14,3 +14,11 @@ n_boolean = TimeDag.block_node(b_boolean)
         end
     end
 end
+
+@testset "binary" begin
+    for op in (>, <, >=, <=)
+        @testset "$op" begin
+            _test_binary_op(op)
+        end
+    end
+end

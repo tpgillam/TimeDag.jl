@@ -1,15 +1,3 @@
-b1 = Block([
-    DateTime(2000, 1, 1) => 1,
-    DateTime(2000, 1, 2) => 2,
-    DateTime(2000, 1, 3) => 3,
-    DateTime(2000, 1, 4) => 4,
-    DateTime(2000, 1, 5) => 5,
-    DateTime(2000, 1, 6) => 6,
-    DateTime(2000, 1, 7) => 7,
-])
-
-n1 = block_node(b1)
-
 _eval(n) = _evaluate(n, DateTime(2000, 1, 1), DateTime(2000, 1, 10))
 
 # Gloriously inefficient way of computing running quantities from inception.
@@ -70,19 +58,19 @@ function _naive_window_reduce(
 end
 
 function _test_inception_op(T, f_normal::Function, f_timedag::Function=f_normal; min_window=1)
-    @test _eval(f_timedag(n1)) ≈ _naive_inception_reduce(T, f_normal, b1, min_window)
+    @test _eval(f_timedag(n4)) ≈ _naive_inception_reduce(T, f_normal, b4, min_window)
 end
 
 function _test_window_op(T, f_normal::Function, f_timedag::Function=f_normal; min_window=1)
-    for window in min_window:(length(b1) + 2)
-        n = f_timedag(n1, window)
+    for window in min_window:(length(b4) + 2)
+        n = f_timedag(n4, window)
         block = _eval(n)
-        block_ee_false = _eval(f_timedag(n1, window; emit_early=false))
-        block_ee_true = _eval(f_timedag(n1, window; emit_early=true))
+        block_ee_false = _eval(f_timedag(n4, window; emit_early=false))
+        block_ee_true = _eval(f_timedag(n4, window; emit_early=true))
         @test block == block_ee_false
 
-        @test block_ee_false ≈ _naive_window_reduce(T, f_normal, b1, window, false, min_window)
-        @test block_ee_true ≈ _naive_window_reduce(T, f_normal, b1, window, true, min_window)
+        @test block_ee_false ≈ _naive_window_reduce(T, f_normal, b4, window, false, min_window)
+        @test block_ee_true ≈ _naive_window_reduce(T, f_normal, b4, window, true, min_window)
     end
     return nothing
 end
@@ -125,8 +113,8 @@ end
     @testset "window" begin
         # Windows that are too small should trigger an exception when attempting to create
         # the node.
-        @test_throws ArgumentError var(n1, 0)
-        @test_throws ArgumentError var(n1, 1)
+        @test_throws ArgumentError var(n4, 0)
+        @test_throws ArgumentError var(n4, 1)
 
         _test_window_op(Float64, var; min_window=2)
     end
