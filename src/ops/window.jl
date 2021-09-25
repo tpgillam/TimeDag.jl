@@ -146,7 +146,7 @@ end
 
 # Mean, cumulative over time.
 # In order to be numerically stable, use a generalisation of Welford's algorithm.
-const MeanData{T} = @NamedTuple {n::Int64, mean::T} where {T}
+const MeanData{T} = @NamedTuple{n::Int64, mean::T} where {T}
 _wrap(::Type{MeanData{T}}, x) where {T} = MeanData{T}((1, x))
 function _combine(state_a::MeanData{T}, state_b::MeanData{T})::MeanData{T} where {T}
     na = state_a.n
@@ -175,7 +175,7 @@ end
 
 # Variance, cumulative over time.
 # In order to be numerically stable, use a generalisation of Welford's algorithm.
-const VarData{T} = @NamedTuple {n::Int64, mean::T, s::T} where {T}
+const VarData{T} = @NamedTuple{n::Int64, mean::T, s::T} where {T}
 _wrap(::Type{VarData{T}}, x) where {T} = VarData{T}((1, x, 0))
 function _combine(state_a::VarData{T}, state_b::VarData{T})::VarData{T} where {T}
     na = state_a.n
