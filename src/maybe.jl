@@ -4,7 +4,8 @@
 
 A structure which can hold a value of type `T`, or represent the absence of a value.
 
-The API is optimised for speed, as a
+The API is optimised for speed over memory usage, by allowing a function that may otherwise
+return `Union{T, Nothing}` to instead always return `Maybe{T}`, and hence be type-stable.
 """
 struct Maybe{T}
     valid::Bool
