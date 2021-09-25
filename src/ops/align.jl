@@ -6,10 +6,7 @@ always_ticks(::Left) = true
 stateless_operator(::Left) = true
 time_agnostic(::Left) = true
 
-function operator!(::Left, out::Ref, x, y)
-    @inbounds out[] = x
-    return true
-end
+operator!(::Left, x, y) = x
 
 struct Right{T, A} <: BinaryAlignedNodeOp{T, A} end
 
@@ -19,10 +16,7 @@ always_ticks(::Right) = true
 stateless_operator(::Right) = true
 time_agnostic(::Right) = true
 
-function operator!(::Right, out::Ref, x, y)
-    @inbounds out[] = y
-    return true
-end
+operator!(::Right, x, y) = y
 
 # API
 

@@ -42,7 +42,6 @@ end
 function operator!(
     op::InceptionOp{T, Data, CombineOp, ExtractOp},
     state::InceptionOpState{Data},
-    out::Ref{T},
     x
 ) where {T, Data, CombineOp, ExtractOp}
     if !state.initialised
@@ -51,11 +50,13 @@ function operator!(
     else
         state.data = CombineOp(state.data, _wrap(Data, x))
     end
-    return if _unfiltered(op) || _should_tick(op, state.data)
-        @inbounds out[] = ExtractOp(state.data)
-        true
+    return if always_ticks(op)
+        # Deal with the case where we always emit.
+        ExtractOp(state.data)
+    elseif _unfiltered(op) || _should_tick(op, state.data)
+        Maybe(ExtractOp(state.data))
     else
-        false
+        Maybe{T}()
     end
 end
 
@@ -87,21 +88,24 @@ end
 function operator!(
     op::WindowOp{T, Data, CombineOp, ExtractOp},
     state::WindowOpState{Data},
-    out::Ref{T},
     x
 ) where {T, Data, CombineOp, ExtractOp}
     update_state!(state.window_state, _wrap(Data, x))
+    if always_ticks(op)
+        # Deal with the case where we always emit.
+        return ExtractOp(window_value(state.window_state))
+    end
+
     ready = _emit_early(op) || window_full(state.window_state)
     if !ready
-        return false
+        return Maybe{T}()
     end
 
     data = window_value(state.window_state)
     return if _unfiltered(op) || _should_tick(op, data)
-        @inbounds out[] = ExtractOp(data)
-        true
+        Maybe(ExtractOp(data))
     else
-        false
+        Maybe{T}()
     end
 end
 

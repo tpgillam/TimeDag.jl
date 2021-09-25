@@ -16,10 +16,7 @@ for (node_op, op) in [
         stateless(::$node_op) = true
         time_agnostic(::$node_op) = true
 
-        function operator!(::$node_op, out::Ref, x)
-            @inbounds out[] = $op(x)
-            return true
-        end
+        operator!(::$node_op, x) = $op(x)
 
         Base.$op(x::Node) = obtain_node((x,), $node_op{output_type($op, value_type(x))}())
     end
@@ -41,10 +38,7 @@ for (node_op, op) in [
         stateless_operator(::$node_op) = true
         time_agnostic(::$node_op) = true
 
-        function operator!(::$node_op, out::Ref, x, y)
-            @inbounds out[] = $op(x, y)
-            return true
-        end
+        operator!(::$node_op, x, y) = $op(x, y)
 
         function Base.$op(x, y, ::Type{A}) where {A <: Alignment}
             x = _ensure_node(x)
