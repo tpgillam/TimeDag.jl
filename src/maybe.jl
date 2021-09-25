@@ -22,7 +22,6 @@ Return true iff `x` holds a value.
 """
 valid(x::Maybe) = x.valid
 
-
 """
     value(x::Maybe{T}) -> T
 

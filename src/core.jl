@@ -5,7 +5,7 @@ abstract type NodeOp{T} end
 # (importantly) means that we can attach finalizers to node instances.
 # Nodes should NEVER actually be mutated!
 mutable struct Node
-    parents::NTuple{N, Node} where {N}
+    parents::NTuple{N,Node} where {N}
     op::NodeOp
 end
 

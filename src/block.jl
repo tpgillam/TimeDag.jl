@@ -6,19 +6,20 @@
 #   Possibly we need a more general type here which can package other representations?
 #   See Stheno ColVecs / RowVecs - they have the same problem.
 
-struct Block{T, VTimes <: AbstractVector{DateTime}, VValues <: AbstractVector{T}}
+struct Block{T,VTimes<:AbstractVector{DateTime},VValues<:AbstractVector{T}}
     times::VTimes
     values::VValues
 
     function Block(
-        times::VTimes,
-        values::VValues
-    ) where {T, VTimes <: AbstractVector{DateTime}, VValues <: AbstractVector{T}}
+        times::VTimes, values::VValues
+    ) where {T,VTimes<:AbstractVector{DateTime},VValues<:AbstractVector{T}}
         # TODO Need some way of skipping checks if we're confident they're unnecessary...?
         if length(times) != length(values)
-            throw(ArgumentError(
-                "Times have length $(length(times)), values $(length(values))"
-            ))
+            throw(
+                ArgumentError(
+                    "Times have length $(length(times)), values $(length(values))"
+                ),
+            )
         end
         # FIXME Should we enforce basic requirements on construction, e.g.
         #   -> time ordering
@@ -26,13 +27,15 @@ struct Block{T, VTimes <: AbstractVector{DateTime}, VValues <: AbstractVector{T}
         #   -> same length of times & values
         #   -> How make times & values immutable? Subclass of AbstractVector that doesn't
         #       implement setindex! ?
-        return new{T, VTimes, VValues}(times, values)
+        return new{T,VTimes,VValues}(times, values)
     end
 end
 
 Block{T}() where {T} = Block(DateTime[], T[])
 
-function Block(knots::Union{AbstractVector{Tuple{DateTime, T}},AbstractVector{Pair{DateTime, T}}}) where {T}
+function Block(
+    knots::Union{AbstractVector{Tuple{DateTime,T}},AbstractVector{Pair{DateTime,T}}}
+) where {T}
     n = length(knots)
     times = _allocate_times(n)
     values = _allocate_values(T, n)
@@ -80,9 +83,10 @@ Tables.columnnames(::Block) = _BLOCK_COLUMNNAMES
 
 function Base.show(io::IO, block::Block)
     return pretty_table(
-        io, block;
+        io,
+        block;
         title="Block{$(value_type(block))}($(length(block)) knots)",
-        tf=tf_markdown
+        tf=tf_markdown,
     )
 end
 
@@ -126,7 +130,7 @@ Base.firstindex(block::Block) = 1
 Base.lastindex(block::Block) = length(block)
 Base.getindex(block::Block, i::Int) = (block.times[i], block.values[i])
 
-Base.eltype(::Block{T}) where {T} = Tuple{DateTime, T}
+Base.eltype(::Block{T}) where {T} = Tuple{DateTime,T}
 function Base.iterate(block::Block, state::Int=1)
     return if (state > length(block))
         nothing
@@ -154,7 +158,7 @@ end
 function _trim!(x::AbstractVector, n::Int)
     # TODO It sounds like this currently doesn't actually free any of the buffer, which
     #   could be a bit inefficient. Maybe sizehint! is required too?
-    resize!(x, n)
+    return resize!(x, n)
 end
 
 """

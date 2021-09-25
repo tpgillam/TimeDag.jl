@@ -9,8 +9,8 @@ Note that this structure is definitely *not* threadsafe. We are assuming that al
 created in a single thread.
 """
 mutable struct NodeGraph
-    node_to_vertex::WeakKeyDict{Node, Int64}
-    vertex_to_ref::Dict{Int64, WeakRef}
+    node_to_vertex::WeakKeyDict{Node,Int64}
+    vertex_to_ref::Dict{Int64,WeakRef}
     # TODO Figure out of this LightGraph representation is useful.
     # Edges are directed from parents to children.
     graph::SimpleDiGraph{Int64}
@@ -96,7 +96,7 @@ graph, use that one, otherwise create a new node, add to the graph, and return i
 
 If the graph is not specified, the global graph is used.
 """
-function obtain_node(graph::NodeGraph, parents::NTuple{N, Node}, op::NodeOp) where {N}
+function obtain_node(graph::NodeGraph, parents::NTuple{N,Node}, op::NodeOp) where {N}
     if !isempty(parents) && _can_propagate_constant(op) && all(_is_constant, parents)
         # Constant propagation, since all inputs are constants & the op supports it.
         return constant(_propagate_constant_value(op, parents))
@@ -171,7 +171,6 @@ function ancestors(graph::NodeGraph, nodes::Node...)
     ancestor_vertices = ancestors(graph.graph, vertices)
     return [graph.vertex_to_ref[vertex].value for vertex in ancestor_vertices]
 end
-
 
 # This is the single instance of the graph that we want
 const _GLOBAL_GRAPH = NodeGraph()

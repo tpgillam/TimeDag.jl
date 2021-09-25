@@ -11,23 +11,20 @@ Some thoughts on requirements
 """
 mutable struct EvaluationState
     evaluation_order::Vector{Node}
-    node_to_state::IdDict{Node, NodeEvaluationState}
+    node_to_state::IdDict{Node,NodeEvaluationState}
     current_time::DateTime
-    evaluated_node_to_blocks::IdDict{Node, Vector{Block}}
+    evaluated_node_to_blocks::IdDict{Node,Vector{Block}}
 end
 
 function duplicate_internal(x::EvaluationState, stackdict::IdDict)
     y = EvaluationState(
         x.evaluation_order,
         IdDict((
-            node => duplicate_internal(state, stackdict)
-            for (node, state) in x.node_to_state
+            node => duplicate_internal(state, stackdict) for
+            (node, state) in x.node_to_state
         )),
         x.current_time,
-        IdDict((
-            node => copy(blocks)
-            for (node, blocks) in x.evaluated_node_to_blocks
-        )),
+        IdDict((node => copy(blocks) for (node, blocks) in x.evaluated_node_to_blocks)),
     )
     stackdict[x] = y
     return y
@@ -56,7 +53,7 @@ function get_up_to!(state::EvaluationState, time_end::DateTime)::EvaluationState
     # TODO Could we use dagger here to solve this & parallelism for us? I think the problem
     #   with this could be mutation - needs thought.
 
-    node_to_block = IdDict{Node, Block}()
+    node_to_block = IdDict{Node,Block}()
 
     for node in state.evaluation_order
         node_state = state.node_to_state[node]
@@ -94,7 +91,7 @@ function evaluate(
     nodes::AbstractVector{Node},
     time_start::DateTime,
     time_end::DateTime;
-    batch_interval::Union{Nothing, TimePeriod}=nothing,
+    batch_interval::Union{Nothing,TimePeriod}=nothing,
 )
     state = start_at(nodes, time_start)
     if isnothing(batch_interval)
@@ -114,10 +111,7 @@ function evaluate(
 end
 
 function evaluate(
-    node::Node,
-    time_start::DateTime,
-    time_end::DateTime;
-    batch_interval=nothing
+    node::Node, time_start::DateTime, time_end::DateTime; batch_interval=nothing
 )
     return only(evaluate([node], time_start, time_end; batch_interval))
 end
