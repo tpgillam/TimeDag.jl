@@ -12,9 +12,9 @@ using TimeDag: block_node, constant, empty_node
 include("common.jl")
 
 @testset "TimeDag.jl" begin
-    include("block.jl")
-    include("graph.jl")
-    include("constants.jl")
+    @testset "block" begin include("block.jl") end
+    @testset "graph" begin include("graph.jl") end
+    @testset "constants" begin include("constants.jl") end
 
     @testset "ops" begin
         @testset "align" begin include("ops_align.jl") end
