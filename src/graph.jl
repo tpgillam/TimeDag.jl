@@ -47,7 +47,7 @@ function insert_node!(graph::NodeGraph, node::Node)
 
     if haskey(graph, node)
         # Nothing to do!
-        return
+        return graph
     end
 
     # We are going to add the node - we must do the following:
