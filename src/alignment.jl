@@ -208,11 +208,13 @@ end
 function _set_l!(state::UnionAlignmentState{L}, x::L) where {L}
     state.latest_l = x
     state.valid_l = true
+    return state
 end
 
 function _set_r!(state::UnionAlignmentState{L,R}, x::R) where {L,R}
     state.latest_r = x
     state.valid_r = true
+    return state
 end
 
 function create_evaluation_state(
@@ -449,6 +451,7 @@ end
 function _set_r!(state::LeftAlignmentState{R}, x::R) where {R}
     state.latest_r = x
     state.valid_r = true
+    return state
 end
 
 function create_evaluation_state(
