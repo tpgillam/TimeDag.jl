@@ -14,7 +14,7 @@ struct IntersectAlignment <: Alignment end
 const DEFAULT_ALIGNMENT = UnionAlignment
 
 abstract type UnaryNodeOp{T} <: NodeOp{T} end
-abstract type BinaryAlignedNodeOp{T, A <: Alignment} <: NodeOp{T} end
+abstract type BinaryAlignedNodeOp{T,A<:Alignment} <: NodeOp{T} end
 
 # A note on the design choice here, which is motivated for performance reasons.
 #
@@ -78,7 +78,6 @@ one is creating a node that is fully stateless, one need only define `stateless`
 stateless_operator(node::Node) = stateless_operator(node.op)
 stateless_operator(op::NodeOp) = stateless(op)
 
-
 """
     create_operator_evaluation_state(parents, op::NodeOp) -> NodeEvaluationState
 
@@ -90,12 +89,7 @@ wrap this state with further state, if this is necessary for e.g. alignment.
 """
 function create_operator_evaluation_state end
 
-function operator!(
-    op::NodeOp,
-    state::NodeEvaluationState,
-    time::DateTime,
-    values...
-)
+function operator!(op::NodeOp, state::NodeEvaluationState, time::DateTime, values...)
     return if stateless_operator(op) && time_agnostic(op)
         operator!(op, values...)
     elseif stateless_operator(op) && !time_agnostic(op)
@@ -116,15 +110,13 @@ function _propagate_constant_value(op::UnaryNodeOp{T}, parents::Tuple{Node}) whe
 end
 
 function _can_propagate_constant(op::BinaryAlignedNodeOp)
-    always_ticks(op) && stateless_operator(op) && time_agnostic(op)
+    return always_ticks(op) && stateless_operator(op) && time_agnostic(op)
 end
 function _propagate_constant_value(
-    op::BinaryAlignedNodeOp{T},
-    parents::Tuple{Node, Node}
+    op::BinaryAlignedNodeOp{T}, parents::Tuple{Node,Node}
 ) where {T}
     return operator!(op, value(@inbounds(parents[1])), value(@inbounds(parents[2])))
 end
-
 
 # An unary node has no alignment state, so any state comes purely from the operator.
 function create_evaluation_state(parents::Tuple{Node}, op::UnaryNodeOp)
@@ -137,7 +129,7 @@ function run_node!(
     ::DateTime,  # time_start
     ::DateTime,  # time_end
     input::Block{L},
-) where {T, L}
+) where {T,L}
     n = length(input)
     values = _allocate_values(T, n)
     return if always_ticks(node_op)
@@ -182,8 +174,7 @@ function _apply_fast_align_binary!(
         for i in 1:n
             time = @inbounds input_l.times[i]
             @inbounds values[i] = operator!(
-                op, operator_state,
-                time, input_l.values[i], input_r.values[i]
+                op, operator_state, time, input_l.values[i], input_r.values[i]
             )
         end
         Block(input_l.times, values)
@@ -195,7 +186,7 @@ end
 
 # TODO Add initial_values, and support for this.
 
-mutable struct UnionAlignmentState{L, R, OperatorState} <: NodeEvaluationState
+mutable struct UnionAlignmentState{L,R,OperatorState} <: NodeEvaluationState
     valid_l::Bool
     valid_r::Bool
     # TODO If OperatorState == EmptyNodeEvaluationState, it'd be nice not to store an extra
@@ -207,10 +198,10 @@ mutable struct UnionAlignmentState{L, R, OperatorState} <: NodeEvaluationState
     latest_l::L
     latest_r::R
 
-    function UnionAlignmentState{L, R}(
+    function UnionAlignmentState{L,R}(
         operator_state::OperatorState
-    ) where {L, R, OperatorState}
-        return new{L, R, OperatorState}(false, false, operator_state)
+    ) where {L,R,OperatorState}
+        return new{L,R,OperatorState}(false, false, operator_state)
     end
 end
 
@@ -219,19 +210,18 @@ function _set_l!(state::UnionAlignmentState{L}, x::L) where {L}
     state.valid_l = true
 end
 
-function _set_r!(state::UnionAlignmentState{L, R}, x::R) where {L, R}
+function _set_r!(state::UnionAlignmentState{L,R}, x::R) where {L,R}
     state.latest_r = x
     state.valid_r = true
 end
 
 function create_evaluation_state(
-    parents::Tuple{Node, Node},
-    op::BinaryAlignedNodeOp{T, UnionAlignment},
+    parents::Tuple{Node,Node}, op::BinaryAlignedNodeOp{T,UnionAlignment}
 ) where {T}
     operator_state = create_operator_evaluation_state(parents, op)
     L = value_type(parents[1])
     R = value_type(parents[2])
-    return UnionAlignmentState{L, R}(operator_state)
+    return UnionAlignmentState{L,R}(operator_state)
 end
 
 @inline function _maybe_add_knot!(
@@ -241,7 +231,7 @@ end
     out_values::AbstractVector{T},
     j::Int,
     time::DateTime,
-    in_values...
+    in_values...,
 ) where {T}
     # Find the output value. For a given op this will either be of type T, or Maybe{T}, and
     # we can (at compile time) select the correct branch below based on `always_ticks(op)`.
@@ -265,13 +255,13 @@ end
 end
 
 function run_node!(
-    state::UnionAlignmentState{L, R},
-    node_op::BinaryAlignedNodeOp{T, UnionAlignment},
+    state::UnionAlignmentState{L,R},
+    node_op::BinaryAlignedNodeOp{T,UnionAlignment},
     ::DateTime,  # time_start
     ::DateTime,  # time_end
     input_l::Block{L},
     input_r::Block{R},
-) where {T, L, R}
+) where {T,L,R}
     if isempty(input_l) && isempty(input_r)
         # Nothing to do, since neither input has ticked.
         return Block{T}()
@@ -349,8 +339,14 @@ function run_node!(
 
         # Compute and possibly output a knot.
         j = _maybe_add_knot!(
-            node_op, state.operator_state, times, values, j,
-            new_time, state.latest_l, state.latest_r
+            node_op,
+            state.operator_state,
+            times,
+            values,
+            j,
+            new_time,
+            state.latest_l,
+            state.latest_r,
         )
     end
 
@@ -362,8 +358,7 @@ function run_node!(
 end
 
 function create_evaluation_state(
-    parents::Tuple{Node, Node},
-    op::BinaryAlignedNodeOp{T, IntersectAlignment},
+    parents::Tuple{Node,Node}, op::BinaryAlignedNodeOp{T,IntersectAlignment}
 ) where {T}
     # Intersect alignment doesn't require remembering any previous state, so just return
     # the operator state.
@@ -372,12 +367,12 @@ end
 
 function run_node!(
     operator_state::NodeEvaluationState,
-    node_op::BinaryAlignedNodeOp{T, IntersectAlignment},
+    node_op::BinaryAlignedNodeOp{T,IntersectAlignment},
     ::DateTime,  # time_start
     ::DateTime,  # time_end
     input_l::Block{L},
     input_r::Block{R},
-) where {T, L, R}
+) where {T,L,R}
     if isempty(input_l) || isempty(input_r)
         # Output will be empty unless both inputs have ticked.
         return Block{T}()
@@ -420,8 +415,14 @@ function run_node!(
         else  # time_l == time_r
             # Shared time point, so emit a knot.
             j = _maybe_add_knot!(
-                node_op, operator_state, times, values, j,
-                time_l, @inbounds(input_l.values[il]), @inbounds(input_r.values[ir])
+                node_op,
+                operator_state,
+                times,
+                values,
+                j,
+                time_l,
+                @inbounds(input_l.values[il]),
+                @inbounds(input_r.values[ir])
             )
             il += 1
             ir += 1
@@ -434,14 +435,14 @@ function run_node!(
     return Block(times, values)
 end
 
-mutable struct LeftAlignmentState{R, OperatorState} <: NodeEvaluationState
+mutable struct LeftAlignmentState{R,OperatorState} <: NodeEvaluationState
     valid_r::Bool
     # TODO As for UnionAlignmentState, would be nice to omit this field when not needed.
     operator_state::OperatorState
     latest_r::R
 
-    function LeftAlignmentState{R}(operator_state::OperatorState) where {R, OperatorState}
-        return new{R, OperatorState}(false, operator_state)
+    function LeftAlignmentState{R}(operator_state::OperatorState) where {R,OperatorState}
+        return new{R,OperatorState}(false, operator_state)
     end
 end
 
@@ -451,8 +452,7 @@ function _set_r!(state::LeftAlignmentState{R}, x::R) where {R}
 end
 
 function create_evaluation_state(
-    parents::Tuple{Node, Node},
-    op::BinaryAlignedNodeOp{T, LeftAlignment},
+    parents::Tuple{Node,Node}, op::BinaryAlignedNodeOp{T,LeftAlignment}
 ) where {T}
     operator_state = create_operator_evaluation_state(parents, op)
     R = value_type(parents[2])
@@ -461,12 +461,12 @@ end
 
 function run_node!(
     state::LeftAlignmentState,
-    node_op::BinaryAlignedNodeOp{T, LeftAlignment},
+    node_op::BinaryAlignedNodeOp{T,LeftAlignment},
     ::DateTime,  # time_start
     ::DateTime,  # time_end
     input_l::Block{L},
     input_r::Block{R},
-) where {T, L, R}
+) where {T,L,R}
     have_initial_r = state.valid_r
 
     if isempty(input_l)
@@ -510,8 +510,14 @@ function run_node!(
             time = input_l.times[il]
 
             j = _maybe_add_knot!(
-                node_op, state.operator_state, times, values, j,
-                time, @inbounds(input_l.values[il]), @inbounds(input_r.values[ir])
+                node_op,
+                state.operator_state,
+                times,
+                values,
+                j,
+                time,
+                @inbounds(input_l.values[il]),
+                @inbounds(input_r.values[ir])
             )
 
         elseif have_initial_r
@@ -519,8 +525,14 @@ function run_node!(
             time = input_l.times[il]
 
             j = _maybe_add_knot!(
-                node_op, state.operator_state, times, values, j,
-                time, @inbounds(input_l.values[il]), state.latest_r
+                node_op,
+                state.operator_state,
+                times,
+                values,
+                j,
+                time,
+                @inbounds(input_l.values[il]),
+                state.latest_r,
             )
         end
     end
