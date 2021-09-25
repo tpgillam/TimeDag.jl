@@ -9,6 +9,8 @@ using PrettyTables
 using Statistics
 using Tables
 
+include("maybe.jl")
+
 include("core.jl")
 include("constant.jl")  # Constant nodes are special, so we need to know about them first.
 
