@@ -29,10 +29,10 @@ function left(x, y, ::Type{A}=DEFAULT_ALIGNMENT) where {A<:Alignment}
     return obtain_node((x, y), Left{value_type(x),A}())
 end
 
-function right(x, y, ::Type{A}=DEFAULT_ALIGNMENT) where {A <: Alignment}
+function right(x, y, ::Type{A}=DEFAULT_ALIGNMENT) where {A<:Alignment}
     x = _ensure_node(x)
     y = _ensure_node(y)
-    return obtain_node((x, y), Right{value_type(y), A}())
+    return obtain_node((x, y), Right{value_type(y),A}())
 end
 
 """

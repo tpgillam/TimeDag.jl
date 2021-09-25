@@ -9,13 +9,15 @@
     @test TimeDag.zap_missing(constant(missing)).op isa TimeDag.ZapMissing
 
     # Standard case.
-    n = block_node(Block([
-        DateTime(2000, 1, 1) => missing,
-        DateTime(2000, 1, 2) => 2,
-        DateTime(2000, 1, 3) => 3,
-        DateTime(2000, 1, 4) => missing,
-    ]))
-    @test value_type(n) == Union{Missing, Int64}
+    n = block_node(
+        Block([
+            DateTime(2000, 1, 1) => missing,
+            DateTime(2000, 1, 2) => 2,
+            DateTime(2000, 1, 3) => 3,
+            DateTime(2000, 1, 4) => missing,
+        ]),
+    )
+    @test value_type(n) == Union{Missing,Int64}
     n2 = TimeDag.zap_missing(n)
     @test value_type(n2) == Int64
 

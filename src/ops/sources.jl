@@ -6,10 +6,7 @@ end
 create_evaluation_state(::Tuple{}, ::BlockNode) = _EMPTY_NODE_STATE
 
 function run_node!(
-    ::EmptyNodeEvaluationState,
-    op::BlockNode{T},
-    time_start::DateTime,
-    time_end::DateTime
+    ::EmptyNodeEvaluationState, op::BlockNode{T}, time_start::DateTime, time_end::DateTime
 ) where {T}
     return _slice(op.block, time_start, time_end)
 end

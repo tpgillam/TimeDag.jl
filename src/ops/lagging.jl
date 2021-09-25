@@ -34,7 +34,7 @@ function run_node!(
     # na = min(w - (ns - m), ni)  # The number of elements to append to the state buffer.
 
     # TODO @inbounds everywhere
-    times = @view(input.times[1 + ni - no:end])
+    times = @view(input.times[(1 + ni - no):end])
     values = if m == 0
         @view(input.values[1:no])
     else
@@ -43,12 +43,12 @@ function run_node!(
         for i in 1:m
             result[i] = popfirst!(state.value_buffer)
         end
-        result[m + 1:end] = @view(input.values[1:1 + no - m])
+        result[(m + 1):end] = @view(input.values[1:(1 + no - m)])
         result
     end
 
     # Update the state with the remaining values.
-    append!(state.value_buffer, @view(input.values[2 + no - m:end]))
+    append!(state.value_buffer, @view(input.values[(2 + no - m):end]))
 
     return Block(times, values)
 

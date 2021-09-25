@@ -12,9 +12,9 @@ output_type(::typeof(+), x, y) = promote_type(x, y)
 output_type(::typeof(-), x, y) = promote_type(x, y)
 output_type(::typeof(*), x, y) = promote_type(x, y)
 
-output_type(::typeof(/), ::Type{T}, ::Type{T}) where {T <: AbstractFloat} = T
-function output_type(::typeof(/), ::Type{X}, ::Type{Y}) where {X <: Real, Y <: Real}
+output_type(::typeof(/), ::Type{T}, ::Type{T}) where {T<:AbstractFloat} = T
+function output_type(::typeof(/), ::Type{X}, ::Type{Y}) where {X<:Real,Y<:Real}
     T = promote_type(X, Y)
     return output_type(/, T, T)
 end
-output_type(::typeof(/), ::Type{T}, ::Type{T}) where {T <: Integer} = Float64
+output_type(::typeof(/), ::Type{T}, ::Type{T}) where {T<:Integer} = Float64

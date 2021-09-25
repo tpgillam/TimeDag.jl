@@ -42,7 +42,6 @@ Map the given function over each of the block's values.
 """
 _mapvalues(f, block::Block) = Block([time => f(value) for (time, value) in block])
 
-
 # Common functionality for testing binary operators that also perform alignment
 
 b1 = Block([

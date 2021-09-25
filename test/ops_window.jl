@@ -1,12 +1,7 @@
 _eval(n) = _evaluate(n, DateTime(2000, 1, 1), DateTime(2000, 1, 10))
 
 # Gloriously inefficient way of computing running quantities from inception.
-function _naive_inception_reduce(
-    T,
-    f::Function,
-    block::Block,
-    min_window::Int,
-)
+function _naive_inception_reduce(T, f::Function, block::Block, min_window::Int)
     @assert min_window > 0
     times = DateTime[]
     values = T[]
@@ -26,12 +21,7 @@ function _naive_inception_reduce(
 end
 
 function _naive_window_reduce(
-    T,
-    f::Function,
-    block::Block,
-    window::Int,
-    emit_early::Bool,
-    min_window::Int,
+    T, f::Function, block::Block, window::Int, emit_early::Bool, min_window::Int
 )
     @assert window > 0
     @assert min_window > 0
@@ -57,7 +47,9 @@ function _naive_window_reduce(
     return Block(times, values)
 end
 
-function _test_inception_op(T, f_normal::Function, f_timedag::Function=f_normal; min_window=1)
+function _test_inception_op(
+    T, f_normal::Function, f_timedag::Function=f_normal; min_window=1
+)
     @test _eval(f_timedag(n4)) ≈ _naive_inception_reduce(T, f_normal, b4, min_window)
 end
 
@@ -69,8 +61,10 @@ function _test_window_op(T, f_normal::Function, f_timedag::Function=f_normal; mi
         block_ee_true = _eval(f_timedag(n4, window; emit_early=true))
         @test block == block_ee_false
 
-        @test block_ee_false ≈ _naive_window_reduce(T, f_normal, b4, window, false, min_window)
-        @test block_ee_true ≈ _naive_window_reduce(T, f_normal, b4, window, true, min_window)
+        @test block_ee_false ≈
+              _naive_window_reduce(T, f_normal, b4, window, false, min_window)
+        @test block_ee_true ≈
+              _naive_window_reduce(T, f_normal, b4, window, true, min_window)
     end
     return nothing
 end
