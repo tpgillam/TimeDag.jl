@@ -16,6 +16,17 @@ const DEFAULT_ALIGNMENT = UnionAlignment
 abstract type UnaryNodeOp{T} <: NodeOp{T} end
 abstract type BinaryAlignedNodeOp{T, A <: Alignment} <: NodeOp{T} end
 
+# FIXME Some benchmarking suggests that it would be more efficient to return
+#   (should_tick, value) rather than use these refs.
+#   In particular, one has to be really careful that the Ref is never actually instantiated
+#   since this creates an allocation, and ends up being really slow.
+#   But even avoiding this, it takes twice as long when inside a tight loop (as it is here).
+#
+#   Returning the pair has its own problems, because we need to choose a value to return in
+#   the case that we do not want to tick. We must return something of the same type to
+#   ensure type stability of the method.
+#
+#   The fix is to use the new Maybe{T} type implemented within TimeDag...
 """
     operator!(op::UnaryNodeOp{T}, (state,) out::Ref{T}, (time,) x) -> should_tick
     operator!(op::BinaryAlignedNodeOp{T}, (state,) out::Ref{T}, (time,) x, y) -> should_tick
@@ -182,18 +193,33 @@ end
 
 # FIXME Add initial_values, and support for this.
 
-# FIXME Instead of Nothing, use a custom marker type. Otherwise we need to make sure that
-#   !(Nothing <: T).
-#   Alternatively we could additionally store boolean sentinels to mark when each input is
-#   active.
-
 mutable struct UnionAlignmentState{L, R, OperatorState} <: NodeEvaluationState
-    latest_l::Union{L, Nothing}
-    latest_r::Union{R, Nothing}
+    valid_l::Bool
+    valid_r::Bool
     # TODO If OperatorState == EmptyNodeEvaluationState, it'd be nice not to store an extra
     # pointer here. Can we skip the field on the struct entirely? (Maybe just a different
     # struct is required.)
     operator_state::OperatorState
+
+    # These fields will initially be uninitialised.
+    latest_l::L
+    latest_r::R
+
+    function UnionAlignmentState{L, R}(
+        operator_state::OperatorState
+    ) where {L, R, OperatorState}
+        return new{L, R, OperatorState}(false, false, operator_state)
+    end
+end
+
+function _set_l!(state::UnionAlignmentState{L}, x::L) where {L}
+    state.latest_l = x
+    state.valid_l = true
+end
+
+function _set_r!(state::UnionAlignmentState{L, R}, x::R) where {L, R}
+    state.latest_r = x
+    state.valid_r = true
 end
 
 function create_evaluation_state(
@@ -203,11 +229,7 @@ function create_evaluation_state(
     operator_state = create_operator_evaluation_state(parents, op)
     L = value_type(parents[1])
     R = value_type(parents[2])
-    return UnionAlignmentState{L, R, typeof(operator_state)}(
-        nothing,
-        nothing,
-        operator_state,
-    )
+    return UnionAlignmentState{L, R}(operator_state)
 end
 
 function run_node!(
@@ -221,23 +243,23 @@ function run_node!(
     if isempty(input_l) && isempty(input_r)
         # Nothing to do, since neither input has ticked.
         return Block{T}()
-    elseif isempty(input_l) && isnothing(state.latest_l)
+    elseif isempty(input_l) && !state.valid_l
         # Left is inactive and won't tick, so nothing gets emitted. But make sure we update
         # the state on the right.
-        state.latest_r = @inbounds last(input_r.values)
+        _set_r!(state, @inbounds last(input_r.values))
         return Block{T}()
-    elseif isempty(input_r) && isnothing(state.latest_r)
+    elseif isempty(input_r) && !state.valid_r
         # Right is inactive and won't tick, so nothing gets emitted. But make sure we update
         # the state on the left.
-        state.latest_l = @inbounds last(input_l.values)
+        _set_l!(state, @inbounds last(input_l.values))
         return Block{T}()
     end
 
     if _equal_times(input_l, input_r)
         # Times are indistinguishable
         # Update the alignment state.
-        state.latest_l = @inbounds last(input_l.values)
-        state.latest_r = @inbounds last(input_r.values)
+        _set_l!(state, @inbounds last(input_l.values))
+        _set_r!(state, @inbounds last(input_r.values))
         return _apply_fast_align_binary!(T, node_op, state.operator_state, input_l, input_r)
     end
 
@@ -271,25 +293,25 @@ function run_node!(
 
         new_time = if (il <= nl && next_time_l < next_time_r) || ir > nr
             # Left ticks next
-            state.latest_l = @inbounds input_l.values[il]
+            _set_l!(state, @inbounds input_l.values[il])
             il += 1
             next_time_l
         elseif (ir <= nr && next_time_r < next_time_l) || il > nl
             # Right ticks next
-            state.latest_r = @inbounds input_r.values[ir]
+            _set_r!(state, @inbounds input_r.values[ir])
             ir += 1
             next_time_r
         else
             # A shared time point where neither x1 nor x2 have been exhausted.
-            state.latest_l = @inbounds input_l.values[il]
-            state.latest_r = @inbounds input_r.values[ir]
+            _set_l!(state, @inbounds input_l.values[il])
+            _set_r!(state, @inbounds input_r.values[ir])
             il += 1
             ir += 1
             next_time_l
         end
 
         # We must only output a knot if both inputs are active.
-        if (isnothing(state.latest_l) || isnothing(state.latest_r))
+        if !state.valid_l || !state.valid_r
             continue
         end
 
@@ -389,9 +411,19 @@ function run_node!(
 end
 
 mutable struct LeftAlignmentState{R, OperatorState} <: NodeEvaluationState
-    latest_r::Union{R, Nothing}
+    valid_r::Bool
     # TODO As for UnionAlignmentState, would be nice to omit this field when not needed.
     operator_state::OperatorState
+    latest_r::R
+
+    function LeftAlignmentState{R}(operator_state::OperatorState) where {R, OperatorState}
+        return new{R, OperatorState}(false, operator_state)
+    end
+end
+
+function _set_r!(state::LeftAlignmentState{R}, x::R) where {R}
+    state.latest_r = x
+    state.valid_r = true
 end
 
 function create_evaluation_state(
@@ -400,7 +432,7 @@ function create_evaluation_state(
 ) where {T}
     operator_state = create_operator_evaluation_state(parents, op)
     R = value_type(parents[2])
-    return LeftAlignmentState{R, typeof(operator_state)}(nothing, operator_state)
+    return LeftAlignmentState{R}(operator_state)
 end
 
 function run_node!(
@@ -411,12 +443,12 @@ function run_node!(
     input_l::Block{L},
     input_r::Block{R},
 ) where {T, L, R}
-    have_initial_r = !isnothing(state.latest_r)
+    have_initial_r = state.valid_r
 
     if isempty(input_l)
         # We will not tick, but update state if necessary.
         if !isempty(input_r)
-            state.latest_r = @inbounds last(input_r.values)
+            _set_r!(state, @inbounds last(input_r.values))
         end
         return Block{T}()
     elseif isempty(input_r) && !have_initial_r
@@ -477,7 +509,7 @@ function run_node!(
 
     # Update state
     if !isempty(input_r)
-        state.latest_r = @inbounds last(input_r.values)
+        _set_r!(state, @inbounds last(input_r.values))
     end
 
     # Package the outputs into a block, resizing the outputs as necessary.
