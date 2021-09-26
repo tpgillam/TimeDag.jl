@@ -23,6 +23,7 @@ include("common.jl")
         @testset "align" begin include("ops_align.jl") end
         @testset "arithmetic" begin include("ops_arithmetic.jl") end
         @testset "conditional" begin include("ops_conditional.jl") end
+        @testset "lagging" begin include("ops_lagging.jl") end
         @testset "logical" begin include("ops_logical.jl") end
         @testset "window" begin include("ops_window.jl") end
     end

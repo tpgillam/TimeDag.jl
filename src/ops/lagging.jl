@@ -1,7 +1,6 @@
 """A node which lags its input by a fixed number of knots."""
 struct Lag{T} <: NodeOp{T}
     n::Int64
-    # TODO verify that n > 0
 end
 
 struct LagState{T} <: NodeEvaluationState
@@ -29,30 +28,35 @@ function run_node!(
     w = op.n  # The window length.
     ni = length(input)  # The input length.
     ns = length(state.value_buffer)  # The state buffer length.
-    m = min(w, ns)  # The number of elements to take from the state buffer.
-    no = max(m + ni - w, 0)  # The output length.
-    # na = min(w - (ns - m), ni)  # The number of elements to append to the state buffer.
 
-    # TODO @inbounds everywhere
-    times = @view(input.times[(1 + ni - no):end])
+    # The output length.
+    #   - at most the input size
+    #   - at most total number of knots available in this batch: max((ns + ni) - w, 0)
+    no = min(ni, max((ns + ni) - w, 0))
+
+    # The number of elements to take from the state buffer.
+    #   - at most the window size
+    #   - at most the number of available elements in the buffer
+    #   - at most the output size
+    m = min(w, ns, no)
+
+    times = @inbounds @view(input.times[(1 + ni - no):end])
     values = if m == 0
-        @view(input.values[1:no])
+        @inbounds @view(input.values[1:no])
     else
         # Merge values from the state and in the Block.
-        result = _allocate_values(T, n)
+        result = _allocate_values(T, no)
         for i in 1:m
-            result[i] = popfirst!(state.value_buffer)
+            @inbounds result[i] = popfirst!(state.value_buffer)
         end
-        result[(m + 1):end] = @view(input.values[1:(1 + no - m)])
+        @inbounds result[(m + 1):end] = @view(input.values[1:(no - m)])
         result
     end
 
-    # Update the state with the remaining values.
-    append!(state.value_buffer, @view(input.values[(2 + no - m):end]))
+    # Update the state with the remaining values in the input.
+    @inbounds append!(state.value_buffer, @view(input.values[(1 + no - m):end]))
 
     return Block(times, values)
-
-    # TODO This needs lots of tests!
 end
 
 function lag(node::Node, n::Integer)
