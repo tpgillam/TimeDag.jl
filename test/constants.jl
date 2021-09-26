@@ -13,3 +13,9 @@
 
     @test TimeDag.lag(n1, 2) === constant(1)
 end
+
+@testset "evaluate" begin
+    for t_start in [DateTime(2020), DateTime(2021)]
+        @test _evaluate(constant(3), t_start, t_start + Day(1)) == Block([t_start => 3])
+    end
+end
