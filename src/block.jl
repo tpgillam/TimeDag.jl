@@ -1,19 +1,53 @@
 # TODO parameterise time type?
-# TODO probably a bunch of @inbounds can go everywhere.
 
 # TODO Using an abstractvector for values requires some thought. The problem is whether or
 #   not it would permit us to have views of an array.
 #   Possibly we need a more general type here which can package other representations?
 #   See Stheno ColVecs / RowVecs - they have the same problem.
 
+function _is_strictly_increasing(x::AbstractVector)
+    length(x) < 2 && return true
+
+    previous_value = @inbounds first(x)
+    for value in @inbounds(x[2:end])
+        if previous_value >= value
+            return false
+        end
+        previous_value = value
+    end
+    return true
+end
+
+"""
+    Block{T}()
+    Block(times::AbstractVector{DateTime}, values::AbstractVector{T})
+    Block(:unchecked, times, values)
+
+Represent some data in timeseries.
+
+Conceptually this is a list of `(time, value)` pairs, or "knots". Times must be strictly
+increasing — i.e. no repeated timestamps are allowed.
+
+The constructor `Block(times, values)` will verify that the input data satisfies this
+constraint, however `Block(:unchecked, times, values)` will skip the checks. This is
+primarily intended for internal use, where the caller assumes responsibility for the
+validity of `times` & `values`.
+"""
 struct Block{T,VTimes<:AbstractVector{DateTime},VValues<:AbstractVector{T}}
     times::VTimes
     values::VValues
 
+    Block(symbol::Symbol, args...) = Block(Val{symbol}, args...)
+
+    function Block(
+        ::Type{Val{:unchecked}}, times::VTimes, values::VValues
+    ) where {T,VTimes<:AbstractVector{DateTime},VValues<:AbstractVector{T}}
+        return new{T,VTimes,VValues}(times, values)
+    end
+
     function Block(
         times::VTimes, values::VValues
     ) where {T,VTimes<:AbstractVector{DateTime},VValues<:AbstractVector{T}}
-        # TODO Need some way of skipping checks if we're confident they're unnecessary...?
         if length(times) != length(values)
             throw(
                 ArgumentError(
@@ -21,17 +55,19 @@ struct Block{T,VTimes<:AbstractVector{DateTime},VValues<:AbstractVector{T}}
                 ),
             )
         end
-        # FIXME Should we enforce basic requirements on construction, e.g.
-        #   -> time ordering
-        #   -> no repeated timestamps
-        #   -> same length of times & values
+
+        if !_is_strictly_increasing(times)
+            throw(ArgumentError("Times are not strictly increasing."))
+        end
+
+        # TODO
         #   -> How make times & values immutable? Subclass of AbstractVector that doesn't
         #       implement setindex! ?
         return new{T,VTimes,VValues}(times, values)
     end
 end
 
-Block{T}() where {T} = Block(DateTime[], T[])
+Block{T}() where {T} = Block(:unchecked, DateTime[], T[])
 
 function Block(
     knots::Union{AbstractVector{Tuple{DateTime,T}},AbstractVector{Pair{DateTime,T}}}
@@ -102,6 +138,7 @@ function _slice(block::Block{T}, time_start::DateTime, time_end::DateTime) where
         return block
     else
         return Block(
+            :unchecked,
             @inbounds(@view(block.times[i_first:i_last])),
             @inbounds(@view(block.values[i_first:i_last])),
         )
@@ -115,6 +152,8 @@ function Base.vcat(blocks::Block{T}...) where {T}
     else
         # TODO Rather than using vcat here, we could use a function that more intelligently
         # merges views and ranges etc.
+        # TODO we could use :unchecked here, if we were to check that all the adjacent
+        #   elements between blocks were correct.
         Block(
             vcat((block.times for block in blocks)...),
             vcat((block.values for block in blocks)...),
