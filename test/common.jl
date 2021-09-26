@@ -42,8 +42,9 @@ Map the given function over each of the block's values.
 """
 _mapvalues(f, block::Block) = Block([time => f(value) for (time, value) in block])
 
-# Common functionality for testing binary operators that also perform alignment
-
+# Common functionality for testing binary operators that also perform alignment.
+# Disable formatting, so as to permit more consistent layout of timeseries.
+#! format: off
 b1 = Block([
     DateTime(2000, 1, 1) => 1,
     DateTime(2000, 1, 2) => 2,
@@ -114,3 +115,5 @@ function _test_binary_op(op_timedag, op=op_timedag)
     ])
     @test _eval(op_timedag(n3, n2, TimeDag.LeftAlignment)) == Block{Int64}()
 end
+
+#! format: on

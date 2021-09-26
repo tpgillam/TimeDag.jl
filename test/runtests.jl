@@ -11,6 +11,8 @@ using TimeDag: block_node, constant, empty_node
 
 include("common.jl")
 
+#! format: off
+
 @testset "TimeDag.jl" begin
     @testset "maybe" begin include("maybe.jl") end
     @testset "block" begin include("block.jl") end
@@ -25,3 +27,5 @@ include("common.jl")
         @testset "window" begin include("ops_window.jl") end
     end
 end
+
+#! format: on

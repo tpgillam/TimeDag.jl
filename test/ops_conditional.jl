@@ -23,8 +23,10 @@
 
     result = _evaluate(n2, DateTime(2000, 1, 1), DateTime(2000, 1, 5))
     @test value_type(result) == Int64
+    #! format: off
     @test result == Block([
         DateTime(2000, 1, 2) => 2,
         DateTime(2000, 1, 3) => 3,
     ])
+    #! format: on
 end
