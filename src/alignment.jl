@@ -168,7 +168,7 @@ function _apply_fast_align_binary!(
 )
     n = length(input_l)
     values = _allocate_values(T, n)
-    return if always_ticks(node_op)
+    return if always_ticks(op)
         # We shouldn't assume that it is valid to broadcast f over the inputs, so loop
         # manually.
         for i in 1:n
