@@ -160,12 +160,11 @@ end
 
 """Apply, assuming `input_l` and `input_r` have identical alignment."""
 function _apply_fast_align_binary!(
-    T,
-    op::BinaryAlignedNodeOp,
+    op::BinaryAlignedNodeOp{T},
     operator_state::NodeEvaluationState,
     input_l::Block,
     input_r::Block,
-)
+) where {T}
     n = length(input_l)
     values = _allocate_values(T, n)
     return if always_ticks(op)
@@ -284,7 +283,7 @@ function run_node!(
         # Update the alignment state.
         _set_l!(state, @inbounds last(input_l.values))
         _set_r!(state, @inbounds last(input_r.values))
-        return _apply_fast_align_binary!(T, node_op, state.operator_state, input_l, input_r)
+        return _apply_fast_align_binary!(node_op, state.operator_state, input_l, input_r)
     end
 
     # Create our outputs as the maximum possible size.
@@ -382,7 +381,7 @@ function run_node!(
 
     if _equal_times(input_l, input_r)
         # Times are indistinguishable.
-        return _apply_fast_align_binary!(T, node_op, operator_state, input_l, input_r)
+        return _apply_fast_align_binary!(node_op, operator_state, input_l, input_r)
     end
 
     # Create our outputs as the maximum possible size.
@@ -485,7 +484,7 @@ function run_node!(
 
     if _equal_times(input_l, input_r)
         # Times are indistinguishable.
-        return _apply_fast_align_binary!(T, node_op, state.operator_state, input_l, input_r)
+        return _apply_fast_align_binary!(node_op, state.operator_state, input_l, input_r)
     end
 
     # The most we can emit is one knot for every knot in input_l.
