@@ -80,6 +80,23 @@ n4 = block_node(b4)
 _eval(n) = _evaluate(n, DateTime(2000, 1, 1), DateTime(2000, 1, 10))
 
 function _test_binary_op(op_timedag, op=op_timedag)
+    # Common (fast) alignment.
+    # Should apply for *any* user choice of alignment.
+    for alignment in (
+            TimeDag.UnionAlignment, TimeDag.LeftAlignment, TimeDag.IntersectAlignment
+        )
+        n = op_timedag(n1, n1, alignment)
+        block = _eval(n)
+        @test block == Block([
+            DateTime(2000, 1, 1) => op(1, 1),
+            DateTime(2000, 1, 2) => op(2, 2),
+            DateTime(2000, 1, 3) => op(3, 3),
+            DateTime(2000, 1, 4) => op(4, 4),
+        ])
+        # For fast alignment, we expect *identical* timestamps as on the input.
+        @test block.times === b1.times
+    end
+
     # Union alignment.
     n = op_timedag(n1, n2)
     @test n === op_timedag(n1, n2, TimeDag.UnionAlignment)
