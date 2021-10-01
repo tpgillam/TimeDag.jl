@@ -13,6 +13,10 @@ n_boolean = TimeDag.block_node(b_boolean)
             @test _eval(op(n_boolean)) == _mapvalues(op, b_boolean)
         end
     end
+
+    @testset "inverse identities" begin
+        @test !(!n_boolean) === n_boolean
+    end
 end
 
 @testset "binary" begin

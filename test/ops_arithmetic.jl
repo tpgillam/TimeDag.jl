@@ -6,6 +6,10 @@ _eval(n) = _evaluate(n, DateTime(2000, 1, 1), DateTime(2000, 1, 10))
             @test _eval(op(n1)) == _mapvalues(op, b1)
         end
     end
+
+    @testset "inverse identities" begin
+        @test -(-n1) === n1
+    end
 end
 
 @testset "binary" begin
