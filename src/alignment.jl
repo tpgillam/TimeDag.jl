@@ -139,7 +139,7 @@ function run_node!(
             time = @inbounds input.times[i]
             @inbounds values[i] = operator!(node_op, state, time, input.values[i])
         end
-        Block(:unchecked, input.times, values)
+        Block(Unchecked, input.times, values)
     else
         times = _allocate_times(n)
         j = 1
@@ -154,7 +154,7 @@ function run_node!(
         end
         _trim!(times, j - 1)
         _trim!(values, j - 1)
-        Block(:unchecked, times, values)
+        Block(Unchecked, times, values)
     end
 end
 
@@ -176,7 +176,7 @@ function _apply_fast_align_binary!(
                 op, operator_state, time, input_l.values[i], input_r.values[i]
             )
         end
-        Block(:unchecked, input_l.times, values)
+        Block(Unchecked, input_l.times, values)
     else
         # FIXME Implement this branch!
         error("Not implemented!")
@@ -355,7 +355,7 @@ function run_node!(
     _trim!(times, j - 1)
     _trim!(values, j - 1)
 
-    return Block(:unchecked, times, values)
+    return Block(Unchecked, times, values)
 end
 
 function create_evaluation_state(
@@ -433,7 +433,7 @@ function run_node!(
     # Package the outputs into a block, resizing the outputs as necessary.
     _trim!(times, j - 1)
     _trim!(values, j - 1)
-    return Block(:unchecked, times, values)
+    return Block(Unchecked, times, values)
 end
 
 mutable struct LeftAlignmentState{R,OperatorState} <: NodeEvaluationState
@@ -547,5 +547,5 @@ function run_node!(
     # Package the outputs into a block, resizing the outputs as necessary.
     _trim!(times, j - 1)
     _trim!(values, j - 1)
-    return Block(:unchecked, times, values)
+    return Block(Unchecked, times, values)
 end

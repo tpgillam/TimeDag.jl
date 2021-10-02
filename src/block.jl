@@ -19,9 +19,14 @@ function _is_strictly_increasing(x::AbstractVector)
 end
 
 """
+Sentinel type for use in the constructor for `Block` below.
+"""
+abstract type Unchecked end
+
+"""
     Block{T}()
     Block(times::AbstractVector{DateTime}, values::AbstractVector{T})
-    Block(:unchecked, times, values)
+    Block(Unchecked, times, values)
 
 Represent some data in timeseries.
 
@@ -29,7 +34,7 @@ Conceptually this is a list of `(time, value)` pairs, or "knots". Times must be 
 increasing — i.e. no repeated timestamps are allowed.
 
 The constructor `Block(times, values)` will verify that the input data satisfies this
-constraint, however `Block(:unchecked, times, values)` will skip the checks. This is
+constraint, however `Block(Unchecked, times, values)` will skip the checks. This is
 primarily intended for internal use, where the caller assumes responsibility for the
 validity of `times` & `values`.
 """
@@ -37,10 +42,8 @@ struct Block{T,VTimes<:AbstractVector{DateTime},VValues<:AbstractVector{T}}
     times::VTimes
     values::VValues
 
-    Block(symbol::Symbol, args...) = Block(Val{symbol}, args...)
-
     function Block(
-        ::Type{Val{:unchecked}}, times::VTimes, values::VValues
+        ::Type{Unchecked}, times::VTimes, values::VValues
     ) where {T,VTimes<:AbstractVector{DateTime},VValues<:AbstractVector{T}}
         return new{T,VTimes,VValues}(times, values)
     end
@@ -67,7 +70,7 @@ struct Block{T,VTimes<:AbstractVector{DateTime},VValues<:AbstractVector{T}}
     end
 end
 
-Block{T}() where {T} = Block(:unchecked, DateTime[], T[])
+Block{T}() where {T} = Block(Unchecked, DateTime[], T[])
 
 function Block(
     knots::Union{AbstractVector{Tuple{DateTime,T}},AbstractVector{Pair{DateTime,T}}}
@@ -138,7 +141,7 @@ function _slice(block::Block{T}, time_start::DateTime, time_end::DateTime) where
         return block
     else
         return Block(
-            :unchecked,
+            Unchecked,
             @inbounds(@view(block.times[i_first:i_last])),
             @inbounds(@view(block.values[i_first:i_last])),
         )
@@ -152,7 +155,7 @@ function Base.vcat(blocks::Block{T}...) where {T}
     else
         # TODO Rather than using vcat here, we could use a function that more intelligently
         # merges views and ranges etc.
-        # TODO we could use :unchecked here, if we were to check that all the adjacent
+        # TODO we could use Unchecked here, if we were to check that all the adjacent
         #   elements between blocks were correct.
         Block(
             vcat((block.times for block in blocks)...),
