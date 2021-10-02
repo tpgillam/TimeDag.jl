@@ -1,7 +1,5 @@
 struct ZapMissing{T} <: UnaryNodeOp{T} end
 
-create_operator_evaluation_state(::Tuple{Node}, ::ZapMissing) = _EMPTY_NODE_STATE
-
 stateless(::ZapMissing) = true
 time_agnostic(::ZapMissing) = true
 

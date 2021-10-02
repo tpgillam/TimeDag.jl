@@ -120,7 +120,11 @@ end
 
 # An unary node has no alignment state, so any state comes purely from the operator.
 function create_evaluation_state(parents::Tuple{Node}, op::UnaryNodeOp)
-    return create_operator_evaluation_state(parents, op)
+    return if stateless_operator(op)
+        _EMPTY_NODE_STATE
+    else
+        create_operator_evaluation_state(parents, op)
+    end
 end
 
 function run_node!(
@@ -185,24 +189,35 @@ end
 
 # TODO Add initial_values, and support for this.
 
-mutable struct UnionAlignmentState{L,R,OperatorState} <: NodeEvaluationState
+abstract type UnionAlignmentState{L,R} <: NodeEvaluationState end
+
+mutable struct UnionWithOpState{L,R,OperatorState} <: UnionAlignmentState{L,R}
     valid_l::Bool
     valid_r::Bool
-    # TODO If OperatorState == EmptyNodeEvaluationState, it'd be nice not to store an extra
-    # pointer here. Can we skip the field on the struct entirely? (Maybe just a different
-    # struct is required.)
     operator_state::OperatorState
-
     # These fields will initially be uninitialised.
     latest_l::L
     latest_r::R
 
-    function UnionAlignmentState{L,R}(
-        operator_state::OperatorState
-    ) where {L,R,OperatorState}
+    function UnionWithOpState{L,R}(operator_state::OperatorState) where {L,R,OperatorState}
         return new{L,R,OperatorState}(false, false, operator_state)
     end
 end
+
+mutable struct UnionWithoutOpState{L,R} <: UnionAlignmentState{L,R}
+    valid_l::Bool
+    valid_r::Bool
+    # These fields will initially be uninitialised.
+    latest_l::L
+    latest_r::R
+
+    function UnionWithoutOpState{L,R}() where {L,R}
+        return new{L,R}(false, false)
+    end
+end
+
+operator_state(::UnionWithoutOpState) = _EMPTY_NODE_STATE
+operator_state(state::UnionWithOpState) = state.operator_state
 
 function _set_l!(state::UnionAlignmentState{L}, x::L) where {L}
     state.latest_l = x
@@ -219,10 +234,14 @@ end
 function create_evaluation_state(
     parents::Tuple{Node,Node}, op::BinaryAlignedNodeOp{T,UnionAlignment}
 ) where {T}
-    operator_state = create_operator_evaluation_state(parents, op)
     L = value_type(parents[1])
     R = value_type(parents[2])
-    return UnionAlignmentState{L,R}(operator_state)
+    return if stateless_operator(op)
+        UnionWithoutOpState{L,R}()
+    else
+        operator_state = create_operator_evaluation_state(parents, op)
+        UnionWithOpState{L,R}(operator_state)
+    end
 end
 
 @inline function _maybe_add_knot!(
@@ -283,7 +302,7 @@ function run_node!(
         # Update the alignment state.
         _set_l!(state, @inbounds last(input_l.values))
         _set_r!(state, @inbounds last(input_r.values))
-        return _apply_fast_align_binary!(node_op, state.operator_state, input_l, input_r)
+        return _apply_fast_align_binary!(node_op, operator_state(state), input_l, input_r)
     end
 
     # Create our outputs as the maximum possible size.
@@ -341,7 +360,7 @@ function run_node!(
         # Compute and possibly output a knot.
         j = _maybe_add_knot!(
             node_op,
-            state.operator_state,
+            operator_state(state),
             times,
             values,
             j,
@@ -363,7 +382,11 @@ function create_evaluation_state(
 ) where {T}
     # Intersect alignment doesn't require remembering any previous state, so just return
     # the operator state.
-    return create_operator_evaluation_state(parents, op)
+    return if stateless_operator(op)
+        _EMPTY_NODE_STATE
+    else
+        create_operator_evaluation_state(parents, op)
+    end
 end
 
 function run_node!(
@@ -436,16 +459,27 @@ function run_node!(
     return Block(Unchecked, times, values)
 end
 
-mutable struct LeftAlignmentState{R,OperatorState} <: NodeEvaluationState
+abstract type LeftAlignmentState{R} <: NodeEvaluationState end
+
+mutable struct LeftWithOpState{R,OperatorState} <: LeftAlignmentState{R}
     valid_r::Bool
-    # TODO As for UnionAlignmentState, would be nice to omit this field when not needed.
     operator_state::OperatorState
     latest_r::R
 
-    function LeftAlignmentState{R}(operator_state::OperatorState) where {R,OperatorState}
+    function LeftWithOpState{R}(operator_state::OperatorState) where {R,OperatorState}
         return new{R,OperatorState}(false, operator_state)
     end
 end
+
+mutable struct LeftWithoutOpState{R} <: LeftAlignmentState{R}
+    valid_r::Bool
+    latest_r::R
+
+    LeftWithoutOpState{R}() where {R} = new{R}(false)
+end
+
+operator_state(::LeftWithoutOpState) = _EMPTY_NODE_STATE
+operator_state(state::LeftWithOpState) = state.operator_state
 
 function _set_r!(state::LeftAlignmentState{R}, x::R) where {R}
     state.latest_r = x
@@ -456,9 +490,13 @@ end
 function create_evaluation_state(
     parents::Tuple{Node,Node}, op::BinaryAlignedNodeOp{T,LeftAlignment}
 ) where {T}
-    operator_state = create_operator_evaluation_state(parents, op)
     R = value_type(parents[2])
-    return LeftAlignmentState{R}(operator_state)
+    return if stateless_operator(op)
+        LeftWithoutOpState{R}()
+    else
+        operator_state = create_operator_evaluation_state(parents, op)
+        LeftWithOpState{R}(operator_state)
+    end
 end
 
 function run_node!(
@@ -484,7 +522,7 @@ function run_node!(
 
     if _equal_times(input_l, input_r)
         # Times are indistinguishable.
-        return _apply_fast_align_binary!(node_op, state.operator_state, input_l, input_r)
+        return _apply_fast_align_binary!(node_op, operator_state(state), input_l, input_r)
     end
 
     # The most we can emit is one knot for every knot in input_l.
@@ -513,7 +551,7 @@ function run_node!(
 
             j = _maybe_add_knot!(
                 node_op,
-                state.operator_state,
+                operator_state(state),
                 times,
                 values,
                 j,
@@ -528,7 +566,7 @@ function run_node!(
 
             j = _maybe_add_knot!(
                 node_op,
-                state.operator_state,
+                operator_state(state),
                 times,
                 values,
                 j,

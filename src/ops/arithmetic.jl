@@ -18,8 +18,6 @@ for op in (:-, :exp, :log, :log10, :log2, :sqrt, :cbrt, :!)
     @eval begin
         struct $node_op{T} <: UnaryNodeOp{T} end
 
-        create_operator_evaluation_state(::Tuple{Node}, ::$node_op) = _EMPTY_NODE_STATE
-
         always_ticks(::$node_op) = true
         stateless(::$node_op) = true
         time_agnostic(::$node_op) = true
@@ -66,8 +64,6 @@ for (node_op, op) in [
 ]
     @eval begin
         struct $node_op{T,A} <: BinaryAlignedNodeOp{T,A} end
-
-        create_operator_evaluation_state(::Tuple{Node,Node}, ::$node_op) = _EMPTY_NODE_STATE
 
         always_ticks(::$node_op) = true
         stateless_operator(::$node_op) = true
