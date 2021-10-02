@@ -2,6 +2,7 @@ module TimeDag
 
 using AbstractTrees
 using AssociativeWindowAggregation
+using Bijections
 using DataStructures
 using Dates
 using LightGraphs

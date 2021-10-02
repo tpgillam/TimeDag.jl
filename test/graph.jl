@@ -1,3 +1,6 @@
+# WARNING: These tests interfere with the global graph state, and as such will break any
+# Node instances that currently exist.
+
 _test_block() = TimeDag.Block(DateTime(2020, 1, 1):Day(1):DateTime(2020, 1, 5), 1:5)
 
 """
@@ -7,10 +10,8 @@ that the graph is emptied.
 function _reset_global_graph()
     GC.gc()
     graph = TimeDag.global_graph()
-    graph.node_to_vertex = WeakKeyDict()
-    graph.vertex_to_ref = Dict()
-    graph.graph = SimpleDiGraph()
-    graph.dirty = false
+    graph.node_to_weak = WeakKeyDict()
+    graph.weak_to_ref = Dict()
     return nothing
 end
 

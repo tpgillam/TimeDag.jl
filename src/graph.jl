@@ -1,74 +1,68 @@
 """
+Represent a node-like object, that doesn't hold strong references to its parents.
+
+This exists purely such that `hash` and `==` *do* allow multiple instances of
+`WeakNode` to compare equal if they have the same `parents` and `op`.
+"""
+struct WeakNode
+    parents::NTuple{N,WeakRef} where {N}
+    op::NodeOp
+end
+WeakNode(node::Node) = WeakNode(map(WeakRef, node.parents), node.op)
+
+# Weak nodes need to have hash & equality defined such that instances with equal
+# parents and op compare equal. This will be relied upon in `obtain_node` later.
+Base.hash(a::WeakNode, h::UInt) = hash(a.op, hash(a.parents, hash(:WeakNode, h)))
+Base.:(==)(a::WeakNode, b::WeakNode) = a.parents == b.parents && a.op == b.op
+
+"""
 Represent a graph of nodes which doesn't hold strong references to any nodes.
 
 This is useful, as it allows the existence of this graph to be somewhat transparent to the
 user, and they only have to care about holding on to references for nodes that they care
 about.
 
+This structure contains nodes, but also node weak nodes -- this allows us to determine
+whether we ought to create a given node.
+
 Note that this structure is definitely *not* threadsafe. We are assuming that all nodes are
 created in a single thread.
 """
 mutable struct NodeGraph
-    node_to_vertex::WeakKeyDict{Node,Int64}
-    vertex_to_ref::Dict{Int64,WeakRef}
-    # TODO Figure out of this LightGraph representation is useful.
-    # Edges are directed from parents to children.
-    graph::SimpleDiGraph{Int64}
-    dirty::Bool  # This means that `vertex_to_ref` needs cleaning.
+    # TODO This could be wrapped up into a WeakBijection data structure.
+    node_to_weak::WeakKeyDict{Node,WeakNode}
+    weak_to_ref::Dict{WeakNode,WeakRef}
 end
-NodeGraph() = NodeGraph(WeakKeyDict(), Dict(), SimpleDiGraph(), false)
+NodeGraph() = NodeGraph(WeakKeyDict(), Dict())
 
-Base.length(graph::NodeGraph) = length(graph.node_to_vertex)
+Base.length(graph::NodeGraph) = length(graph.node_to_weak)
 Base.isempty(graph::NodeGraph) = length(graph) == 0
-Base.haskey(graph::NodeGraph, node::Node) = haskey(graph.node_to_vertex, node)
-
-function _cleanup(graph::NodeGraph)
-    if graph.dirty
-        # Clean up any dangling references in vertex_to_ref.
-        graph.dirty = false
-
-        # This does a full scan. This is a bit sad, although in practice we shouldn't do it
-        # especially often (as hopefully we rarely throw away nodes in typical usage).
-        for (key, ref) in graph.vertex_to_ref
-            if isnothing(ref.value)
-                delete!(graph.vertex_to_ref, key)
-                # TODO Remove index from graph too? -- actually CAREFUL about this, as the
-                # default LightGraph implementation will then relabel the last vertex so as
-                # to preserve contiguity.
-                # Probably simpler to leave dangling for now, but in the future we should
-                # think about solving this more nicely.
-            end
-        end
-    end
+Base.haskey(graph::NodeGraph, node::Node) = haskey(graph.node_to_weak, node)
+function Base.haskey(graph::NodeGraph, weak_node::WeakNode)
+    return haskey(graph.weak_to_ref, weak_node)
 end
 
+"""
+    insert_node!(graph::NodeGraph, node) -> NodeGraph
+
+Insert `node` into `graph`.
+"""
 function insert_node!(graph::NodeGraph, node::Node)
-    _cleanup(graph)
+    # TODO This shouldn't be required, as it is an error to attempt to insert an existing
+    # node to the graph. Delete?
+    haskey(graph, node) && throw(ArgumentError("$node is already in $graph"))
 
-    if haskey(graph, node)
-        # Nothing to do!
-        return graph
-    end
+    # We are going to add the node.
+    weak_node = WeakNode(node)
 
-    # We are going to add the node - we must do the following:
-    #   1. Figure out what index the node should have
-    add_vertex!(graph.graph)
-    index = nv(graph.graph)
+    # Insert the node & its weak counterpart to the mappings.
+    graph.node_to_weak[node] = weak_node
+    graph.weak_to_ref[weak_node] = WeakRef(node)
 
-    #   2. Insert into A & B
-    graph.node_to_vertex[node] = index
-    graph.vertex_to_ref[index] = WeakRef(node)
+    # Add a finalizer to the node that will declare the graph to be dirty when it is
+    # deleted. We handle this above.
+    finalizer(n -> delete!(graph.weak_to_ref, WeakNode(n)), node)
 
-    #   3. Add a finalizer to node that will declare the graph to be dirty when it is
-    #       deleted. We handle this above.
-    finalizer(n -> graph.dirty = true, node)
-
-    # Insert all parents.
-    for parent in parents(node)
-        insert_node!(graph, parent)
-        # Add edge from node to parent.
-        add_edge!(graph.graph, graph.node_to_vertex[node], graph.node_to_vertex[parent])
-    end
     return graph
 end
 
@@ -99,16 +93,17 @@ If the graph is not specified, the global graph is used.
 function obtain_node(graph::NodeGraph, parents::NTuple{N,Node}, op::NodeOp) where {N}
     if !isempty(parents) && _can_propagate_constant(op) && all(_is_constant, parents)
         # Constant propagation, since all inputs are constants & the op supports it.
+        # Note that `constant` does, itself, call through to `obtain_node`, so the node will
+        # be correctly registered with the graph.
         return constant(_propagate_constant_value(op, parents))
     end
-    node = Node(parents, op)
-    return if haskey(graph, node)
-        # An equivalent node exists in the graph; return the existing node.
-        index = graph.node_to_vertex[node]
+    weak_node = WeakNode(map(WeakRef, parents), op)
+    return if haskey(graph, weak_node)
         # Remember that we need to unwrap the value from the WeakRef...
-        graph.vertex_to_ref[index].value
+        graph.weak_to_ref[weak_node].value
     else
-        # Insert the new node into the graph, and return it.
+        # An equivalent node does not yet exist in the graph; create it
+        node = Node(parents, op)
         insert_node!(graph, node)
         node
     end
@@ -128,14 +123,11 @@ The result will be ordered such that the parents of any given vertex will always
 the vertex itself.
 """
 function ancestors(graph::AbstractGraph{T}, sources::AbstractVector{T}) where {T}
-    if isempty(sources)
-        throw(ArgumentError("Need at least 1 source"))
-    end
+    isempty(sources) && throw(ArgumentError("Need at least 1 source"))
 
     seen = Set{T}()
 
     stack = Vector(sources)
-    # results = [[source] for source in sources]
 
     # Get the search data for the current source.
     while !isempty(stack)
@@ -167,9 +159,21 @@ Get a list of all nodes in the graph defined by `nodes`, including all parents.
 If `graph` is not specified, the global graph will be used.
 """
 function ancestors(graph::NodeGraph, nodes::Node...)
-    vertices = [graph.node_to_vertex[node] for node in nodes]
-    ancestor_vertices = ancestors(graph.graph, vertices)
-    return [graph.vertex_to_ref[vertex].value for vertex in ancestor_vertices]
+    # Construct a LightGraphs representation of the whole node graph.
+    node_to_vertex = Bijection(
+        Dict(n => i for (i, n) in enumerate(keys(graph.node_to_weak)))
+    )
+    light_graph = SimpleDiGraph(length(graph))
+    for (node, i) in node_to_vertex
+        for parent in parents(node)
+            # Add edge from node to parent.
+            add_edge!(light_graph, i, node_to_vertex[parent])
+        end
+    end
+
+    vertices = [node_to_vertex[node] for node in nodes]
+    ancestor_vertices = ancestors(light_graph, vertices)
+    return [inverse(node_to_vertex, vertex) for vertex in ancestor_vertices]
 end
 
 # This is the single instance of the graph that we want
