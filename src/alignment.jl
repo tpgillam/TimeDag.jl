@@ -148,8 +148,8 @@ function run_node!(
         times = _allocate_times(n)
         j = 1
         for i in 1:n
-            time = input.times[i]
-            out = operator!(node_op, state, time, input.values[i])
+            time = @inbounds input.times[i]
+            out = operator!(node_op, state, time, @inbounds(input.values[i]))
             if valid(out)
                 @inbounds values[j] = unsafe_value(out)
                 @inbounds times[j] = input.times[i]
@@ -540,14 +540,12 @@ function run_node!(
     for il in 1:nl
         # Consume r while it would leave us before the current time in l, or until we reach
         # the end of r.
-        # TODO Check these conditions, add @inbounds when happy.
-        # while (ir < nr && @inbounds(input_r.times[ir + 1] <= input_l.times[il]))
-        while (ir < nr && input_r.times[ir + 1] <= input_l.times[il])
+        while (ir < nr && @inbounds(input_r.times[ir + 1] <= input_l.times[il]))
             ir += 1
         end
 
         if ir > 0
-            time = input_l.times[il]
+            time = @inbounds input_l.times[il]
 
             j = _maybe_add_knot!(
                 node_op,
@@ -562,7 +560,7 @@ function run_node!(
 
         elseif have_initial_r
             # R hasn't ticked in this batch, but we have an initial value.
-            time = input_l.times[il]
+            time = @inbounds input_l.times[il]
 
             j = _maybe_add_knot!(
                 node_op,
