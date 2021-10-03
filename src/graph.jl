@@ -25,20 +25,18 @@ about.
 
 This structure contains nodes, but also node weak nodes -- this allows us to determine
 whether we ought to create a given node.
-
-Note that this structure is definitely *not* threadsafe. We are assuming that all nodes are
-created in a single thread.
 """
 mutable struct NodeGraph
     # TODO This could be wrapped up into a WeakBijection data structure, which would
     #   potentially allow for more efficient handling of nodes going out of scope.
     node_to_weak::WeakKeyDict{Node,WeakNode}
     weak_to_ref::Dict{WeakNode,WeakRef}
+    lock::ReentrantLock
     dirty::Bool
     finalizer::Function
 
     function NodeGraph()
-        graph = new(WeakKeyDict(), Dict(), false)
+        graph = new(WeakKeyDict(), Dict(), ReentrantLock(), false)
         graph.finalizer = _ -> graph.dirty = true
         return graph
     end
@@ -46,6 +44,8 @@ end
 
 Base.length(graph::NodeGraph) = length(graph.node_to_weak)
 Base.isempty(graph::NodeGraph) = length(graph) == 0
+
+Base.lock(f, graph::NodeGraph) = lock(f, graph.lock)
 
 function _cleanup!(graph::NodeGraph)
     graph.dirty || return nothing
@@ -115,27 +115,23 @@ function obtain_node(graph::NodeGraph, parents::NTuple{N,Node}, op::NodeOp) wher
         return constant(_propagate_constant_value(op, parents))
     end
 
-    # Before attempting to query or modify the graph, ensure it is free of dangling
-    # references.
-    _cleanup!(graph)
+    return lock(graph) do
+        # Before attempting to query or modify the graph, ensure it is free of dangling
+        # references.
+        _cleanup!(graph)
 
-    weak_node = WeakNode(map(WeakRef, parents), op)
-    node_ref = get(graph.weak_to_ref, weak_node, nothing)
-    if !isnothing(node_ref)
-        # Remember that we need to unwrap the value from the WeakRef...
-        node = node_ref.value
-
-        # There is still a chance that the node may have been cleaned up while we were
-        # fetching it.
-        if !isnothing(node)
-            return node
+        weak_node = WeakNode(map(WeakRef, parents), op)
+        node_ref = get(graph.weak_to_ref, weak_node, nothing)
+        if !isnothing(node_ref)
+            # Remember that we need to unwrap the value from the WeakRef...
+            node_ref.value
+        else
+            # An equivalent node does not yet exist in the graph; create it.
+            node = Node(parents, op)
+            _insert_node!(graph, node, weak_node)
+            node
         end
     end
-
-    # An equivalent node does not yet exist in the graph; create it.
-    node = Node(parents, op)
-    _insert_node!(graph, node, weak_node)
-    return node
 end
 
 """
