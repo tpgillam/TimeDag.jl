@@ -115,7 +115,7 @@ function obtain_node(graph::NodeGraph, parents::NTuple{N,Node}, op::NodeOp) wher
         return constant(_propagate_constant_value(op, parents))
     end
 
-    GC.safepoint()  # TODO I don't think this helps.
+    GC.gc()  # FIXME So so so so slow. But what happens on 1.5?
     return lock(graph) do
         # FIXME This results in tests breaking! Excellent...
         #   It looks reminiscent of the failures seen on Julia 1.5
