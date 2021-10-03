@@ -205,13 +205,15 @@ function ancestors(graph::NodeGraph, nodes::Node...)
     # Construct a LightGraphs representation of the whole node graph.
     node_to_vertex = Bijection(Dict(n => i for (i, n) in enumerate(all_nodes(graph))))
 
-    # Initialising a SimpleDiGraph via an edge list is more efficient than call add_edge!
+    # Initialising a SimpleDiGraph via an edge list is more efficient than calling add_edge!
     # repeatedly.
+    #! format: off
     edges = Edge{Int64}[
         Edge(i, node_to_vertex[parent])
         for (node, i) in node_to_vertex
         for parent in parents(node)
     ]
+    #! format: on
     light_graph = SimpleDiGraph(edges)
 
     # Suppose we have nodes with no parents on children in the graph - these will not show
