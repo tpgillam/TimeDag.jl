@@ -51,5 +51,33 @@ end
     _reset_global_graph()
     _create_and_discard()
     GC.gc()
+    # Manual cleanup invocation required, as otherwise it only occurs when we create a new
+    # node.
+    TimeDag._cleanup!(TimeDag.global_graph())
     @test isempty(TimeDag.global_graph())
+    @test isempty(TimeDag.global_graph().node_to_weak)
+    @test isempty(TimeDag.global_graph().weak_to_ref)
+end
+
+@testset "many weakref" begin
+    function _create_and_discard()
+        count = 1
+        start = DateTime(2020)
+        block = TimeDag.Block(start:Day(1):(start + Day(count - 1)), 1:count)
+        n1 = TimeDag.block_node(block)
+        x = n1
+        for _ in 1:100
+            x += n1
+        end
+        return nothing
+    end
+
+    _reset_global_graph()
+    _create_and_discard()
+    _create_and_discard()
+    GC.gc()
+    TimeDag._cleanup!(TimeDag.global_graph())
+    @test isempty(TimeDag.global_graph())
+    @test isempty(TimeDag.global_graph().node_to_weak)
+    @test isempty(TimeDag.global_graph().weak_to_ref)
 end

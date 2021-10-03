@@ -1,3 +1,11 @@
+@testset "equality" begin
+    @test TimeDag.Constant(1) == TimeDag.Constant(1)
+    @test isequal(TimeDag.Constant(1), TimeDag.Constant(1))
+
+    @test TimeDag.Constant(1.0) != TimeDag.Constant(1)
+    @test !isequal(TimeDag.Constant(1.0), TimeDag.Constant(1))
+end
+
 @testset "constant propagation" begin
     n1 = constant(1)
     n2 = constant(2)

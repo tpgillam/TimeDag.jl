@@ -13,7 +13,9 @@ WeakNode(node::Node) = WeakNode(map(WeakRef, node.parents), node.op)
 # Weak nodes need to have hash & equality defined such that instances with equal
 # parents and op compare equal. This will be relied upon in `obtain_node` later.
 Base.hash(a::WeakNode, h::UInt) = hash(a.op, hash(a.parents, hash(:WeakNode, h)))
-Base.:(==)(a::WeakNode, b::WeakNode) = a.parents == b.parents && a.op == b.op
+function Base.isequal(a::WeakNode, b::WeakNode)
+    isequal(a.parents, b.parents) && isequal(a.op, b.op)
+end
 
 """
 Represent a graph of nodes which doesn't hold strong references to any nodes.
@@ -29,17 +31,40 @@ Note that this structure is definitely *not* threadsafe. We are assuming that al
 created in a single thread.
 """
 mutable struct NodeGraph
-    # TODO This could be wrapped up into a WeakBijection data structure.
+    # TODO This could be wrapped up into a WeakBijection data structure, which would
+    #   potentially allow for more efficient handling of nodes going out of scope.
     node_to_weak::WeakKeyDict{Node,WeakNode}
     weak_to_ref::Dict{WeakNode,WeakRef}
+    dirty::Bool
+    finalizer::Function
+
+    function NodeGraph()
+        graph = new(WeakKeyDict(), Dict(), false)
+        graph.finalizer = _ -> graph.dirty = true
+        return graph
+    end
 end
-NodeGraph() = NodeGraph(WeakKeyDict(), Dict())
 
 Base.length(graph::NodeGraph) = length(graph.node_to_weak)
 Base.isempty(graph::NodeGraph) = length(graph) == 0
-Base.haskey(graph::NodeGraph, node::Node) = haskey(graph.node_to_weak, node)
-function Base.haskey(graph::NodeGraph, weak_node::WeakNode)
-    return haskey(graph.weak_to_ref, weak_node)
+
+function _cleanup!(graph::NodeGraph)
+    graph.dirty || return nothing
+
+    # We need to clean up stale entries from weak_to_ref.
+    graph.dirty = false
+
+    # This is analogous to the implementation in WeakKeyDict.
+    # Note that we use hidden functionality of Dict here. This is because we can no longer
+    # rely on the keys to be a good indexer, since they contain weak references that may
+    # have gone stale
+    idx = Base.skip_deleted_floor!(graph.weak_to_ref)
+    while idx != 0
+        if graph.weak_to_ref.vals[idx].value === nothing
+            Base._delete!(graph.weak_to_ref, idx)
+        end
+        idx = Base.skip_deleted(graph.weak_to_ref, idx + 1)
+    end
 end
 
 """
@@ -54,7 +79,7 @@ function _insert_node!(graph::NodeGraph, node::Node, weak_node::WeakNode)
 
     # Add a finalizer to the node that will declare the graph to be dirty when it is
     # deleted. We handle this above.
-    finalizer(n -> delete!(graph.weak_to_ref, WeakNode(n)), node)
+    finalizer(graph.finalizer, node)
 
     return graph
 end
@@ -90,10 +115,16 @@ function obtain_node(graph::NodeGraph, parents::NTuple{N,Node}, op::NodeOp) wher
         # be correctly registered with the graph.
         return constant(_propagate_constant_value(op, parents))
     end
+
+    # Before attempting to query or modify the graph, ensure it is free of dangling
+    # references.
+    _cleanup!(graph)
+
     weak_node = WeakNode(map(WeakRef, parents), op)
-    return if haskey(graph, weak_node)
+    node_ref = get(graph.weak_to_ref, weak_node, nothing)
+    return if !isnothing(node_ref)
         # Remember that we need to unwrap the value from the WeakRef...
-        graph.weak_to_ref[weak_node].value
+        node_ref.value
     else
         # An equivalent node does not yet exist in the graph; create it
         node = Node(parents, op)
