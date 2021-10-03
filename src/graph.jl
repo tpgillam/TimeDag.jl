@@ -43,18 +43,11 @@ function Base.haskey(graph::NodeGraph, weak_node::WeakNode)
 end
 
 """
-    insert_node!(graph::NodeGraph, node) -> NodeGraph
+    _insert_node!(graph::NodeGraph, node, weak_node) -> NodeGraph
 
-Insert `node` into `graph`.
+Insert `node` & equivalent `weak_node` into `graph`.
 """
-function insert_node!(graph::NodeGraph, node::Node)
-    # TODO This shouldn't be required, as it is an error to attempt to insert an existing
-    # node to the graph. Delete?
-    haskey(graph, node) && throw(ArgumentError("$node is already in $graph"))
-
-    # We are going to add the node.
-    weak_node = WeakNode(node)
-
+function _insert_node!(graph::NodeGraph, node::Node, weak_node::WeakNode)
     # Insert the node & its weak counterpart to the mappings.
     graph.node_to_weak[node] = weak_node
     graph.weak_to_ref[weak_node] = WeakRef(node)
@@ -104,7 +97,7 @@ function obtain_node(graph::NodeGraph, parents::NTuple{N,Node}, op::NodeOp) wher
     else
         # An equivalent node does not yet exist in the graph; create it
         node = Node(parents, op)
-        insert_node!(graph, node)
+        _insert_node!(graph, node, weak_node)
         node
     end
 end
