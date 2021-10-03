@@ -132,10 +132,6 @@ function obtain_node(graph::NodeGraph, parents::NTuple{N,Node}, op::NodeOp) wher
     end
 end
 
-function obtain_node(graph::NodeGraph, parents::AbstractVector{Node}, op::NodeOp)
-    return obtain_node(graph, op, Tuple(parents))
-end
-
 """
     ancestors(graph::AbstractGraph{T}, sources::AbstractVector{T}) -> Vector{T}
 
