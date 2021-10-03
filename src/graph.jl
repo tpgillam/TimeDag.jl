@@ -121,15 +121,21 @@ function obtain_node(graph::NodeGraph, parents::NTuple{N,Node}, op::NodeOp) wher
 
     weak_node = WeakNode(map(WeakRef, parents), op)
     node_ref = get(graph.weak_to_ref, weak_node, nothing)
-    return if !isnothing(node_ref)
+    if !isnothing(node_ref)
         # Remember that we need to unwrap the value from the WeakRef...
-        node_ref.value
-    else
-        # An equivalent node does not yet exist in the graph; create it
-        node = Node(parents, op)
-        _insert_node!(graph, node, weak_node)
-        node
+        node = node_ref.value
+
+        # There is still a chance that the node may have been cleaned up while we were
+        # fetching it.
+        if !isnothing(node)
+            return node
+        end
     end
+
+    # An equivalent node does not yet exist in the graph; create it.
+    node = Node(parents, op)
+    _insert_node!(graph, node, weak_node)
+    return node
 end
 
 """
