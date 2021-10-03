@@ -14,7 +14,7 @@ WeakNode(node::Node) = WeakNode(map(WeakRef, node.parents), node.op)
 # parents and op compare equal. This will be relied upon in `obtain_node` later.
 Base.hash(a::WeakNode, h::UInt) = hash(a.op, hash(a.parents, hash(:WeakNode, h)))
 function Base.isequal(a::WeakNode, b::WeakNode)
-    isequal(a.parents, b.parents) && isequal(a.op, b.op)
+    return isequal(a.parents, b.parents) && isequal(a.op, b.op)
 end
 
 """

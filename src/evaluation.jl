@@ -68,10 +68,12 @@ function get_up_to!(state::EvaluationState, time_end::DateTime)::EvaluationState
     #   A reasonable approach is likely to allow the user to specify a scheduler when
     #   evaluating.
 
+    #! format: off
     node_to_input_blocks = Dict(
         node => Vector{Block}(undef, length(parents(node)))
         for node in keys(state.ordered_node_to_children)
     )
+    #! format: on
 
     for node in keys(state.ordered_node_to_children)
         node_state = state.node_to_state[node]
