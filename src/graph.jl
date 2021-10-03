@@ -115,7 +115,15 @@ function obtain_node(graph::NodeGraph, parents::NTuple{N,Node}, op::NodeOp) wher
         return constant(_propagate_constant_value(op, parents))
     end
 
+    GC.safepoint()  # TODO I don't think this helps.
     return lock(graph) do
+        # FIXME This results in tests breaking! Excellent...
+        #   It looks reminiscent of the failures seen on Julia 1.5
+        #   This looks relevant: https://github.com/JuliaLang/julia/pull/38487
+        #   It changed the behaviour of finalizers so that they didn't run when locks
+        #   had been acquired.
+        # GC.gc()
+
         # Before attempting to query or modify the graph, ensure it is free of dangling
         # references.
         _cleanup!(graph)
@@ -124,6 +132,7 @@ function obtain_node(graph::NodeGraph, parents::NTuple{N,Node}, op::NodeOp) wher
         node_ref = get(graph.weak_to_ref, weak_node, nothing)
         if !isnothing(node_ref)
             # Remember that we need to unwrap the value from the WeakRef...
+            # FIXME This value can be nothing because of some horrible race condition.
             node_ref.value
         else
             # An equivalent node does not yet exist in the graph; create it.
