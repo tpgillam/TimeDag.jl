@@ -96,6 +96,8 @@ function get_up_to!(state::EvaluationState, time_end::DateTime)::EvaluationState
         if !isnothing(evaluated_blocks)
             # The current node is of interest - persist its output onto the evaluation
             # state.
+            # TODO maybe we need to provide a size hint for the initial evaluated_blocks.
+            #   Base.grow_to! seems to be a minor hotspot
             push!(evaluated_blocks, block)
         end
     end

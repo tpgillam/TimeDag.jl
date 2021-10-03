@@ -27,23 +27,19 @@ This structure contains nodes, but also node weak nodes -- this allows us to det
 whether we ought to create a given node.
 """
 mutable struct NodeGraph
-    # TODO This could be wrapped up into a WeakBijection data structure, which would
+    # TODO This could be wrapped up into a WeakValueDict data structure, which would
     #   potentially allow for more efficient handling of nodes going out of scope.
-    node_to_weak::WeakKeyDict{Node,WeakNode}
     weak_to_ref::Dict{WeakNode,WeakRef}
     lock::ReentrantLock
     dirty::Bool
     finalizer::Function
 
     function NodeGraph()
-        graph = new(WeakKeyDict(), Dict(), ReentrantLock(), false)
+        graph = new(Dict(), ReentrantLock(), false)
         graph.finalizer = _ -> graph.dirty = true
         return graph
     end
 end
-
-Base.length(graph::NodeGraph) = length(graph.node_to_weak)
-Base.isempty(graph::NodeGraph) = length(graph) == 0
 
 Base.lock(f, graph::NodeGraph) = lock(f, graph.lock)
 
@@ -66,6 +62,21 @@ function _cleanup!(graph::NodeGraph)
     end
 end
 
+function Base.length(graph::NodeGraph)
+    return lock(graph) do
+        _cleanup!(graph)
+        length(graph.weak_to_ref)
+    end
+end
+Base.isempty(graph::NodeGraph) = length(graph) == 0
+
+function all_nodes(graph::NodeGraph)
+    return lock(graph) do
+        _cleanup!(graph)
+        Node[x.value for x in values(graph.weak_to_ref)]
+    end
+end
+
 """
     _insert_node!(graph::NodeGraph, node, weak_node) -> NodeGraph
 
@@ -73,7 +84,6 @@ Insert `node` & equivalent `weak_node` into `graph`.
 """
 function _insert_node!(graph::NodeGraph, node::Node, weak_node::WeakNode)
     # Insert the node & its weak counterpart to the mappings.
-    graph.node_to_weak[node] = weak_node
     graph.weak_to_ref[weak_node] = WeakRef(node)
 
     # Add a finalizer to the node that will declare the graph to be dirty when it is
@@ -115,7 +125,10 @@ function obtain_node(graph::NodeGraph, parents::NTuple{N,Node}, op::NodeOp) wher
         return constant(_propagate_constant_value(op, parents))
     end
 
-    GC.gc()  # FIXME So so so so slow. But what happens on 1.5?
+    # FIXME So so so so slow on 1.6.
+    #   On 1.5, this adds *even more* failures (of the form of obtaining nodes, and them
+    #   ending up being `nothing`.)
+    # GC.gc()
     return lock(graph) do
         # FIXME This results in tests breaking! Excellent...
         #   It looks reminiscent of the failures seen on Julia 1.5
@@ -190,10 +203,10 @@ If `graph` is not specified, the global graph will be used.
 """
 function ancestors(graph::NodeGraph, nodes::Node...)
     # Construct a LightGraphs representation of the whole node graph.
-    node_to_vertex = Bijection(
-        Dict(n => i for (i, n) in enumerate(keys(graph.node_to_weak)))
-    )
-    light_graph = SimpleDiGraph(length(graph))
+    node_to_vertex = Bijection(Dict(n => i for (i, n) in enumerate(all_nodes(graph))))
+
+    light_graph = SimpleDiGraph(length(node_to_vertex))
+    # FIXME This now has performance issues following changes... not sure why!
     for (node, i) in node_to_vertex
         for parent in parents(node)
             # Add edge from node to parent.

@@ -10,7 +10,6 @@ that the graph is emptied.
 function _reset_global_graph()
     GC.gc()
     graph = TimeDag.global_graph()
-    graph.node_to_weak = WeakKeyDict()
     graph.weak_to_ref = Dict()
     return nothing
 end
@@ -55,7 +54,6 @@ end
     # node.
     TimeDag._cleanup!(TimeDag.global_graph())
     @test isempty(TimeDag.global_graph())
-    @test isempty(TimeDag.global_graph().node_to_weak)
     @test isempty(TimeDag.global_graph().weak_to_ref)
 end
 
@@ -78,6 +76,5 @@ end
     GC.gc()
     TimeDag._cleanup!(TimeDag.global_graph())
     @test isempty(TimeDag.global_graph())
-    @test isempty(TimeDag.global_graph().node_to_weak)
     @test isempty(TimeDag.global_graph().weak_to_ref)
 end
