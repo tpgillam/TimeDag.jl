@@ -8,7 +8,6 @@ struct WeakNode
     parents::NTuple{N,WeakRef} where {N}
     op::NodeOp
 end
-WeakNode(node::Node) = WeakNode(map(WeakRef, node.parents), node.op)
 
 # Weak nodes need to have hash & equality defined such that instances with equal
 # parents and op compare equal. This will be relied upon in `obtain_node` later.
