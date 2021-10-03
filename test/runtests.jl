@@ -6,6 +6,7 @@ using TimeDag
 using Test
 
 using TimeDag: Block, Node
+using TimeDag: IntersectAlignment, LeftAlignment, UnionAlignment
 using TimeDag: duplicate, evaluate, get_up_to!, start_at, value_type
 using TimeDag: block_node, constant, empty_node
 
@@ -26,7 +27,6 @@ using TimeDag: block_node, constant, empty_node
         @testset "arithmetic" begin include("ops_arithmetic.jl") end
         @testset "conditional" begin include("ops_conditional.jl") end
         @testset "lagging" begin include("ops_lagging.jl") end
-        @testset "logical" begin include("ops_logical.jl") end
         @testset "window" begin include("ops_window.jl") end
     end
 end

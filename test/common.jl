@@ -72,10 +72,19 @@ b4 = Block([
     DateTime(2000, 1, 7) => 7,
 ])
 
+b_boolean = Block([
+    DateTime(2000, 1, 1) => true,
+    DateTime(2000, 1, 2) => false,
+    DateTime(2000, 1, 3) => true,
+    DateTime(2000, 1, 4) => true,
+])
+
+
 n1 = block_node(b1)
 n2 = block_node(b2)
 n3 = block_node(b3)
 n4 = block_node(b4)
+n_boolean = TimeDag.block_node(b_boolean)
 
 _eval(n) = _evaluate(n, DateTime(2000, 1, 1), DateTime(2000, 1, 10))
 
