@@ -24,9 +24,9 @@ using TimeDag: block_node, constant, empty_node
 
     @testset "ops" begin
         @testset "align" begin include("ops_align.jl") end
-        @testset "arithmetic" begin include("ops_arithmetic.jl") end
         @testset "conditional" begin include("ops_conditional.jl") end
         @testset "lagging" begin include("ops_lagging.jl") end
+        @testset "simple" begin include("ops_simple.jl") end
         @testset "window" begin include("ops_window.jl") end
     end
 end
