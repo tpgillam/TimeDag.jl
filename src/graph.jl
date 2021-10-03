@@ -205,14 +205,18 @@ function ancestors(graph::NodeGraph, nodes::Node...)
     # Construct a LightGraphs representation of the whole node graph.
     node_to_vertex = Bijection(Dict(n => i for (i, n) in enumerate(all_nodes(graph))))
 
-    light_graph = SimpleDiGraph(length(node_to_vertex))
-    # FIXME This now has performance issues following changes... not sure why!
-    for (node, i) in node_to_vertex
+    # Initialising a SimpleDiGraph via an edge list is more efficient than call add_edge!
+    # repeatedly.
+    edges = Edge{Int64}[
+        Edge(i, node_to_vertex[parent])
+        for (node, i) in node_to_vertex
         for parent in parents(node)
-            # Add edge from node to parent.
-            add_edge!(light_graph, i, node_to_vertex[parent])
-        end
-    end
+    ]
+    light_graph = SimpleDiGraph(edges)
+
+    # Suppose we have nodes with no parents on children in the graph - these will not show
+    # up in the edge list, and may hence require manual addition.
+    add_vertices!(light_graph, length(node_to_vertex) - nv(light_graph))
 
     vertices = [node_to_vertex[node] for node in nodes]
     ancestor_vertices = ancestors(light_graph, vertices)
