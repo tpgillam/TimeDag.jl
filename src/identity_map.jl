@@ -16,18 +16,6 @@ function Base.isequal(a::WeakNode, b::WeakNode)
     return isequal(a.parents, b.parents) && isequal(a.op, b.op)
 end
 
-# FIXME
-#   If the WeakIdentityMap can't be made to work on 1.5, we could have two identity maps:
-#       * WeakIdentityMap  (default on 1.6+)
-#       * StrongIdentityMap (default otherwise)
-#
-#   The latter will hold onto strong references. It will avoid much of the complexity at
-#   the expense of remembering every node ever created, which would get bad quickly.
-#
-#   Could *maybe* also have:
-#       * NullIdentityMap  (no id-mapping)
-#   if this doesn't break assumptions elsewhere (it would always create new nodes).
-
 abstract type IdentityMap end
 
 """
@@ -37,12 +25,11 @@ This is useful, as it allows the existence of this cache to be somewhat transpar
 user, and they only have to care about holding on to references for nodes that they care
 about.
 
-This structure contains nodes, but also node weak nodes -- this allows us to determine
+This structure contains nodes, but also node weak nodes -- these allow us to determine
 whether we ought to create a given node.
 """
 mutable struct WeakIdentityMap <: IdentityMap
-    # TODO This could be wrapped up into a WeakValueDict data structure, which would
-    #   potentially allow for more efficient handling of nodes going out of scope.
+    # TODO This could be wrapped up into a WeakValueDict data structure.
     weak_to_ref::Dict{WeakNode,WeakRef}
     lock::ReentrantLock
     dirty::Bool
@@ -110,18 +97,7 @@ end
 function obtain_node!(
     id_map::WeakIdentityMap, parents::NTuple{N,Node}, op::NodeOp
 ) where {N}
-    # FIXME So so so so slow on 1.6.
-    #   On 1.5, this adds *even more* failures (of the form of obtaining nodes, and them
-    #   ending up being `nothing`.)
-    # GC.gc()
     return lock(id_map) do
-        # FIXME This results in tests breaking! Excellent...
-        #   It looks reminiscent of the failures seen on Julia 1.5
-        #   This looks relevant: https://github.com/JuliaLang/julia/pull/38487
-        #   It changed the behaviour of finalizers so that they didn't run when locks
-        #   had been acquired.
-        # GC.gc()
-
         # Before attempting to query or modify the id_map, ensure it is free of dangling
         # references.
         _cleanup!(id_map)
@@ -130,7 +106,6 @@ function obtain_node!(
         node_ref = get(id_map.weak_to_ref, weak_node, nothing)
         if !isnothing(node_ref)
             # Remember that we need to unwrap the value from the WeakRef...
-            # FIXME This value can be nothing because of some horrible race condition.
             node_ref.value
         else
             # An equivalent node does not yet exist in the id_map; create it.
