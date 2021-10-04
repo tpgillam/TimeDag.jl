@@ -1,3 +1,14 @@
+# TODO Maybe take a look at:
+#   https://github.com/JuliaString/InternedStrings.jl/blob/master/src/InternedStrings.jl
+#
+#   The main observation would be that we could potentially do away with WeakNode.
+#   Cache becomes `WeakKeyDict{Node,Nothing}` (a.k.a. a weak set)
+#   Base.isequal / == should check for _equality_ of ops, and _identitical equality_ of
+#   parents.
+#
+#   Overall a clear benefit would be shrinking the size of the identity map, since we no
+#   longer duplicate information.
+
 """
 Represent a node-like object, that doesn't hold strong references to its parents.
 
@@ -15,6 +26,7 @@ Base.hash(a::WeakNode, h::UInt) = hash(a.op, hash(a.parents, hash(:WeakNode, h))
 function Base.isequal(a::WeakNode, b::WeakNode)
     return isequal(a.parents, b.parents) && isequal(a.op, b.op)
 end
+Base.:(==)(a::WeakNode, b::WeakNode) = isequal(a, b)
 
 abstract type IdentityMap end
 
@@ -79,11 +91,13 @@ function all_nodes(id_map::WeakIdentityMap)
 end
 
 """
-    _insert_node!(id_map::WeakIdentityMap, node, weak_node) -> WeakIdentityMap
+    _create_node!(id_map::WeakIdentityMap, parents, op, weak_node) -> Node
 
-Insert `node` & equivalent `weak_node` into `id_map`.
+Create a node and insert it into `id_map`.
 """
-function _insert_node!(id_map::WeakIdentityMap, node::Node, weak_node::WeakNode)
+function _create_node!(id_map::WeakIdentityMap, parents, op, weak_node::WeakNode)
+    node = Node(parents, op)
+
     # Insert the node & its weak counterpart to the mappings.
     id_map.weak_to_ref[weak_node] = WeakRef(node)
 
@@ -91,7 +105,7 @@ function _insert_node!(id_map::WeakIdentityMap, node::Node, weak_node::WeakNode)
     # deleted. We handle this above.
     finalizer(id_map.finalizer, node)
 
-    return id_map
+    return node
 end
 
 function obtain_node!(
@@ -106,12 +120,16 @@ function obtain_node!(
         node_ref = get(id_map.weak_to_ref, weak_node, nothing)
         if !isnothing(node_ref)
             # Remember that we need to unwrap the value from the WeakRef...
-            node_ref.value
+            node = node_ref.value
+
+            # This is inspired by iterate(::WeakKeyDict, ...) in base/weakkeydict.jl ,
+            # and included due to otherwise seeing transient issues of `node_ref.value`
+            # being `nothing`.
+            GC.safepoint()  # ensure `node` is now gc-rooted
+            isnothing(node) ? _create_node!(id_map, parents, op, weak_node) : node
         else
             # An equivalent node does not yet exist in the id_map; create it.
-            node = Node(parents, op)
-            _insert_node!(id_map, node, weak_node)
-            node
+            _create_node!(id_map, parents, op, weak_node)
         end
     end
 end
