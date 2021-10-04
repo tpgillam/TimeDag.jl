@@ -32,7 +32,7 @@ end
 
 function start_at(nodes, time_start::DateTime)::EvaluationState
     # Create empty evaluation state for all these, and return in some suitable pacakge.
-    evaluation_order = ancestors(nodes...)
+    evaluation_order = ancestors(nodes)
 
     ordered_node_to_children = OrderedDict{Node,Set{Node}}(
         node => Set{Node}() for node in evaluation_order

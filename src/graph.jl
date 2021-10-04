@@ -16,6 +16,19 @@ function Base.isequal(a::WeakNode, b::WeakNode)
     return isequal(a.parents, b.parents) && isequal(a.op, b.op)
 end
 
+# FIXME
+#   `NodeGraph` should then be renamed `NodeIdentityMap` or similar.
+#
+#   Actually we should have two identity maps:
+#       * WeakIdentityMap  (default on 1.6+)
+#       * StrongIdentityMap (default otherwise)
+#
+#   The latter will hold onto strong references. It will avoid much of the complexity at
+#   the expense of remembering every node ever created, which would get bad quickly.
+#
+#   Could *maybe* also have:
+#       * NullIdentityMap  (no id-mapping)
+#   if this doesn't break assumptions elsewhere (it would always create new nodes).
 """
 Represent a graph of nodes which doesn't hold strong references to any nodes.
 
@@ -191,19 +204,47 @@ function ancestors(graph::AbstractGraph{T}, sources::AbstractVector{T}) where {T
     return [v for v in order if v in seen]
 end
 
+struct NodeIterator
+    nodes::Vector{Node}
+end
+
+struct NodeIteratorState
+    stack::Vector{Node}
+    seen::Set{Node}
+    NodeIteratorState(ni::NodeIterator) = new(ni.nodes, Set())
+end
+
+Base.IteratorSize(::Type{NodeIterator}) = Base.SizeUnknown()
+Base.eltype(::Type{NodeIterator}) = Node
+Base.iterate(ni::NodeIterator) = iterate(ni, NodeIteratorState(ni))
+function Base.iterate(::NodeIterator, state::NodeIteratorState)
+    # Find a node on the stack that we haven't seen already.
+    local node
+    while true
+        isempty(state.stack) && return nothing
+        node = popfirst!(state.stack)
+        in(node, state.seen) || break
+    end
+
+    # We now know that this is a new node, so process it.
+    append!(state.stack, parents(node))
+    push!(state.seen, node)
+
+    return (node, state)
+end
+
+iternodes(nodes::AbstractVector{Node}) = NodeIterator(Vector{Node}(nodes))
+
 """
-    ancestors(graph, nodes...) -> Vector{Node}
-    ancestors(nodes...)
+    ancestors(nodes)
 
 Get a list of all nodes in the graph defined by `nodes`, including all parents.
     * Every node in the graph will be visited exactly once.
     * The parents of any vertex will always come before the vertex itself.
-
-If `graph` is not specified, the global graph will be used.
 """
-function ancestors(graph::NodeGraph, nodes::Node...)
+function ancestors(nodes::AbstractVector{Node})
     # Construct a LightGraphs representation of the whole node graph.
-    node_to_vertex = Bijection(Dict(n => i for (i, n) in enumerate(all_nodes(graph))))
+    node_to_vertex = Bijection(Dict(n => i for (i, n) in enumerate(iternodes(nodes))))
 
     # Initialising a SimpleDiGraph via an edge list is more efficient than calling add_edge!
     # repeatedly.
@@ -236,4 +277,3 @@ Get the global NodeGraph instance used in TimeDag.
 global_graph() = _GLOBAL_GRAPH
 
 obtain_node(parents, op::NodeOp) = obtain_node(_GLOBAL_GRAPH, parents, op)
-ancestors(nodes::Node...) = ancestors(_GLOBAL_GRAPH, nodes...)
