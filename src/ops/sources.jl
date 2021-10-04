@@ -3,6 +3,11 @@ struct BlockNode{T} <: NodeOp{T}
     block::Block{T}
 end
 
+Base.hash(x::BlockNode, h::UInt64) = hash(x.block, hash(:BlockNode, h))
+function Base.:(==)(x::BlockNode{T}, y::BlockNode{T}) where {T}
+    return x.block === y.block
+end
+
 create_evaluation_state(::Tuple{}, ::BlockNode) = _EMPTY_NODE_STATE
 
 function run_node!(

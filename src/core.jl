@@ -1,9 +1,18 @@
 """Represent a time-series operation."""
 abstract type NodeOp{T} end
 
-# Note that a Node is only declared mutable so as to force it to live on the heap, which
-# (importantly) means that we can attach finalizers to node instances.
-# Nodes should NEVER actually be mutated!
+"""
+    Node(parents, op)
+
+Represent a node in the computational graph that combines zero or more `parents` with `op`
+to produce a timeseries.
+
+Note that a Node is only declared mutable so that we can attach finalizers to instances.
+Nodes should NEVER actually be mutated!
+
+Due to subgraph elimination, nodes that are equivalent should always be identical objects.
+We therefore leave `hash` & `==` defined in terms of the `objectid`.
+"""
 mutable struct Node
     parents::NTuple{N,Node} where {N}
     op::NodeOp
@@ -12,11 +21,6 @@ end
 # Node & NodeOps are immutable for duplication purposes.
 duplicate_internal(x::Node, ::IdDict) = x
 duplicate_internal(x::NodeOp, ::IdDict) = x
-
-# Nodes need to have hash & equality defined such that nodes with equal parents and op
-# compare equal. This will be relied upon in `obtain_node` later.
-Base.hash(a::Node, h::UInt) = hash(a.op, hash(a.parents, hash(:Node, h)))
-Base.:(==)(a::Node, b::Node) = a.parents == b.parents && a.op == b.op
 
 Base.show(io::IO, node::Node) = show(io, node.op)
 

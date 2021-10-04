@@ -1,7 +1,5 @@
 struct Left{T,A} <: BinaryAlignedNodeOp{T,A} end
 
-create_operator_evaluation_state(::Tuple{Node,Node}, ::Left) = _EMPTY_NODE_STATE
-
 always_ticks(::Left) = true
 stateless_operator(::Left) = true
 time_agnostic(::Left) = true
@@ -9,8 +7,6 @@ time_agnostic(::Left) = true
 operator!(::Left, x, y) = x
 
 struct Right{T,A} <: BinaryAlignedNodeOp{T,A} end
-
-create_operator_evaluation_state(::Tuple{Node,Node}, ::Right) = _EMPTY_NODE_STATE
 
 always_ticks(::Right) = true
 stateless_operator(::Right) = true

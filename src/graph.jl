@@ -1,78 +1,4 @@
 """
-Represent a graph of nodes which doesn't hold strong references to any nodes.
-
-This is useful, as it allows the existence of this graph to be somewhat transparent to the
-user, and they only have to care about holding on to references for nodes that they care
-about.
-
-Note that this structure is definitely *not* threadsafe. We are assuming that all nodes are
-created in a single thread.
-"""
-mutable struct NodeGraph
-    node_to_vertex::WeakKeyDict{Node,Int64}
-    vertex_to_ref::Dict{Int64,WeakRef}
-    # TODO Figure out of this LightGraph representation is useful.
-    # Edges are directed from parents to children.
-    graph::SimpleDiGraph{Int64}
-    dirty::Bool  # This means that `vertex_to_ref` needs cleaning.
-end
-NodeGraph() = NodeGraph(WeakKeyDict(), Dict(), SimpleDiGraph(), false)
-
-Base.length(graph::NodeGraph) = length(graph.node_to_vertex)
-Base.isempty(graph::NodeGraph) = length(graph) == 0
-Base.haskey(graph::NodeGraph, node::Node) = haskey(graph.node_to_vertex, node)
-
-function _cleanup(graph::NodeGraph)
-    if graph.dirty
-        # Clean up any dangling references in vertex_to_ref.
-        graph.dirty = false
-
-        # This does a full scan. This is a bit sad, although in practice we shouldn't do it
-        # especially often (as hopefully we rarely throw away nodes in typical usage).
-        for (key, ref) in graph.vertex_to_ref
-            if isnothing(ref.value)
-                delete!(graph.vertex_to_ref, key)
-                # TODO Remove index from graph too? -- actually CAREFUL about this, as the
-                # default LightGraph implementation will then relabel the last vertex so as
-                # to preserve contiguity.
-                # Probably simpler to leave dangling for now, but in the future we should
-                # think about solving this more nicely.
-            end
-        end
-    end
-end
-
-function insert_node!(graph::NodeGraph, node::Node)
-    _cleanup(graph)
-
-    if haskey(graph, node)
-        # Nothing to do!
-        return graph
-    end
-
-    # We are going to add the node - we must do the following:
-    #   1. Figure out what index the node should have
-    add_vertex!(graph.graph)
-    index = nv(graph.graph)
-
-    #   2. Insert into A & B
-    graph.node_to_vertex[node] = index
-    graph.vertex_to_ref[index] = WeakRef(node)
-
-    #   3. Add a finalizer to node that will declare the graph to be dirty when it is
-    #       deleted. We handle this above.
-    finalizer(n -> graph.dirty = true, node)
-
-    # Insert all parents.
-    for parent in parents(node)
-        insert_node!(graph, parent)
-        # Add edge from node to parent.
-        add_edge!(graph.graph, graph.node_to_vertex[node], graph.node_to_vertex[parent])
-    end
-    return graph
-end
-
-"""
     _can_propagate_constant(::NodeOp) -> Bool
 
 Return true for ops which can propagate constant values if all their parents are constant.
@@ -88,34 +14,21 @@ This assumes that `_can_propagate_constant(op)` is true.
 function _propagate_constant_value end
 
 """
-    obtain_node(graph::NodeGraph, parents, op::NodeOp) -> Node
     obtain_node(parents, op) -> Node
 
 Get a node for the given NodeOp and parents. If an equivalent node already exists in the
-graph, use that one, otherwise create a new node, add to the graph, and return it.
-
-If the graph is not specified, the global graph is used.
+identity map, use that one, otherwise create a new node, add to the identity map, and return
+it.
 """
-function obtain_node(graph::NodeGraph, parents::NTuple{N,Node}, op::NodeOp) where {N}
+function obtain_node(parents::NTuple{N,Node}, op::NodeOp) where {N}
     if !isempty(parents) && _can_propagate_constant(op) && all(_is_constant, parents)
         # Constant propagation, since all inputs are constants & the op supports it.
+        # Note that `constant` does, itself, call through to `obtain_node`, so the node will
+        # be correctly registered with the id_map.
         return constant(_propagate_constant_value(op, parents))
     end
-    node = Node(parents, op)
-    return if haskey(graph, node)
-        # An equivalent node exists in the graph; return the existing node.
-        index = graph.node_to_vertex[node]
-        # Remember that we need to unwrap the value from the WeakRef...
-        graph.vertex_to_ref[index].value
-    else
-        # Insert the new node into the graph, and return it.
-        insert_node!(graph, node)
-        node
-    end
-end
 
-function obtain_node(graph::NodeGraph, parents::AbstractVector{Node}, op::NodeOp)
-    return obtain_node(graph, op, Tuple(parents))
+    return obtain_node!(global_identity_map(), parents, op)
 end
 
 """
@@ -128,14 +41,11 @@ The result will be ordered such that the parents of any given vertex will always
 the vertex itself.
 """
 function ancestors(graph::AbstractGraph{T}, sources::AbstractVector{T}) where {T}
-    if isempty(sources)
-        throw(ArgumentError("Need at least 1 source"))
-    end
+    isempty(sources) && throw(ArgumentError("Need at least 1 source"))
 
     seen = Set{T}()
 
     stack = Vector(sources)
-    # results = [[source] for source in sources]
 
     # Get the search data for the current source.
     while !isempty(stack)
@@ -156,31 +66,64 @@ function ancestors(graph::AbstractGraph{T}, sources::AbstractVector{T}) where {T
     return [v for v in order if v in seen]
 end
 
+struct NodeIterator
+    nodes::Vector{Node}
+end
+
+struct NodeIteratorState
+    stack::Vector{Node}
+    seen::Set{Node}
+    NodeIteratorState(ni::NodeIterator) = new(ni.nodes, Set())
+end
+
+Base.IteratorSize(::Type{NodeIterator}) = Base.SizeUnknown()
+Base.eltype(::Type{NodeIterator}) = Node
+Base.iterate(ni::NodeIterator) = iterate(ni, NodeIteratorState(ni))
+function Base.iterate(::NodeIterator, state::NodeIteratorState)
+    # Find a node on the stack that we haven't seen already.
+    local node
+    while true
+        isempty(state.stack) && return nothing
+        node = popfirst!(state.stack)
+        in(node, state.seen) || break
+    end
+
+    # We now know that this is a new node, so process it.
+    append!(state.stack, parents(node))
+    push!(state.seen, node)
+
+    return (node, state)
+end
+
+iternodes(nodes::AbstractVector{Node}) = NodeIterator(Vector{Node}(nodes))
+
 """
-    ancestors(graph, nodes...) -> Vector{Node}
-    ancestors(nodes...)
+    ancestors(nodes)
 
 Get a list of all nodes in the graph defined by `nodes`, including all parents.
     * Every node in the graph will be visited exactly once.
     * The parents of any vertex will always come before the vertex itself.
-
-If `graph` is not specified, the global graph will be used.
 """
-function ancestors(graph::NodeGraph, nodes::Node...)
-    vertices = [graph.node_to_vertex[node] for node in nodes]
-    ancestor_vertices = ancestors(graph.graph, vertices)
-    return [graph.vertex_to_ref[vertex].value for vertex in ancestor_vertices]
+function ancestors(nodes::AbstractVector{Node})
+    # Construct a LightGraphs representation of the whole node graph.
+    node_to_vertex = Bijection(Dict(n => i for (i, n) in enumerate(iternodes(nodes))))
+
+    # Initialising a SimpleDiGraph via an edge list is more efficient than calling add_edge!
+    # repeatedly.
+    #! format: off
+    edges = Edge{Int64}[
+        Edge(i, node_to_vertex[parent])
+        for (node, i) in node_to_vertex
+        for parent in parents(node)
+    ]
+    #! format: on
+    light_graph = SimpleDiGraph(edges)
+
+    # Suppose we have nodes with no parents on children in the graph - these will not show
+    # up in the edge list, and may hence require manual addition.
+    add_vertices!(light_graph, length(node_to_vertex) - nv(light_graph))
+
+    vertices = [node_to_vertex[node] for node in nodes]
+    ancestor_vertices = ancestors(light_graph, vertices)
+    return [inverse(node_to_vertex, vertex) for vertex in ancestor_vertices]
 end
-
-# This is the single instance of the graph that we want
-const _GLOBAL_GRAPH = NodeGraph()
-
-"""
-    global_graph() -> NodeGraph
-
-Get the global NodeGraph instance used in TimeDag.
-"""
-global_graph() = _GLOBAL_GRAPH
-
-obtain_node(parents, op::NodeOp) = obtain_node(_GLOBAL_GRAPH, parents, op)
-ancestors(nodes::Node...) = ancestors(_GLOBAL_GRAPH, nodes...)
