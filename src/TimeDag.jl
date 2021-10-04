@@ -13,6 +13,7 @@ using Tables
 include("maybe.jl")
 
 include("core.jl")
+include("identity_map.jl")
 include("constant.jl")  # Constant nodes are special, so we need to know about them first.
 
 include("output_type.jl")

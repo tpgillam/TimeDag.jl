@@ -13,8 +13,9 @@ using TimeDag: block_node, constant, empty_node
 #! format: off
 
 @testset "TimeDag.jl" begin
-    # Perform these tests first, because they do naughty things to the global graph state.
-    @testset "graph" begin include("graph.jl") end
+    # Perform these tests first, because they do naughty things to the global identity map
+    # which would e.g. break nodes defined in common.jl.
+    @testset "identity map" begin include("identity_map.jl") end
 
     include("common.jl")
 

@@ -1,112 +1,4 @@
 """
-Represent a node-like object, that doesn't hold strong references to its parents.
-
-This exists purely such that `hash` and `==` *do* allow multiple instances of
-`WeakNode` to compare equal if they have the same `parents` and `op`.
-"""
-struct WeakNode
-    parents::NTuple{N,WeakRef} where {N}
-    op::NodeOp
-end
-
-# Weak nodes need to have hash & equality defined such that instances with equal
-# parents and op compare equal. This will be relied upon in `obtain_node` later.
-Base.hash(a::WeakNode, h::UInt) = hash(a.op, hash(a.parents, hash(:WeakNode, h)))
-function Base.isequal(a::WeakNode, b::WeakNode)
-    return isequal(a.parents, b.parents) && isequal(a.op, b.op)
-end
-
-# FIXME
-#   `NodeGraph` should then be renamed `NodeIdentityMap` or similar.
-#
-#   Actually we should have two identity maps:
-#       * WeakIdentityMap  (default on 1.6+)
-#       * StrongIdentityMap (default otherwise)
-#
-#   The latter will hold onto strong references. It will avoid much of the complexity at
-#   the expense of remembering every node ever created, which would get bad quickly.
-#
-#   Could *maybe* also have:
-#       * NullIdentityMap  (no id-mapping)
-#   if this doesn't break assumptions elsewhere (it would always create new nodes).
-"""
-Represent a graph of nodes which doesn't hold strong references to any nodes.
-
-This is useful, as it allows the existence of this graph to be somewhat transparent to the
-user, and they only have to care about holding on to references for nodes that they care
-about.
-
-This structure contains nodes, but also node weak nodes -- this allows us to determine
-whether we ought to create a given node.
-"""
-mutable struct NodeGraph
-    # TODO This could be wrapped up into a WeakValueDict data structure, which would
-    #   potentially allow for more efficient handling of nodes going out of scope.
-    weak_to_ref::Dict{WeakNode,WeakRef}
-    lock::ReentrantLock
-    dirty::Bool
-    finalizer::Function
-
-    function NodeGraph()
-        graph = new(Dict(), ReentrantLock(), false)
-        graph.finalizer = _ -> graph.dirty = true
-        return graph
-    end
-end
-
-Base.lock(f, graph::NodeGraph) = lock(f, graph.lock)
-
-function _cleanup!(graph::NodeGraph)
-    graph.dirty || return nothing
-
-    # We need to clean up stale entries from weak_to_ref.
-    graph.dirty = false
-
-    # This is analogous to the implementation in WeakKeyDict.
-    # Note that we use hidden functionality of Dict here. This is because we can no longer
-    # rely on the keys to be a good indexer, since they contain weak references that may
-    # have gone stale
-    idx = Base.skip_deleted_floor!(graph.weak_to_ref)
-    while idx != 0
-        if graph.weak_to_ref.vals[idx].value === nothing
-            Base._delete!(graph.weak_to_ref, idx)
-        end
-        idx = Base.skip_deleted(graph.weak_to_ref, idx + 1)
-    end
-end
-
-function Base.length(graph::NodeGraph)
-    return lock(graph) do
-        _cleanup!(graph)
-        length(graph.weak_to_ref)
-    end
-end
-Base.isempty(graph::NodeGraph) = length(graph) == 0
-
-function all_nodes(graph::NodeGraph)
-    return lock(graph) do
-        _cleanup!(graph)
-        Node[x.value for x in values(graph.weak_to_ref)]
-    end
-end
-
-"""
-    _insert_node!(graph::NodeGraph, node, weak_node) -> NodeGraph
-
-Insert `node` & equivalent `weak_node` into `graph`.
-"""
-function _insert_node!(graph::NodeGraph, node::Node, weak_node::WeakNode)
-    # Insert the node & its weak counterpart to the mappings.
-    graph.weak_to_ref[weak_node] = WeakRef(node)
-
-    # Add a finalizer to the node that will declare the graph to be dirty when it is
-    # deleted. We handle this above.
-    finalizer(graph.finalizer, node)
-
-    return graph
-end
-
-"""
     _can_propagate_constant(::NodeOp) -> Bool
 
 Return true for ops which can propagate constant values if all their parents are constant.
@@ -122,51 +14,21 @@ This assumes that `_can_propagate_constant(op)` is true.
 function _propagate_constant_value end
 
 """
-    obtain_node(graph::NodeGraph, parents, op::NodeOp) -> Node
     obtain_node(parents, op) -> Node
 
 Get a node for the given NodeOp and parents. If an equivalent node already exists in the
-graph, use that one, otherwise create a new node, add to the graph, and return it.
-
-If the graph is not specified, the global graph is used.
+identity map, use that one, otherwise create a new node, add to the identity map, and return
+it.
 """
-function obtain_node(graph::NodeGraph, parents::NTuple{N,Node}, op::NodeOp) where {N}
+function obtain_node(parents::NTuple{N,Node}, op::NodeOp) where {N}
     if !isempty(parents) && _can_propagate_constant(op) && all(_is_constant, parents)
         # Constant propagation, since all inputs are constants & the op supports it.
         # Note that `constant` does, itself, call through to `obtain_node`, so the node will
-        # be correctly registered with the graph.
+        # be correctly registered with the id_map.
         return constant(_propagate_constant_value(op, parents))
     end
 
-    # FIXME So so so so slow on 1.6.
-    #   On 1.5, this adds *even more* failures (of the form of obtaining nodes, and them
-    #   ending up being `nothing`.)
-    # GC.gc()
-    return lock(graph) do
-        # FIXME This results in tests breaking! Excellent...
-        #   It looks reminiscent of the failures seen on Julia 1.5
-        #   This looks relevant: https://github.com/JuliaLang/julia/pull/38487
-        #   It changed the behaviour of finalizers so that they didn't run when locks
-        #   had been acquired.
-        # GC.gc()
-
-        # Before attempting to query or modify the graph, ensure it is free of dangling
-        # references.
-        _cleanup!(graph)
-
-        weak_node = WeakNode(map(WeakRef, parents), op)
-        node_ref = get(graph.weak_to_ref, weak_node, nothing)
-        if !isnothing(node_ref)
-            # Remember that we need to unwrap the value from the WeakRef...
-            # FIXME This value can be nothing because of some horrible race condition.
-            node_ref.value
-        else
-            # An equivalent node does not yet exist in the graph; create it.
-            node = Node(parents, op)
-            _insert_node!(graph, node, weak_node)
-            node
-        end
-    end
+    return obtain_node!(global_identity_map(), parents, op)
 end
 
 """
@@ -265,15 +127,3 @@ function ancestors(nodes::AbstractVector{Node})
     ancestor_vertices = ancestors(light_graph, vertices)
     return [inverse(node_to_vertex, vertex) for vertex in ancestor_vertices]
 end
-
-# This is the single instance of the graph that we want
-const _GLOBAL_GRAPH = NodeGraph()
-
-"""
-    global_graph() -> NodeGraph
-
-Get the global NodeGraph instance used in TimeDag.
-"""
-global_graph() = _GLOBAL_GRAPH
-
-obtain_node(parents, op::NodeOp) = obtain_node(_GLOBAL_GRAPH, parents, op)
