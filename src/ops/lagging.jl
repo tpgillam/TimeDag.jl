@@ -56,7 +56,7 @@ function run_node!(
     # Update the state with the remaining values in the input.
     @inbounds append!(state.value_buffer, @view(input.values[(1 + no - m):end]))
 
-    return Block(Unchecked, times, values)
+    return Block(unchecked, times, values)
 end
 
 function lag(node::Node, n::Integer)

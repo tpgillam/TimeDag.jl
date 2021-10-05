@@ -42,7 +42,7 @@ end
     @test_throws ArgumentError Block([DateTime(1991), DateTime(1990)], [1, 2])
 
     # Creating an invalid block when unchecked should not throw an exception.
-    block = Block(TimeDag.Unchecked, [DateTime(1990)], Int64[])
+    block = Block(TimeDag.unchecked, [DateTime(1990)], Int64[])
     @test block.times == [DateTime(1990)]
     @test block.values == Int64[]
 end
