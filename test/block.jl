@@ -42,7 +42,21 @@ end
     @test_throws ArgumentError Block([DateTime(1991), DateTime(1990)], [1, 2])
 
     # Creating an invalid block when unchecked should not throw an exception.
-    block = Block(TimeDag.Unchecked, [DateTime(1990)], Int64[])
+    block = Block(TimeDag.unchecked, [DateTime(1990)], Int64[])
     @test block.times == [DateTime(1990)]
     @test block.values == Int64[]
+end
+
+@testset "tables" begin
+    @test Tables.columnnames(b1) == (:time, :value)
+
+    for (i, row) in enumerate(Tables.namedtupleiterator(b1))
+        @test b1.times[i] == row.time
+        @test b1.values[i] == row.value
+    end
+
+    df1 = DataFrame(b1)
+    @test Tables.columnnames(df1) == [:time, :value]
+    @test df1[!, :time] == b1.times
+    @test df1[!, :value] == b1.values
 end

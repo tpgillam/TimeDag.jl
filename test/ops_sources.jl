@@ -15,3 +15,17 @@
     @test x != y
     @test x !== y
 end
+
+@testset "tea_file" begin
+    mktempdir() do prefix
+        # Write some basic data to a file, then read it back.
+        path = joinpath(prefix, "moo.tea")
+        TeaFiles.write(path, b1)
+
+        n = TimeDag.tea_file(path, :value)
+        n2 = TimeDag.tea_file(path, :value)
+
+        @test n2 === n
+        @test _eval(n) == b1
+    end
+end

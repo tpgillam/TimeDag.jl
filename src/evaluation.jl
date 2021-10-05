@@ -30,6 +30,13 @@ function duplicate_internal(x::EvaluationState, stackdict::IdDict)
     return y
 end
 
+"""
+Wrapper that avoids the need to define `create_evaluation_state` for stateless nodes.
+"""
+function _create_evaluation_state(node)
+    return stateless(node) ? _EMPTY_NODE_STATE : create_evaluation_state(node)
+end
+
 function start_at(nodes, time_start::DateTime)::EvaluationState
     # Create empty evaluation state for all these, and return in some suitable pacakge.
     evaluation_order = ancestors(nodes)
@@ -46,7 +53,7 @@ function start_at(nodes, time_start::DateTime)::EvaluationState
 
     return EvaluationState(
         ordered_node_to_children,
-        IdDict(map(node -> node => create_evaluation_state(node), evaluation_order)),
+        IdDict(map(node -> node => _create_evaluation_state(node), evaluation_order)),
         time_start,
         IdDict((node => Block{value_type(node)}[] for node in nodes)),
     )

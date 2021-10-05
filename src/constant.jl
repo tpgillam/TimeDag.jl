@@ -36,7 +36,7 @@ function run_node!(
         Block{T}()
     else
         state.ticked = true
-        Block(Unchecked, [time_start], [op.value])
+        Block(unchecked, [time_start], [op.value])
     end
 end
 
