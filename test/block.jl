@@ -48,10 +48,15 @@ end
 end
 
 @testset "tables" begin
-    @test Tables.columnnames(b1) == (:times, :values)
+    @test Tables.columnnames(b1) == (:time, :value)
+
+    for (i, row) in enumerate(Tables.namedtupleiterator(b1))
+        @test b1.times[i] == row.time
+        @test b1.values[i] == row.value
+    end
 
     df1 = DataFrame(b1)
-    @test Tables.columnnames(df1) == [:times, :values]
-    @test df1[!, :times] == b1.times
-    @test df1[!, :values] == b1.values
+    @test Tables.columnnames(df1) == [:time, :value]
+    @test df1[!, :time] == b1.times
+    @test df1[!, :value] == b1.values
 end

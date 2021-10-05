@@ -103,17 +103,17 @@ function Base.isapprox(a::Block, b::Block; kwargs...)
 end
 
 # Make a block behave like a table with two columns, primarily for printing purposes.
-Tables.istable(::Block) = true
-Tables.columnaccess(::Block) = true
+Tables.istable(::Type{<:Block}) = true
+Tables.columnaccess(::Type{<:Block}) = true
 Tables.columns(block::Block) = block
 
-const _BLOCK_COLUMNNAMES = (:times, :values)
+const _BLOCK_COLUMNNAMES = (:time, :value)
 Tables.schema(::Block{T}) where {T} = Tables.Schema(_BLOCK_COLUMNNAMES, (DateTime, T))
 Tables.getcolumn(block::Block, i::Int) = Tables.getcolumn(block, _BLOCK_COLUMNNAMES[i])
 function Tables.getcolumn(block::Block, nm::Symbol)
-    if nm == :times
+    if nm == :time
         return block.times
-    elseif nm == :values
+    elseif nm == :value
         return block.values
     else
         throw(ArgumentError("Unknown column $nm"))
