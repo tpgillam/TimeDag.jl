@@ -216,3 +216,9 @@ function Statistics.var(x::Node, window::Int; emit_early::Bool=false)
     T = output_type(/, value_type(x), Int)
     return obtain_node((x,), WindowVar{T,emit_early}(window))
 end
+
+# Standard deviation.
+Statistics.std(x::Node) = sqrt(var(x))
+function Statistics.std(x::Node, window::Int; emit_early::Bool=false)
+    return sqrt(var(x, window; emit_early))
+end

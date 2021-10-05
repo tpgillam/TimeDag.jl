@@ -113,3 +113,18 @@ end
         _test_window_op(Float64, var; min_window=2)
     end
 end
+
+@testset "std" begin
+    @testset "inception" begin
+        _test_inception_op(Float64, std; min_window=2)
+    end
+
+    @testset "window" begin
+        # Windows that are too small should trigger an exception when attempting to create
+        # the node.
+        @test_throws ArgumentError std(n4, 0)
+        @test_throws ArgumentError std(n4, 1)
+
+        _test_window_op(Float64, std; min_window=2)
+    end
+end
