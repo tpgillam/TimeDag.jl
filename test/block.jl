@@ -46,3 +46,12 @@ end
     @test block.times == [DateTime(1990)]
     @test block.values == Int64[]
 end
+
+@testset "tables" begin
+    @test Tables.columnnames(b1) == (:times, :values)
+
+    df1 = DataFrame(b1)
+    @test Tables.columnnames(df1) == [:times, :values]
+    @test df1[!, :times] == b1.times
+    @test df1[!, :values] == b1.values
+end
