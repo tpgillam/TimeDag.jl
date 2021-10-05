@@ -1,9 +1,11 @@
+using DataFrames
 using DataStructures
 using Dates
 using LightGraphs
 using Statistics
-using TimeDag
+using TeaFiles
 using Test
+using TimeDag
 
 using TimeDag: Block, Node
 using TimeDag: IntersectAlignment, LeftAlignment, UnionAlignment

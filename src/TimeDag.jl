@@ -9,6 +9,7 @@ using LightGraphs
 using PrettyTables
 using Statistics
 using Tables
+using TeaFiles
 
 include("maybe.jl")
 
