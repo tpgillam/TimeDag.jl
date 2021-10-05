@@ -69,7 +69,7 @@ always_ticks(::NodeOp) = false
 
 Returns true iff `operator(op, ...)` would never look at or modify the evaluation state.
 
-If this returns true, `create_operator_evaluation_state` should return _EMPTY_NODE_STATE.
+If this returns true, `create_operator_evaluation_state` will not be used.
 
 Note that if an `op` has `stateless(op)` returning true, then it necessarily should also
 return true here. The default implementation is to return `stateless(op)`, meaning that if

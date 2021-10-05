@@ -8,7 +8,7 @@ function Base.:(==)(x::BlockNode{T}, y::BlockNode{T}) where {T}
     return x.block === y.block
 end
 
-create_evaluation_state(::Tuple{}, ::BlockNode) = _EMPTY_NODE_STATE
+stateless(::BlockNode) = true
 
 function run_node!(
     ::EmptyNodeEvaluationState, op::BlockNode{T}, time_start::DateTime, time_end::DateTime
