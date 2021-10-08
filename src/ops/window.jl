@@ -84,39 +84,53 @@ Windowed associative binary operator, potentially emitting early before the wind
 """
 abstract type UnaryWindowOp{T,Data,CombineOp,EmitEarly} <: UnaryNodeOp{T} end
 
+abstract type BinaryWindowOp{T,Data,CombineOp,EmitEarly,A} <: BinaryAlignedNodeOp{T,A} end
+
+const WindowOp{T,Data,CombineOp,EmitEarly} = Union{
+    UnaryWindowOp{T,Data,CombineOp,EmitEarly},BinaryWindowOp{T,Data,CombineOp,EmitEarly}
+}
+
 """
     _window(window_op) -> Int64
 
 Return the window for the specified op.
 The default implementation expects a field called `window` on the op structure.
 """
-_window(op::UnaryWindowOp) = op.window
+_window(op::WindowOp) = op.window
 
 """Whether or not this window op is set to emit with a non-full window."""
-function _emit_early(::UnaryWindowOp{T,Data,CombineOp,true}) where {T,Data,CombineOp}
+function _emit_early(::WindowOp{T,Data,CombineOp,true}) where {T,Data,CombineOp}
     return true
 end
-function _emit_early(::UnaryWindowOp{T,Data,CombineOp,false}) where {T,Data,CombineOp}
+function _emit_early(::WindowOp{T,Data,CombineOp,false}) where {T,Data,CombineOp}
     return false
 end
 
-always_ticks(op::UnaryWindowOp) = _emit_early(op) && _unfiltered(op)
-time_agnostic(::UnaryWindowOp) = true
+always_ticks(op::WindowOp) = _emit_early(op) && _unfiltered(op)
+time_agnostic(::WindowOp) = true
 
 mutable struct WindowOpState{Data} <: NodeEvaluationState
     window_state::FixedWindowAssociativeOp{Data}
 end
 
+function create_operator_evaluation_state(::Tuple{Node}, op::UnaryWindowOp)
+    return create_operator_evaluation_state(op)
+end
+
+function create_operator_evaluation_state(::Tuple{Node,Node}, op::BinaryWindowOp)
+    return create_operator_evaluation_state(op)
+end
+
 function create_operator_evaluation_state(
-    ::Tuple{Node}, op::UnaryWindowOp{T,Data,CombineOp}
+    op::WindowOp{T,Data,CombineOp}
 ) where {T,Data,CombineOp}
     return WindowOpState{Data}(FixedWindowAssociativeOp{Data,CombineOp}(_window(op)))
 end
 
 function operator!(
-    op::UnaryWindowOp{T,Data,CombineOp}, state::WindowOpState{Data}, x
+    op::WindowOp{T,Data,CombineOp}, state::WindowOpState{Data}, x...
 ) where {T,Data,CombineOp}
-    update_state!(state.window_state, _wrap(Data, x))
+    update_state!(state.window_state, _wrap(Data, x...))
     if always_ticks(op)
         # Deal with the case where we always emit.
         return _extract(op, window_value(state.window_state))
@@ -253,6 +267,7 @@ _extract(::WindowVar{T,true}, data::VarData) where {T} = data.s / (data.n - 1)
 _extract(::WindowVar{T,false}, data::VarData) where {T} = data.s / data.n
 Base.show(io::IO, op::WindowVar{T}) where {T} = print(io, "WindowVar{$T}($(_window(op)))")
 function Statistics.var(x::Node, window::Int; emit_early::Bool=false, corrected::Bool=true)
+    _is_constant(x) && throw(ArgumentError("Cannot compute variance of constant $x"))
     window >= 2 || throw(ArgumentError("Got window=$window, but should be at least 2"))
     T = output_type(/, value_type(x), Int)
     return obtain_node((x,), WindowVar{T,corrected,emit_early}(window))
@@ -309,3 +324,41 @@ function Statistics.cov(x::Node, y::Node; corrected::Bool=true)
 end
 Statistics.cov(x::Node, y; corrected::Bool=true) = cov(x, y, DEFAULT_ALIGNMENT; corrected)
 Statistics.cov(x, y::Node; corrected::Bool=true) = cov(x, y, DEFAULT_ALIGNMENT; corrected)
+
+# Covariance over fixed window.
+struct WindowCov{T,Corrected,EmitEarly,A} <:
+       BinaryWindowOp{T,CovData{T},_combine,EmitEarly,A}
+    window::Int64
+end
+_should_tick(::WindowCov, data::CovData) = data.n > 1
+_extract(::WindowCov{T,true}, data::CovData) where {T} = data.c / (data.n - 1)
+_extract(::WindowCov{T,false}, data::CovData) where {T} = data.c / data.n
+Base.show(io::IO, op::WindowCov{T}) where {T} = print(io, "WindowCov{$T}($(_window(op)))")
+
+function Statistics.cov(
+    x, y, window::Int, ::Type{A}; emit_early::Bool=false, corrected::Bool=true
+) where {A<:Alignment}
+    window >= 2 || throw(ArgumentError("Got window=$window, but should be at least 2"))
+    x = _ensure_node(x)
+    y = _ensure_node(y)
+    if _is_constant(x) && _is_constant(y)
+        throw(ArgumentError("Cannot compute covariance of constants $x and $y"))
+    end
+    T = output_type(/, output_type(*, value_type(x), value_type(y)), Int)
+    return obtain_node((x, y), WindowCov{T,corrected,emit_early,A}(window))
+end
+function Statistics.cov(
+    x::Node, y::Node, window::Int; emit_early::Bool=false, corrected::Bool=true
+)
+    return cov(x, y, window, DEFAULT_ALIGNMENT; emit_early, corrected)
+end
+function Statistics.cov(
+    x::Node, y, window::Int; emit_early::Bool=false, corrected::Bool=true
+)
+    return cov(x, y, window, DEFAULT_ALIGNMENT; emit_early, corrected)
+end
+function Statistics.cov(
+    x, y::Node, window::Int; emit_early::Bool=false, corrected::Bool=true
+)
+    return cov(x, y, window, DEFAULT_ALIGNMENT; emit_early, corrected)
+end

@@ -1,6 +1,7 @@
 _eval(n) = _evaluate(n, DateTime(2000, 1, 1), DateTime(2000, 1, 10))
 
-# Gloriously inefficient way of computing running quantities from inception.
+# Gloriously inefficient ways of computing running & rolled quantities.
+
 function _naive_inception_reduce(T, f::Function, block::Block, min_window::Int)
     @assert min_window > 0
     times = DateTime[]
@@ -20,7 +21,6 @@ function _naive_inception_reduce(T, f::Function, block::Block, min_window::Int)
     return Block(times, values)
 end
 
-# Gloriously inefficient way of computing running quantities from inception.
 function _naive_inception_reduce(
     T, f::Function, block_a::Block, block_b::Block, min_window::Int
 )
@@ -74,6 +74,46 @@ function _naive_window_reduce(
     return Block(times, values)
 end
 
+function _naive_window_reduce(
+    T,
+    f::Function,
+    block_a::Block,
+    block_b::Block,
+    window::Int,
+    emit_early::Bool,
+    min_window::Int,
+)
+    @assert window > 0
+    @assert min_window > 0
+    @assert block_a.times == block_b.times  # Don't attempt to perform alignment
+
+    times = DateTime[]
+    values = T[]
+    buffer_a = CircularBuffer{value_type(block_a)}(window)
+    buffer_b = CircularBuffer{value_type(block_b)}(window)
+    for i in 1:length(block_a)
+        time, value_a = block_a[i]
+        _, value_b = block_b[i]
+        # Push a new value onto the buffer. (If the buffer is full, it will overwrite the
+        # value that is falling out of the buffer, because it is circular.)
+        push!(buffer_a, value_a)
+        push!(buffer_b, value_b)
+        if !emit_early && !isfull(buffer_a)
+            @assert !isfull(buffer_b)
+            # The buffer is not full, and we require that it be full for us to emit a knot.
+            continue
+        end
+        if i < min_window
+            # We need to wait longer before emitting.
+            continue
+        end
+        push!(times, time)
+        push!(values, f(buffer_a, buffer_b))
+    end
+
+    return Block(times, values)
+end
+
 function _test_inception_op(
     T, f_normal::Function, f_timedag::Function=f_normal; min_window=1
 )
@@ -97,15 +137,38 @@ end
 function _test_window_op(T, f_normal::Function, f_timedag::Function=f_normal; min_window=1)
     for window in min_window:(length(b4) + 2)
         n = f_timedag(n4, window)
+
         block = _eval(n)
         block_ee_false = _eval(f_timedag(n4, window; emit_early=false))
         block_ee_true = _eval(f_timedag(n4, window; emit_early=true))
-        @test block == block_ee_false
 
+        @test block == block_ee_false
         @test block_ee_false ≈
               _naive_window_reduce(T, f_normal, b4, window, false, min_window)
         @test block_ee_true ≈
               _naive_window_reduce(T, f_normal, b4, window, true, min_window)
+    end
+    return nothing
+end
+
+function _test_binary_window_op(
+    T, f_normal::Function, f_timedag::Function=f_normal; min_window=1
+)
+    na = n4
+    nb = TimeDag.align(n1, n4)
+    block_a, block_b = _eval_fast([na, nb])
+    for window in min_window:(length(b4) + 2)
+        n = f_timedag(n1, n4, window)
+
+        block = _eval(n)
+        block_ee_false = _eval(f_timedag(n1, n4, window; emit_early=false))
+        block_ee_true = _eval(f_timedag(n1, n4, window; emit_early=true))
+
+        @test block == block_ee_false
+        @test block_ee_false ≈
+              _naive_window_reduce(T, f_normal, block_a, block_b, window, false, min_window)
+        @test block_ee_true ≈
+              _naive_window_reduce(T, f_normal, block_a, block_b, window, true, min_window)
     end
     return nothing
 end
@@ -156,6 +219,7 @@ end
         # the node.
         @test_throws ArgumentError var(n4, 0)
         @test_throws ArgumentError var(n4, 1)
+        @test_throws ArgumentError var(constant(42.0), 2)
 
         _test_window_op(Float64, var; min_window=2)
         _test_window_op(Float64, partial(var; corrected=false); min_window=2)
@@ -176,6 +240,7 @@ end
         # the node.
         @test_throws ArgumentError std(n4, 0)
         @test_throws ArgumentError std(n4, 1)
+        @test_throws ArgumentError std(constant(42.0), 2)
 
         _test_window_op(Float64, std; min_window=2)
         _test_window_op(Float64, partial(std; corrected=false); min_window=2)
@@ -189,5 +254,17 @@ end
         _test_binary_inception_op(Float64, cov; min_window=2)
         _test_binary_inception_op(Float64, partial(cov; corrected=false); min_window=2)
         _test_binary_inception_op(Float64, partial(cov; corrected=true); min_window=2)
+    end
+
+    @testset "window" begin
+        # Windows that are too small should trigger an exception when attempting to create
+        # the node.
+        @test_throws ArgumentError cov(n1, n4, 0)
+        @test_throws ArgumentError cov(n1, n4, 1)
+        @test_throws ArgumentError cov(constant(42.0), constant(24.0), 2)
+
+        _test_binary_window_op(Float64, cov; min_window=2)
+        _test_binary_window_op(Float64, partial(cov; corrected=false); min_window=2)
+        _test_binary_window_op(Float64, partial(cov; corrected=true); min_window=2)
     end
 end
