@@ -20,6 +20,33 @@ function _naive_inception_reduce(T, f::Function, block::Block, min_window::Int)
     return Block(times, values)
 end
 
+# Gloriously inefficient way of computing running quantities from inception.
+function _naive_inception_reduce(
+    T, f::Function, block_a::Block, block_b::Block, min_window::Int
+)
+    @assert min_window > 0
+    @assert block_a.times == block_b.times  # Don't attempt to perform alignment
+    times = DateTime[]
+    values = T[]
+    buffer_a = value_type(block_a)[]
+    buffer_b = value_type(block_b)[]
+    for i in 1:length(block_a)
+        time, a = block_a[i]
+        _, b = block_b[i]
+        # Push new values onto the buffer.
+        push!(buffer_a, a)
+        push!(buffer_b, b)
+        if i < min_window
+            # We need to wait longer before emitting.
+            continue
+        end
+        push!(times, time)
+        push!(values, f(buffer_a, buffer_b))
+    end
+
+    return Block(times, values)
+end
+
 function _naive_window_reduce(
     T, f::Function, block::Block, window::Int, emit_early::Bool, min_window::Int
 )
@@ -53,6 +80,20 @@ function _test_inception_op(
     @test _eval(f_timedag(n4)) ≈ _naive_inception_reduce(T, f_normal, b4, min_window)
 end
 
+function _test_binary_inception_op(
+    T, f_normal::Function, f_timedag::Function=f_normal; min_window=1
+)
+    # TODO test other alignments
+    # pre-align outputs so the reduction operation is simpler
+    # TODO write & use `coalign` (or maybe `align_all`?)
+    # na, nb = coalign(n1, n4)
+    na = n4
+    nb = TimeDag.align(n1, n4)
+    block_a, block_b = _eval_fast([na, nb])
+    @test _eval(f_timedag(n1, n4)) ≈
+          _naive_inception_reduce(T, f_normal, block_a, block_b, min_window)
+end
+
 function _test_window_op(T, f_normal::Function, f_timedag::Function=f_normal; min_window=1)
     for window in min_window:(length(b4) + 2)
         n = f_timedag(n4, window)
@@ -71,6 +112,7 @@ end
 
 @testset "sum" begin
     @testset "inception" begin
+        @test sum(constant(42)) == constant(42)
         _test_inception_op(Int64, sum)
     end
 
@@ -81,6 +123,7 @@ end
 
 @testset "prod" begin
     @testset "inception" begin
+        @test prod(constant(42)) == constant(42)
         _test_inception_op(Int64, prod)
     end
 
@@ -91,6 +134,7 @@ end
 
 @testset "mean" begin
     @testset "inception" begin
+        @test mean(constant(42)) == constant(42)
         _test_inception_op(Float64, mean)
     end
 
@@ -101,7 +145,10 @@ end
 
 @testset "var" begin
     @testset "inception" begin
+        @test_throws ArgumentError var(constant(42.0))
         _test_inception_op(Float64, var; min_window=2)
+        _test_inception_op(Float64, partial(var; corrected=false); min_window=2)
+        _test_inception_op(Float64, partial(var; corrected=true); min_window=2)
     end
 
     @testset "window" begin
@@ -118,7 +165,10 @@ end
 
 @testset "std" begin
     @testset "inception" begin
+        @test_throws ArgumentError std(constant(42.0))
         _test_inception_op(Float64, std; min_window=2)
+        _test_inception_op(Float64, partial(std; corrected=false); min_window=2)
+        _test_inception_op(Float64, partial(std; corrected=true); min_window=2)
     end
 
     @testset "window" begin
@@ -130,5 +180,14 @@ end
         _test_window_op(Float64, std; min_window=2)
         _test_window_op(Float64, partial(std; corrected=false); min_window=2)
         _test_window_op(Float64, partial(std; corrected=true); min_window=2)
+    end
+end
+
+@testset "cov" begin
+    @testset "inception" begin
+        @test_throws ArgumentError cov(constant(42.0), constant(24.0))
+        _test_binary_inception_op(Float64, cov; min_window=2)
+        _test_binary_inception_op(Float64, partial(cov; corrected=false); min_window=2)
+        _test_binary_inception_op(Float64, partial(cov; corrected=true); min_window=2)
     end
 end

@@ -97,6 +97,8 @@ n4 = block_node(b4)
 n_boolean = TimeDag.block_node(b_boolean)
 
 _eval(n) = _evaluate(n, DateTime(2000, 1, 1), DateTime(2000, 1, 10))
+# Evaluation when not wanting to perform tests.
+_eval_fast(n) = evaluate(n, DateTime(2000, 1, 1), DateTime(2000, 1, 10))
 
 function _test_binary_op(op_timedag, op=op_timedag)
     # Common (fast) alignment.
