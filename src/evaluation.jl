@@ -124,7 +124,7 @@ If `nodes` have common dependencies, work will not be repeated when performing t
 evaluation.
 """
 function evaluate(
-    nodes::AbstractVector{Node},
+    nodes::AbstractVector{<:Node},
     time_start::DateTime,
     time_end::DateTime;
     batch_interval::Union{Nothing,TimePeriod}=nothing,

@@ -95,7 +95,7 @@ function Base.iterate(::NodeIterator, state::NodeIteratorState)
     return (node, state)
 end
 
-iternodes(nodes::AbstractVector{Node}) = NodeIterator(Vector{Node}(nodes))
+iternodes(nodes::AbstractVector{<:Node}) = NodeIterator(Vector{Node}(nodes))
 
 """
     ancestors(nodes)
@@ -104,7 +104,7 @@ Get a list of all nodes in the graph defined by `nodes`, including all parents.
     * Every node in the graph will be visited exactly once.
     * The parents of any vertex will always come before the vertex itself.
 """
-function ancestors(nodes::AbstractVector{Node})
+function ancestors(nodes::AbstractVector{<:Node})
     # Construct a LightGraphs representation of the whole node graph.
     node_to_vertex = Bijection(Dict(n => i for (i, n) in enumerate(iternodes(nodes))))
 

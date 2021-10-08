@@ -13,9 +13,9 @@ Nodes should NEVER actually be mutated!
 Due to subgraph elimination, nodes that are equivalent should always be identical objects.
 We therefore leave `hash` & `==` defined in terms of the `objectid`.
 """
-mutable struct Node
+mutable struct Node{T}
     parents::NTuple{N,Node} where {N}
-    op::NodeOp
+    op::NodeOp{T}
 end
 
 # Node & NodeOps are immutable for duplication purposes.
@@ -35,7 +35,7 @@ AbstractTrees.children(node::Node) = parents(node)
 AbstractTrees.nodetype(::Node) = Node
 
 """The type of each value emitted for this node."""
-value_type(node::Node) = value_type(node.op)
+value_type(::Node{T}) where {T} = T
 value_type(::NodeOp{T}) where {T} = T
 
 abstract type NodeEvaluationState end
