@@ -9,6 +9,7 @@ using TimeDag
 
 using TimeDag: Block, Node
 using TimeDag: IntersectAlignment, LeftAlignment, UnionAlignment
+using TimeDag: INTERSECT, LEFT, UNION
 using TimeDag: duplicate, evaluate, get_up_to!, start_at, value_type
 using TimeDag: block_node, constant, empty_node
 

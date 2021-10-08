@@ -103,9 +103,7 @@ _eval_fast(n) = evaluate(n, DateTime(2000, 1, 1), DateTime(2000, 1, 10))
 function _test_binary_op(op_timedag, op=op_timedag)
     # Common (fast) alignment.
     # Should apply for *any* user choice of alignment.
-    for alignment in (
-            TimeDag.UnionAlignment, TimeDag.LeftAlignment, TimeDag.IntersectAlignment
-        )
+    for alignment in (UNION, LEFT, INTERSECT)
         n = op_timedag(n1, n1, alignment)
         block = _eval(n)
         @test block == Block([
@@ -120,7 +118,7 @@ function _test_binary_op(op_timedag, op=op_timedag)
 
     # Union alignment.
     n = op_timedag(n1, n2)
-    @test n === op_timedag(n1, n2, TimeDag.UnionAlignment)
+    @test n === op_timedag(n1, n2, UNION)
     block = _eval(n)
     @test block == Block([
         DateTime(2000, 1, 2) => op(2, 5),
@@ -130,7 +128,7 @@ function _test_binary_op(op_timedag, op=op_timedag)
     ])
 
     # Intersect alignment.
-    n = op_timedag(n1, n2, TimeDag.IntersectAlignment)
+    n = op_timedag(n1, n2, INTERSECT)
 
     @test _eval(n) == Block([
         DateTime(2000, 1, 2) => op(2, 5),
@@ -138,7 +136,7 @@ function _test_binary_op(op_timedag, op=op_timedag)
     ])
 
     # Left alignment
-    n = op_timedag(n1, n2, TimeDag.LeftAlignment)
+    n = op_timedag(n1, n2, LEFT)
     @test _eval(n) == Block([
         DateTime(2000, 1, 2) => op(2, 5),
         DateTime(2000, 1, 3) => op(3, 6),
@@ -146,12 +144,12 @@ function _test_binary_op(op_timedag, op=op_timedag)
     ])
 
     # Catch edge-case in which there was a bug.
-    @test _eval(op_timedag(n2, n3, TimeDag.LeftAlignment)) == Block([
+    @test _eval(op_timedag(n2, n3, LEFT)) == Block([
         DateTime(2000, 1, 2) => op(5, 15),
         DateTime(2000, 1, 3) => op(6, 15),
         DateTime(2000, 1, 5) => op(8, 15),
     ])
-    @test _eval(op_timedag(n3, n2, TimeDag.LeftAlignment)) == Block{Int64}()
+    @test _eval(op_timedag(n3, n2, LEFT)) == Block{Int64}()
 end
 
 #! format: on

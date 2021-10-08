@@ -310,7 +310,7 @@ _should_tick(::Cov, data::CovData) = data.n > 1
 _extract(::Cov{T,true}, data::CovData) where {T} = data.c / (data.n - 1)
 _extract(::Cov{T,false}, data::CovData) where {T} = data.c / data.n
 Base.show(io::IO, ::Cov{T}) where {T} = print(io, "Var{$T}")
-function Statistics.cov(x, y, ::Type{A}; corrected::Bool=true) where {A<:Alignment}
+function Statistics.cov(x, y, ::A; corrected::Bool=true) where {A<:Alignment}
     x = _ensure_node(x)
     y = _ensure_node(y)
     if _is_constant(x) && _is_constant(y)
@@ -336,7 +336,7 @@ _extract(::WindowCov{T,false}, data::CovData) where {T} = data.c / data.n
 Base.show(io::IO, op::WindowCov{T}) where {T} = print(io, "WindowCov{$T}($(_window(op)))")
 
 function Statistics.cov(
-    x, y, window::Int, ::Type{A}; emit_early::Bool=false, corrected::Bool=true
+    x, y, window::Int, ::A; emit_early::Bool=false, corrected::Bool=true
 ) where {A<:Alignment}
     window >= 2 || throw(ArgumentError("Got window=$window, but should be at least 2"))
     x = _ensure_node(x)

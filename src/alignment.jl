@@ -1,17 +1,20 @@
 """Represent a technique for aligning two timeseries."""
 abstract type Alignment end
-
-"""For a pair (A, B), tick whenever A ticks so long as both nodes are active."""
 struct LeftAlignment <: Alignment end
-
-"""For a pair (A, B), tick whenever A or B ticks so long as both nodes are active."""
 struct UnionAlignment <: Alignment end
-
-"""For a pair (A, B), tick whenever A and B tick simultaneously."""
 struct IntersectAlignment <: Alignment end
 
+"""For a pair (A, B), tick whenever A ticks so long as both nodes are active."""
+const LEFT = LeftAlignment()
+
+"""For a pair (A, B), tick whenever A or B ticks so long as both nodes are active."""
+const UNION = UnionAlignment()
+
+"""For a pair (A, B), tick whenever A and B tick simultaneously."""
+const INTERSECT = IntersectAlignment()
+
 """The default alignment for operators when not specified."""
-const DEFAULT_ALIGNMENT = UnionAlignment
+const DEFAULT_ALIGNMENT = UNION
 
 abstract type UnaryNodeOp{T} <: NodeOp{T} end
 abstract type BinaryAlignedNodeOp{T,A<:Alignment} <: NodeOp{T} end

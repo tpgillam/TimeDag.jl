@@ -33,7 +33,7 @@ macro binary_define(op, node_op)
 
         TimeDag.operator!(::$node_op, x, y) = $op(x, y)
 
-        function $op(x, y, ::Type{A}) where {A<:Alignment}
+        function $op(x, y, ::A) where {A<:Alignment}
             x = _ensure_node(x)
             y = _ensure_node(y)
             T = output_type($op, value_type(x), value_type(y))
