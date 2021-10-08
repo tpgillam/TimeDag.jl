@@ -18,8 +18,16 @@ The return value determines whether a knot should be emitted for this value.
 """
 function _should_tick end
 
+"""
+    _extract(op, data) -> value
+
+This should be defined for all inception and windowed ops. Given some data object, it should
+compute the appropriate output value for the node.
+"""
+function _extract end
+
 # Operator accumulated from inception.
-struct InceptionOp{T,Data,CombineOp,ExtractOp} <: UnaryNodeOp{T} end
+abstract type InceptionOp{T,Data,CombineOp} <: UnaryNodeOp{T} end
 
 always_ticks(op::InceptionOp) = _unfiltered(op)
 time_agnostic(::InceptionOp) = true
@@ -39,8 +47,8 @@ function create_operator_evaluation_state(
 end
 
 function operator!(
-    op::InceptionOp{T,Data,CombineOp,ExtractOp}, state::InceptionOpState{Data}, x
-) where {T,Data,CombineOp,ExtractOp}
+    op::InceptionOp{T,Data,CombineOp}, state::InceptionOpState{Data}, x
+) where {T,Data,CombineOp}
     if !state.initialised
         state.data = _wrap(Data, x)
         state.initialised = true
@@ -49,9 +57,9 @@ function operator!(
     end
     return if always_ticks(op)
         # Deal with the case where we always emit.
-        ExtractOp(state.data)
+        _extract(op, state.data)
     elseif _unfiltered(op) || _should_tick(op, state.data)
-        Maybe(ExtractOp(state.data))
+        Maybe(_extract(op, state.data))
     else
         Maybe{T}()
     end
@@ -59,19 +67,21 @@ end
 
 # Windowed associative binary operator, potentially emitting early before the window is
 # full.
-struct WindowOp{T,Data,CombineOp,ExtractOp,EmitEarly} <: UnaryNodeOp{T}
-    window::Int64
-end
+abstract type WindowOp{T,Data,CombineOp,EmitEarly} <: UnaryNodeOp{T} end
+
+"""
+    _window(window_op) -> Int64
+
+Return the window for the specified op.
+The default implementation expects a field called `window` on the op structure.
+"""
+_window(op::WindowOp) = op.window
 
 """Whether or not this window op is set to emit with a non-full window."""
-function _emit_early(
-    ::WindowOp{T,Data,CombineOp,ExtractOp,true}
-) where {T,Data,CombineOp,ExtractOp}
+function _emit_early(::WindowOp{T,Data,CombineOp,true}) where {T,Data,CombineOp}
     return true
 end
-function _emit_early(
-    ::WindowOp{T,Data,CombineOp,ExtractOp,false}
-) where {T,Data,CombineOp,ExtractOp}
+function _emit_early(::WindowOp{T,Data,CombineOp,false}) where {T,Data,CombineOp}
     return false
 end
 
@@ -85,16 +95,16 @@ end
 function create_operator_evaluation_state(
     ::Tuple{Node}, op::WindowOp{T,Data,CombineOp}
 ) where {T,Data,CombineOp}
-    return WindowOpState{Data}(FixedWindowAssociativeOp{Data,CombineOp}(op.window))
+    return WindowOpState{Data}(FixedWindowAssociativeOp{Data,CombineOp}(_window(op)))
 end
 
 function operator!(
-    op::WindowOp{T,Data,CombineOp,ExtractOp}, state::WindowOpState{Data}, x
-) where {T,Data,CombineOp,ExtractOp}
+    op::WindowOp{T,Data,CombineOp}, state::WindowOpState{Data}, x
+) where {T,Data,CombineOp}
     update_state!(state.window_state, _wrap(Data, x))
     if always_ticks(op)
         # Deal with the case where we always emit.
-        return ExtractOp(window_value(state.window_state))
+        return _extract(op, window_value(state.window_state))
     end
 
     ready = _emit_early(op) || window_full(state.window_state)
@@ -104,15 +114,16 @@ function operator!(
 
     data = window_value(state.window_state)
     return if _unfiltered(op) || _should_tick(op, data)
-        Maybe(ExtractOp(data))
+        Maybe(_extract(op, data))
     else
         Maybe{T}()
     end
 end
 
 # Sum, cumulative over time.
-const Sum{T} = InceptionOp{T,T,+,identity}
+struct Sum{T} <: InceptionOp{T,T,+} end
 _unfiltered(::Sum) = true
+_extract(::Sum, data) = data
 Base.show(io::IO, ::Sum{T}) where {T} = print(io, "Sum{$T}")
 function Base.sum(x::Node)
     _is_constant(x) && return x
@@ -120,16 +131,20 @@ function Base.sum(x::Node)
 end
 
 # Sum over fixed window.
-const WindowSum{T,EmitEarly} = WindowOp{T,T,+,identity,EmitEarly}
+struct WindowSum{T,EmitEarly} <: WindowOp{T,T,+,EmitEarly}
+    window::Int64
+end
 _unfiltered(::WindowSum) = true
-Base.show(io::IO, op::WindowSum{T}) where {T} = print(io, "WindowSum{$T}($(op.window))")
+_extract(::WindowSum, data) = data
+Base.show(io::IO, op::WindowSum{T}) where {T} = print(io, "WindowSum{$T}($(_window(op)))")
 function Base.sum(x::Node, window::Int; emit_early::Bool=false)
     return obtain_node((x,), WindowSum{value_type(x),emit_early}(window))
 end
 
 # Product, cumulative over time.
-const Prod{T} = InceptionOp{T,T,*,identity}
+struct Prod{T} <: InceptionOp{T,T,*} end
 _unfiltered(::Prod) = true
+_extract(::Prod, data) = data
 Base.show(io::IO, ::Prod{T}) where {T} = print(io, "Prod{$T}")
 function Base.prod(x::Node)
     _is_constant(x) && return x
@@ -137,9 +152,12 @@ function Base.prod(x::Node)
 end
 
 # Product over fixed window.
-const WindowProd{T,EmitEarly} = WindowOp{T,T,*,identity,EmitEarly}
+struct WindowProd{T,EmitEarly} <: WindowOp{T,T,*,EmitEarly}
+    window::Int64
+end
 _unfiltered(::WindowProd) = true
-Base.show(io::IO, op::WindowProd{T}) where {T} = print(io, "WindowProd{$T}($(op.window))")
+_extract(::WindowProd, data) = data
+Base.show(io::IO, op::WindowProd{T}) where {T} = print(io, "WindowProd{$T}($(_window(op)))")
 function Base.prod(x::Node, window::Int; emit_early::Bool=false)
     return obtain_node((x,), WindowProd{value_type(x),emit_early}(window))
 end
@@ -157,9 +175,9 @@ function _combine(state_a::MeanData{T}, state_b::MeanData{T})::MeanData{T} where
     nc = na + nb
     return MeanData{T}((n=nc, mean=state_a.mean * (na / nc) + state_b.mean * (nb / nc)))
 end
-_extract(data::MeanData) = data.mean
-const Mean{T} = InceptionOp{T,MeanData{T},_combine,_extract}
+struct Mean{T} <: InceptionOp{T,MeanData{T},_combine} end
 _unfiltered(::Mean) = true
+_extract(::Mean, data::MeanData) = data.mean
 Base.show(io::IO, ::Mean{T}) where {T} = print(io, "Mean{$T}")
 function Statistics.mean(x::Node)
     _is_constant(x) && return x
@@ -168,9 +186,12 @@ function Statistics.mean(x::Node)
 end
 
 # Mean over fixed window.
-const WindowMean{T,EmitEarly} = WindowOp{T,MeanData{T},_combine,_extract,EmitEarly}
+struct WindowMean{T,EmitEarly} <: WindowOp{T,MeanData{T},_combine,EmitEarly}
+    window::Int64
+end
 _unfiltered(::WindowMean) = true
-Base.show(io::IO, op::WindowMean{T}) where {T} = print(io, "WindowMean{$T}($(op.window))")
+_extract(::WindowMean, data::MeanData) = data.mean
+Base.show(io::IO, op::WindowMean{T}) where {T} = print(io, "WindowMean{$T}($(_window(op)))")
 function Statistics.mean(x::Node, window::Int; emit_early::Bool=false)
     T = output_type(/, value_type(x), Int)
     return obtain_node((x,), WindowMean{T,emit_early}(window))
@@ -197,28 +218,33 @@ function _combine(state_a::VarData{T}, state_b::VarData{T})::VarData{T} where {T
 
     return VarData{T}((n=nc, mean=μc, s=(sa + sb) + nb * (μb - μa) * (μb - μc)))
 end
-_extract(data::VarData) = data.s / (data.n - 1)
-const Var{T} = InceptionOp{T,VarData{T},_combine,_extract}
+struct Var{T,corrected} <: InceptionOp{T,VarData{T},_combine} end
 _should_tick(::Var, data::VarData) = data.n > 1
+_extract(::Var{T,true}, data::VarData) where {T} = data.s / (data.n - 1)
+_extract(::Var{T,false}, data::VarData) where {T} = data.s / data.n
 Base.show(io::IO, ::Var{T}) where {T} = print(io, "Var{$T}")
-function Statistics.var(x::Node)
+function Statistics.var(x::Node; corrected::Bool=true)
     _is_constant(x) && return x
     T = output_type(/, value_type(x), Int)
-    return obtain_node((x,), Var{T}())
+    return obtain_node((x,), Var{T,corrected}())
 end
 
 # Variance over fixed window.
-const WindowVar{T,EmitEarly} = WindowOp{T,VarData{T},_combine,_extract,EmitEarly}
+struct WindowVar{T,Corrected,EmitEarly} <: WindowOp{T,VarData{T},_combine,EmitEarly}
+    window::Int64
+end
 _should_tick(::WindowVar, data::VarData) = data.n > 1
-Base.show(io::IO, op::WindowVar{T}) where {T} = print(io, "WindowVar{$T}($(op.window))")
-function Statistics.var(x::Node, window::Int; emit_early::Bool=false)
+_extract(::WindowVar{T,true}, data::VarData) where {T} = data.s / (data.n - 1)
+_extract(::WindowVar{T,false}, data::VarData) where {T} = data.s / data.n
+Base.show(io::IO, op::WindowVar{T}) where {T} = print(io, "WindowVar{$T}($(_window(op)))")
+function Statistics.var(x::Node, window::Int; emit_early::Bool=false, corrected::Bool=true)
     window >= 2 || throw(ArgumentError("Got window=$window, but should be at least 2"))
     T = output_type(/, value_type(x), Int)
-    return obtain_node((x,), WindowVar{T,emit_early}(window))
+    return obtain_node((x,), WindowVar{T,corrected,emit_early}(window))
 end
 
 # Standard deviation.
-Statistics.std(x::Node) = sqrt(var(x))
-function Statistics.std(x::Node, window::Int; emit_early::Bool=false)
-    return sqrt(var(x, window; emit_early))
+Statistics.std(x::Node; corrected::Bool=true) = sqrt(var(x; corrected))
+function Statistics.std(x::Node, window::Int; emit_early::Bool=false, corrected::Bool=true)
+    return sqrt(var(x, window; emit_early, corrected))
 end

@@ -111,6 +111,8 @@ end
         @test_throws ArgumentError var(n4, 1)
 
         _test_window_op(Float64, var; min_window=2)
+        _test_window_op(Float64, partial(var; corrected=false); min_window=2)
+        _test_window_op(Float64, partial(var; corrected=true); min_window=2)
     end
 end
 
@@ -126,5 +128,7 @@ end
         @test_throws ArgumentError std(n4, 1)
 
         _test_window_op(Float64, std; min_window=2)
+        _test_window_op(Float64, partial(std; corrected=false); min_window=2)
+        _test_window_op(Float64, partial(std; corrected=true); min_window=2)
     end
 end

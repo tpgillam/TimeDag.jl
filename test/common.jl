@@ -1,4 +1,14 @@
 """
+Partial function application.
+"""
+function partial(f, args...; kwargs...)
+    function new_f(fargs...; fkwargs...)
+        return f(args..., fargs...; kwargs..., fkwargs...)
+    end
+    return new_f
+end
+
+"""
 Doesn't fail iff the two blocks are equivalent.
 Blocks are equivalent if they represent equal time-series, even if the representations of
 those time series are different (e.g. a range vs a vector)
