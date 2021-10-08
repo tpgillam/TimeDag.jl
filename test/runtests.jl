@@ -27,12 +27,12 @@ using TimeDag: block_node, constant, empty_node
     @testset "constants" begin include("constants.jl") end
 
     @testset "ops" begin
-        @testset "align" begin include("ops_align.jl") end
-        @testset "conditional" begin include("ops_conditional.jl") end
-        @testset "lagging" begin include("ops_lagging.jl") end
-        @testset "simple" begin include("ops_simple.jl") end
-        @testset "sources" begin include("ops_sources.jl") end
-        @testset "window" begin include("ops_window.jl") end
+        @testset "align" begin include("ops/align.jl") end
+        @testset "conditional" begin include("ops/conditional.jl") end
+        @testset "lagging" begin include("ops/lagging.jl") end
+        @testset "simple" begin include("ops/simple.jl") end
+        @testset "sources" begin include("ops/sources.jl") end
+        @testset "window" begin include("ops/window.jl") end
     end
 end
 
