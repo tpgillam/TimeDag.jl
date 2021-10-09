@@ -96,8 +96,9 @@ Base.hash(a::Block, h::UInt) = hash(a.values, hash(a.times, hash(:Block, h)))
 Base.:(==)(a::Block, b::Block) = a.times == b.times && a.values == b.values
 
 # Implement approximate equality in terms of exact equality for timestamps, but approximate
-# for values.
-function Base.isapprox(a::Block, b::Block; kwargs...)
+# for values. Only blocks with the same value type should compare approximately equal.
+function Base.isapprox(a::Block{T}, b::Block{T}; kwargs...) where {T}
+    isempty(a) && isempty(b) && return true
     a.times == b.times || return false
     return isapprox(a.values, b.values; kwargs...)
 end

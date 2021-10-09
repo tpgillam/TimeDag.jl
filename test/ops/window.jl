@@ -272,15 +272,27 @@ end
 end
 
 @testset "cov matrix" begin
+    dim = 3
+    n_obs = 20
+    block = _get_rand_svec_block(MersenneTwister(42), dim, n_obs)
+    T = SMatrix{dim,dim,eltype(value_type(block))}
+
     @testset "inception" begin
         @test_throws ArgumentError cov(constant(SVector((1.0, 2.0, 3.0))))
-        rng = MersenneTwister(42)
-        dim = 3
-        n_obs = 20
-        block = _get_rand_svec_block(rng, dim, n_obs)
-        T = SMatrix{dim,dim,eltype(value_type(block))}
         _test_inception_op(T, cov; min_window=2, block)
         _test_inception_op(T, partial(cov; corrected=false); min_window=2, block)
         _test_inception_op(T, partial(cov; corrected=true); min_window=2, block)
+    end
+
+    @testset "window" begin
+        # Windows that are too small should trigger an exception when attempting to create
+        # the node.
+        @test_throws ArgumentError cov(block_node(block), 0)
+        @test_throws ArgumentError cov(block_node(block), 1)
+        @test_throws ArgumentError cov(constant(SVector((1, 2, 3))), 2)
+
+        _test_window_op(T, cov; min_window=2, block)
+        _test_window_op(T, partial(cov; corrected=false); min_window=2, block)
+        _test_window_op(T, partial(cov; corrected=true); min_window=2, block)
     end
 end
