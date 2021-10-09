@@ -275,7 +275,7 @@ end
     dim = 3
     n_obs = 20
     block = _get_rand_svec_block(MersenneTwister(42), dim, n_obs)
-    T = SMatrix{dim,dim,eltype(value_type(block))}
+    T = SMatrix{dim,dim,eltype(value_type(block)),dim * dim}
 
     @testset "inception" begin
         @test_throws ArgumentError cov(constant(SVector((1.0, 2.0, 3.0))))
