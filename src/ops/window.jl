@@ -412,7 +412,9 @@ _extract(::CovMatrix{N,T,true}, data::CovMatrixData) where {N,T} = data.c ./ (da
 _extract(::CovMatrix{N,T,false}, data::CovMatrixData) where {N,T} = data.c ./ data.n
 Base.show(io::IO, ::CovMatrix{N,T}) where {N,T} = print(io, "CovMatrix{$T,$(N)x$(N)}")
 
-function Statistics.cov(x::Node{SVector{N,T}}; corrected::Bool=true) where {N,T<:Number}
+function Statistics.cov(
+    x::Node{<:StaticVector{N,T}}; corrected::Bool=true
+) where {N,T<:Number}
     _is_constant(x) && throw(ArgumentError("Cannot compute covariance of constant $x"))
     Out = output_type(/, T, Int)
     return obtain_node((x,), CovMatrix{N,Out,corrected}())
