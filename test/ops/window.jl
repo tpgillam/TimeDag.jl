@@ -1,5 +1,3 @@
-_eval(n) = _evaluate(n, DateTime(2000, 1, 1), DateTime(2000, 1, 10))
-
 # Gloriously inefficient ways of computing running & rolled quantities.
 
 function _naive_inception_reduce(T, f::Function, block::Block, min_window::Int)
@@ -115,9 +113,10 @@ function _naive_window_reduce(
 end
 
 function _test_inception_op(
-    T, f_normal::Function, f_timedag::Function=f_normal; min_window=1
+    T, f_normal::Function, f_timedag::Function=f_normal; min_window=1, block::Block=b4
 )
-    @test _eval(f_timedag(n4)) ≈ _naive_inception_reduce(T, f_normal, b4, min_window)
+    n_in = block_node(block)
+    @test _eval(f_timedag(n_in)) ≈ _naive_inception_reduce(T, f_normal, block, min_window)
 end
 
 function _test_binary_inception_op(
@@ -134,19 +133,22 @@ function _test_binary_inception_op(
           _naive_inception_reduce(T, f_normal, block_a, block_b, min_window)
 end
 
-function _test_window_op(T, f_normal::Function, f_timedag::Function=f_normal; min_window=1)
-    for window in min_window:(length(b4) + 2)
-        n = f_timedag(n4, window)
+function _test_window_op(
+    T, f_normal::Function, f_timedag::Function=f_normal; min_window=1, block::Block=b4
+)
+    n_in = block_node(block)
+    for window in min_window:(length(block) + 2)
+        n = f_timedag(n_in, window)
 
-        block = _eval(n)
-        block_ee_false = _eval(f_timedag(n4, window; emit_early=false))
-        block_ee_true = _eval(f_timedag(n4, window; emit_early=true))
+        block_default = _eval(n)
+        block_ee_false = _eval(f_timedag(n_in, window; emit_early=false))
+        block_ee_true = _eval(f_timedag(n_in, window; emit_early=true))
 
-        @test block == block_ee_false
+        @test block_default == block_ee_false
         @test block_ee_false ≈
-              _naive_window_reduce(T, f_normal, b4, window, false, min_window)
+              _naive_window_reduce(T, f_normal, block, window, false, min_window)
         @test block_ee_true ≈
-              _naive_window_reduce(T, f_normal, b4, window, true, min_window)
+              _naive_window_reduce(T, f_normal, block, window, true, min_window)
     end
     return nothing
 end
@@ -266,5 +268,19 @@ end
         _test_binary_window_op(Float64, cov; min_window=2)
         _test_binary_window_op(Float64, partial(cov; corrected=false); min_window=2)
         _test_binary_window_op(Float64, partial(cov; corrected=true); min_window=2)
+    end
+end
+
+@testset "cov matrix" begin
+    @testset "inception" begin
+        @test_throws ArgumentError cov(constant(SVector((1.0, 2.0, 3.0))))
+        rng = MersenneTwister(42)
+        dim = 3
+        n_obs = 20
+        block = _get_rand_svec_block(rng, dim, n_obs)
+        T = SMatrix{dim,dim,eltype(value_type(block))}
+        _test_inception_op(T, cov; min_window=2, block)
+        _test_inception_op(T, partial(cov; corrected=false); min_window=2, block)
+        _test_inception_op(T, partial(cov; corrected=true); min_window=2, block)
     end
 end

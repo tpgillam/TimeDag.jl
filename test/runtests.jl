@@ -2,6 +2,8 @@ using DataFrames
 using DataStructures
 using Dates
 using LightGraphs
+using Random
+using StaticArrays
 using Statistics
 using TeaFiles
 using Test

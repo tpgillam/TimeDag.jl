@@ -375,3 +375,45 @@ function Statistics.cov(
 )
     return cov(x, y, window, DEFAULT_ALIGNMENT; emit_early, corrected)
 end
+
+# An n-dimensional covariance matrix of statically known dimension.
+struct CovMatrixData{T,N}
+    n::Int64
+    mean::SVector{N,T}
+    c::SMatrix{N,N,T}
+end
+
+function _wrap(::Type{CovMatrixData{T,N}}, x::SVector{N}) where {T,N}
+    return CovMatrixData{T,N}(1, x, zeros(SMatrix{N,N,T}))
+end
+
+function _combine(state_a::CovMatrixData{T,N}, state_b::CovMatrixData{T,N}) where {T,N}
+    na = state_a.n
+    nb = state_b.n
+    nc = na + nb
+
+    μa = state_a.mean
+    μb = state_b.mean
+    μc = @. μa * (na / nc) + μb * (nb / nc)
+
+    ca = state_a.c
+    cb = state_b.c
+    # FIXME This is speculation - do the algebra to check this!
+    cc = (ca .+ cb) .+ nb .* (μb .- μa) * (μb .- μc)'
+
+    # TODO wrap in `Hermitian`?
+    return CovMatrixData(nc, μc, cc)
+end
+
+struct CovMatrix{N,T,corrected} <: UnaryInceptionOp{SMatrix{N,N,T},CovMatrixData{T,N}} end
+_should_tick(::CovMatrix, data::CovMatrixData) = data.n > 1
+_combine(::CovMatrix, x::CovMatrixData, y::CovMatrixData) = _combine(x, y)
+_extract(::CovMatrix{N,T,true}, data::CovMatrixData) where {N,T} = data.c ./ (data.n - 1)
+_extract(::CovMatrix{N,T,false}, data::CovMatrixData) where {N,T} = data.c ./ data.n
+Base.show(io::IO, ::CovMatrix{N,T}) where {N,T} = print(io, "CovMatrix{$T,$(N)x$(N)}")
+
+function Statistics.cov(x::Node{SVector{N,T}}; corrected::Bool=true) where {N,T<:Number}
+    _is_constant(x) && throw(ArgumentError("Cannot compute covariance of constant $x"))
+    Out = output_type(/, T, Int)
+    return obtain_node((x,), CovMatrix{N,Out,corrected}())
+end

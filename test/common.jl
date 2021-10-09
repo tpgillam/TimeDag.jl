@@ -96,9 +96,23 @@ n3 = block_node(b3)
 n4 = block_node(b4)
 n_boolean = TimeDag.block_node(b_boolean)
 
-_eval(n) = _evaluate(n, DateTime(2000, 1, 1), DateTime(2000, 1, 10))
+const _T_START = DateTime(2000, 1, 1)
+const _T_END = DateTime(2001, 1, 1)
+
+_eval(n) = _evaluate(n, _T_START, _T_END)
 # Evaluation when not wanting to perform tests.
-_eval_fast(n) = evaluate(n, DateTime(2000, 1, 1), DateTime(2000, 1, 10))
+_eval_fast(n) = evaluate(n, _T_START, _T_END)
+
+"""
+    _get_rand_svec_block(rng::AbstractRNG, dim::Int, n_obs::Int) -> Block
+
+Get a block of value type `SVector{dim,Float64}`, of length `n_obs`, with random values.
+"""
+function _get_rand_svec_block(rng::AbstractRNG, dim::Int, n_obs::Int)
+    times = _T_START:Day(1):(_T_START + Day(n_obs - 1))
+    values = [SVector{dim}(rand(rng, dim)) for _ in 1:n_obs]
+    return Block(times, values)
+end
 
 function _test_binary_op(op_timedag, op=op_timedag)
     # Common (fast) alignment.

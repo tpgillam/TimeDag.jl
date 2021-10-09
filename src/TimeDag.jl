@@ -7,6 +7,7 @@ using DataStructures
 using Dates
 using LightGraphs
 using PrettyTables
+using StaticArrays
 using Statistics
 using Tables
 using TeaFiles
