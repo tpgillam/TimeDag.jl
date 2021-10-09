@@ -43,6 +43,8 @@ const _BINARY_STUFF = [
     (:*, :Multiply),
     (:/, :Divide),
     (:^, :Power),
+    (:min, :Min),
+    (:max, :Max),
     (:>, :Greater),
     (:<, :Less),
     (:>=, :GreaterEqual),
