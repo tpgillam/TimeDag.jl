@@ -1,4 +1,14 @@
 """
+Partial function application.
+"""
+function partial(f, args...; kwargs...)
+    function new_f(fargs...; fkwargs...)
+        return f(args..., fargs...; kwargs..., fkwargs...)
+    end
+    return new_f
+end
+
+"""
 Doesn't fail iff the two blocks are equivalent.
 Blocks are equivalent if they represent equal time-series, even if the representations of
 those time series are different (e.g. a range vs a vector)
@@ -86,14 +96,28 @@ n3 = block_node(b3)
 n4 = block_node(b4)
 n_boolean = TimeDag.block_node(b_boolean)
 
-_eval(n) = _evaluate(n, DateTime(2000, 1, 1), DateTime(2000, 1, 10))
+const _T_START = DateTime(2000, 1, 1)
+const _T_END = DateTime(2001, 1, 1)
+
+_eval(n) = _evaluate(n, _T_START, _T_END)
+# Evaluation when not wanting to perform tests.
+_eval_fast(n) = evaluate(n, _T_START, _T_END)
+
+"""
+    _get_rand_svec_block(rng::AbstractRNG, dim::Int, n_obs::Int) -> Block
+
+Get a block of value type `SVector{dim,Float64}`, of length `n_obs`, with random values.
+"""
+function _get_rand_svec_block(rng::AbstractRNG, dim::Int, n_obs::Int)
+    times = _T_START:Day(1):(_T_START + Day(n_obs - 1))
+    values = [SVector{dim}(rand(rng, dim)) for _ in 1:n_obs]
+    return Block(times, values)
+end
 
 function _test_binary_op(op_timedag, op=op_timedag)
     # Common (fast) alignment.
     # Should apply for *any* user choice of alignment.
-    for alignment in (
-            TimeDag.UnionAlignment, TimeDag.LeftAlignment, TimeDag.IntersectAlignment
-        )
+    for alignment in (UNION, LEFT, INTERSECT)
         n = op_timedag(n1, n1, alignment)
         block = _eval(n)
         @test block == Block([
@@ -108,7 +132,7 @@ function _test_binary_op(op_timedag, op=op_timedag)
 
     # Union alignment.
     n = op_timedag(n1, n2)
-    @test n === op_timedag(n1, n2, TimeDag.UnionAlignment)
+    @test n === op_timedag(n1, n2, UNION)
     block = _eval(n)
     @test block == Block([
         DateTime(2000, 1, 2) => op(2, 5),
@@ -118,7 +142,7 @@ function _test_binary_op(op_timedag, op=op_timedag)
     ])
 
     # Intersect alignment.
-    n = op_timedag(n1, n2, TimeDag.IntersectAlignment)
+    n = op_timedag(n1, n2, INTERSECT)
 
     @test _eval(n) == Block([
         DateTime(2000, 1, 2) => op(2, 5),
@@ -126,7 +150,7 @@ function _test_binary_op(op_timedag, op=op_timedag)
     ])
 
     # Left alignment
-    n = op_timedag(n1, n2, TimeDag.LeftAlignment)
+    n = op_timedag(n1, n2, LEFT)
     @test _eval(n) == Block([
         DateTime(2000, 1, 2) => op(2, 5),
         DateTime(2000, 1, 3) => op(3, 6),
@@ -134,12 +158,12 @@ function _test_binary_op(op_timedag, op=op_timedag)
     ])
 
     # Catch edge-case in which there was a bug.
-    @test _eval(op_timedag(n2, n3, TimeDag.LeftAlignment)) == Block([
+    @test _eval(op_timedag(n2, n3, LEFT)) == Block([
         DateTime(2000, 1, 2) => op(5, 15),
         DateTime(2000, 1, 3) => op(6, 15),
         DateTime(2000, 1, 5) => op(8, 15),
     ])
-    @test _eval(op_timedag(n3, n2, TimeDag.LeftAlignment)) == Block{Int64}()
+    @test _eval(op_timedag(n3, n2, LEFT)) == Block{Int64}()
 end
 
 #! format: on

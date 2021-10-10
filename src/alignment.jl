@@ -1,17 +1,20 @@
 """Represent a technique for aligning two timeseries."""
 abstract type Alignment end
-
-"""For a pair (A, B), tick whenever A ticks so long as both nodes are active."""
 struct LeftAlignment <: Alignment end
-
-"""For a pair (A, B), tick whenever A or B ticks so long as both nodes are active."""
 struct UnionAlignment <: Alignment end
-
-"""For a pair (A, B), tick whenever A and B tick simultaneously."""
 struct IntersectAlignment <: Alignment end
 
+"""For a pair (A, B), tick whenever A ticks so long as both nodes are active."""
+const LEFT = LeftAlignment()
+
+"""For a pair (A, B), tick whenever A or B ticks so long as both nodes are active."""
+const UNION = UnionAlignment()
+
+"""For a pair (A, B), tick whenever A and B tick simultaneously."""
+const INTERSECT = IntersectAlignment()
+
 """The default alignment for operators when not specified."""
-const DEFAULT_ALIGNMENT = UnionAlignment
+const DEFAULT_ALIGNMENT = UNION
 
 abstract type UnaryNodeOp{T} <: NodeOp{T} end
 abstract type BinaryAlignedNodeOp{T,A<:Alignment} <: NodeOp{T} end
@@ -89,7 +92,8 @@ wrap this state with further state, if this is necessary for e.g. alignment.
 """
 function create_operator_evaluation_state end
 
-function operator!(op::NodeOp, state::NodeEvaluationState, time::DateTime, values...)
+"""Convenience method to dispatch to reduced-argument `operator!` calls."""
+function _operator!(op::NodeOp, state::NodeEvaluationState, time::DateTime, values...)
     return if stateless_operator(op) && time_agnostic(op)
         operator!(op, values...)
     elseif stateless_operator(op) && !time_agnostic(op)
@@ -141,7 +145,7 @@ function run_node!(
         # promised that it will always tick. Hence we can use a for loop too.
         for i in 1:n
             time = @inbounds input.times[i]
-            @inbounds values[i] = operator!(node_op, state, time, input.values[i])
+            @inbounds values[i] = _operator!(node_op, state, time, input.values[i])
         end
         Block(unchecked, input.times, values)
     else
@@ -149,7 +153,7 @@ function run_node!(
         j = 1
         for i in 1:n
             time = @inbounds input.times[i]
-            out = operator!(node_op, state, time, @inbounds(input.values[i]))
+            out = _operator!(node_op, state, time, @inbounds(input.values[i]))
             if valid(out)
                 @inbounds values[j] = unsafe_value(out)
                 @inbounds times[j] = input.times[i]
@@ -176,7 +180,7 @@ function _apply_fast_align_binary!(
         # manually.
         for i in 1:n
             time = @inbounds input_l.times[i]
-            @inbounds values[i] = operator!(
+            @inbounds values[i] = _operator!(
                 op, operator_state, time, input_l.values[i], input_r.values[i]
             )
         end
@@ -255,7 +259,7 @@ end
 ) where {T}
     # Find the output value. For a given op this will either be of type T, or Maybe{T}, and
     # we can (at compile time) select the correct branch below based on `always_ticks(op)`.
-    out = operator!(node_op, operator_state, time, in_values...)
+    out = _operator!(node_op, operator_state, time, in_values...)
 
     if always_ticks(node_op)
         # Output value is raw, and should always be used.

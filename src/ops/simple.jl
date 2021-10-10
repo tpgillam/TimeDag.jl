@@ -21,6 +21,14 @@ end
 @binary_define(Base.:*, Multiply)
 @binary_define(Base.:/, Divide)
 @binary_define(Base.:^, Power)
+@binary_define(Base.min, Min)
+@binary_define(Base.max, Max)
+function Base.min(x::Node, y::Node, z::Node, args...)
+    return min(min(x, y), z, args...)
+end
+function Base.max(x::Node, y::Node, z::Node, args...)
+    return max(max(x, y), z, args...)
+end
 
 # Logical
 

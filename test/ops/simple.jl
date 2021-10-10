@@ -1,5 +1,3 @@
-_eval(n) = _evaluate(n, DateTime(2000, 1, 1), DateTime(2000, 1, 10))
-
 const _UNARY_STUFF = [
     (:-, :Negate, b1),
     (:exp, :Exp, b1),
@@ -45,6 +43,8 @@ const _BINARY_STUFF = [
     (:*, :Multiply),
     (:/, :Divide),
     (:^, :Power),
+    (:min, :Min),
+    (:max, :Max),
     (:>, :Greater),
     (:<, :Less),
     (:>=, :GreaterEqual),
