@@ -412,7 +412,7 @@ function Statistics.cov(
     return obtain_node((x,), CovMatrix{N,N * N,Out,corrected}())
 end
 
-# Covariance matrixover fixed window.
+# An n-dimensional covariance matrix over a fixed window.
 struct WindowCovMatrix{N,L,T,Corrected,EmitEarly} <:
        UnaryWindowOp{SMatrix{N,N,T,L},CovMatrixData{T,N,L},EmitEarly}
     window::Int64
