@@ -114,6 +114,17 @@ function _get_rand_svec_block(rng::AbstractRNG, dim::Int, n_obs::Int)
     return Block(times, values)
 end
 
+"""
+    _get_rand_vec_block(rng::AbstractRNG, dim::Int, n_obs::Int) -> Block
+
+Get a block of value type `Vector{Float64}`, of length `n_obs`, with random values.
+"""
+function _get_rand_vec_block(rng::AbstractRNG, dim::Int, n_obs::Int)
+    times = _T_START:Day(1):(_T_START + Day(n_obs - 1))
+    values = [rand(rng, dim) for _ in 1:n_obs]
+    return Block(times, values)
+end
+
 function _test_binary_op(op_timedag, op=op_timedag)
     # Common (fast) alignment.
     # Should apply for *any* user choice of alignment.

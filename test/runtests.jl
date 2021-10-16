@@ -11,9 +11,7 @@ using TimeDag
 
 using TimeDag: Block, Node
 using TimeDag: IntersectAlignment, LeftAlignment, UnionAlignment
-using TimeDag: INTERSECT, LEFT, UNION
-using TimeDag: duplicate, evaluate, get_up_to!, start_at, value_type
-using TimeDag: block_node, constant, empty_node
+using TimeDag: duplicate, get_up_to!, start_at
 
 #! format: off
 
@@ -31,6 +29,7 @@ using TimeDag: block_node, constant, empty_node
     @testset "ops" begin
         @testset "align" begin include("ops/align.jl") end
         @testset "conditional" begin include("ops/conditional.jl") end
+        @testset "history" begin include("ops/history.jl") end
         @testset "lagging" begin include("ops/lagging.jl") end
         @testset "simple" begin include("ops/simple.jl") end
         @testset "sources" begin include("ops/sources.jl") end
