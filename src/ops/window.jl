@@ -376,57 +376,83 @@ function Statistics.cov(
     return cov(x, y, window, DEFAULT_ALIGNMENT; emit_early, corrected)
 end
 
-# An n-dimensional covariance matrix of statically known dimension.
-struct CovMatrixData{T,N,L}
+# Covariance matrix.
+abstract type AbstractCovMatrixData{T} end
+
+"""State for an n-dimensional covariance matrix."""
+struct CovMatrixData{T} <: AbstractCovMatrixData{T}
+    n::Int64
+    μ::Vector{T}
+    c::Matrix{T}
+end
+
+function _wrap(::Type{CovMatrixData{T}}, x::AbstractVector) where {T}
+    return CovMatrixData{T}(1, Vector(x), zeros(eltype(x), size(x, 1), size(x, 1)))
+end
+
+"""State for an n-dimensional covariance matrix of statically known dimension."""
+struct CovMatrixStaticData{T,N,L} <: AbstractCovMatrixData{T}
     n::Int64
     μ::SVector{N,T}
     c::SMatrix{N,N,T,L}
 end
 
-function _wrap(::Type{CovMatrixData{T,N,L}}, x::SVector{N}) where {T,N,L}
-    return CovMatrixData{T,N,L}(1, x, zeros(SMatrix{N,N,T,L}))
+function _wrap(::Type{CovMatrixStaticData{T,N,L}}, x::SVector{N}) where {T,N,L}
+    return CovMatrixStaticData{T,N,L}(1, x, zeros(SMatrix{N,N,T,L}))
 end
 
-function _combine(a::CovMatrixData{T,N,L}, b::CovMatrixData{T,N,L}) where {T,N,L}
+function _combine(a::Data, b::Data) where {Data<:AbstractCovMatrixData}
     n = a.n + b.n
     μ = @. a.μ * (a.n / n) + b.μ * (b.n / n)
+    # TODO wrap c in `Hermitian` / only update one triangle?
     c = (a.c .+ b.c) .+ b.n .* (b.μ .- a.μ) * (b.μ .- μ)'
-    # TODO wrap in `Hermitian`?
-    return CovMatrixData(n, μ, c)
+    return Data(n, μ, c)
 end
 
-struct CovMatrix{N,L,T,corrected} <: UnaryInceptionOp{SMatrix{N,N,T,L},CovMatrixData{T,N,L}} end
-_should_tick(::CovMatrix, data::CovMatrixData) = data.n > 1
-_combine(::CovMatrix, x::CovMatrixData, y::CovMatrixData) = _combine(x, y)
-function _extract(::CovMatrix{N,L,T,true}, data::CovMatrixData) where {N,L,T}
+# Static covariance matrix node ops.
+struct CovMatrixStatic{N,L,T,corrected} <:
+       UnaryInceptionOp{SMatrix{N,N,T,L},CovMatrixStaticData{T,N,L}} end
+_should_tick(::CovMatrixStatic, data::CovMatrixStaticData) = data.n > 1
+_combine(::CovMatrixStatic, x::CovMatrixStaticData, y::CovMatrixStaticData) = _combine(x, y)
+function _extract(::CovMatrixStatic{N,L,T,true}, data::CovMatrixStaticData) where {N,L,T}
     return data.c ./ (data.n - 1)
 end
-_extract(::CovMatrix{N,L,T,false}, data::CovMatrixData) where {N,L,T} = data.c ./ data.n
-Base.show(io::IO, ::CovMatrix{N,L,T}) where {N,L,T} = print(io, "CovMatrix{$T,$(N)x$(N)}")
+function _extract(::CovMatrixStatic{N,L,T,false}, data::CovMatrixStaticData) where {N,L,T}
+    return data.c ./ data.n
+end
+function Base.show(io::IO, ::CovMatrixStatic{N,L,T}) where {N,L,T}
+    return print(io, "CovMatrixStatic{$T,$(N)x$(N)}")
+end
 
 function Statistics.cov(
     x::Node{<:StaticVector{N,T}}; corrected::Bool=true
 ) where {N,T<:Number}
     _is_constant(x) && throw(ArgumentError("Cannot compute covariance of constant $x"))
     Out = output_type(/, T, Int)
-    return obtain_node((x,), CovMatrix{N,N * N,Out,corrected}())
+    return obtain_node((x,), CovMatrixStatic{N,N * N,Out,corrected}())
 end
 
 # An n-dimensional covariance matrix over a fixed window.
-struct WindowCovMatrix{N,L,T,Corrected,EmitEarly} <:
-       UnaryWindowOp{SMatrix{N,N,T,L},CovMatrixData{T,N,L},EmitEarly}
+struct WindowCovMatrixStatic{N,L,T,Corrected,EmitEarly} <:
+       UnaryWindowOp{SMatrix{N,N,T,L},CovMatrixStaticData{T,N,L},EmitEarly}
     window::Int64
 end
-_should_tick(::WindowCovMatrix, data::CovMatrixData) = data.n > 1
-_combine(::WindowCovMatrix, x::CovMatrixData, y::CovMatrixData) = _combine(x, y)
-function _extract(::WindowCovMatrix{N,L,T,true}, data::CovMatrixData) where {N,L,T}
+_should_tick(::WindowCovMatrixStatic, data::CovMatrixStaticData) = data.n > 1
+function _combine(::WindowCovMatrixStatic, x::CovMatrixStaticData, y::CovMatrixStaticData)
+    return _combine(x, y)
+end
+function _extract(
+    ::WindowCovMatrixStatic{N,L,T,true}, data::CovMatrixStaticData
+) where {N,L,T}
     return data.c ./ (data.n - 1)
 end
-function _extract(::WindowCovMatrix{N,L,T,false}, data::CovMatrixData) where {N,L,T}
+function _extract(
+    ::WindowCovMatrixStatic{N,L,T,false}, data::CovMatrixStaticData
+) where {N,L,T}
     return data.c ./ data.n
 end
-function Base.show(io::IO, op::WindowCovMatrix{N,L,T}) where {N,L,T}
-    return print(io, "WindowCovMatrix{$T,$(N)x$(N)}($(_window(op)))")
+function Base.show(io::IO, op::WindowCovMatrixStatic{N,L,T}) where {N,L,T}
+    return print(io, "WindowCovMatrixStatic{$T,$(N)x$(N)}($(_window(op)))")
 end
 function Statistics.cov(
     x::Node{<:StaticVector{N,T}}, window::Int; emit_early::Bool=false, corrected::Bool=true
@@ -434,5 +460,43 @@ function Statistics.cov(
     _is_constant(x) && throw(ArgumentError("Cannot compute variance of constant $x"))
     window >= 2 || throw(ArgumentError("Got window=$window, but should be at least 2"))
     Out = output_type(/, T, Int)
-    return obtain_node((x,), WindowCovMatrix{N,N * N,Out,corrected,emit_early}(window))
+    return obtain_node(
+        (x,), WindowCovMatrixStatic{N,N * N,Out,corrected,emit_early}(window)
+    )
+end
+
+# Non-static covariance matrix nodes.
+struct CovMatrix{T,corrected} <: UnaryInceptionOp{Matrix{T},CovMatrixData{T}} end
+_should_tick(::CovMatrix, data::CovMatrixData) = data.n > 1
+_combine(::CovMatrix, x::CovMatrixData, y::CovMatrixData) = _combine(x, y)
+_extract(::CovMatrix{T,true}, data::CovMatrixData) where {T} = data.c ./ (data.n - 1)
+_extract(::CovMatrix{T,false}, data::CovMatrixData) where {T} = data.c ./ data.n
+Base.show(io::IO, ::CovMatrix{T}) where {T} = print(io, "CovMatrix{$T,?x?}")
+
+function Statistics.cov(
+    x::Node{<:AbstractVector{T}}; corrected::Bool=true
+) where {T<:Number}
+    _is_constant(x) && throw(ArgumentError("Cannot compute covariance of constant $x"))
+    Out = output_type(/, T, Int)
+    return obtain_node((x,), CovMatrix{Out,corrected}())
+end
+
+struct WindowCovMatrix{T,Corrected,EmitEarly} <:
+       UnaryWindowOp{Matrix{T},CovMatrixData{T},EmitEarly}
+    window::Int64
+end
+_should_tick(::WindowCovMatrix, data::CovMatrixData) = data.n > 1
+_combine(::WindowCovMatrix, x::CovMatrixData, y::CovMatrixData) = _combine(x, y)
+_extract(::WindowCovMatrix{T,true}, data::CovMatrixData) where {T} = data.c ./ (data.n - 1)
+_extract(::WindowCovMatrix{T,false}, data::CovMatrixData) where {T} = data.c ./ data.n
+function Base.show(io::IO, op::WindowCovMatrix{T}) where {T}
+    return print(io, "WindowCovMatrix{$T,?x?}($(_window(op)))")
+end
+function Statistics.cov(
+    x::Node{<:AbstractVector{T}}, window::Int; emit_early::Bool=false, corrected::Bool=true
+) where {T<:Number}
+    _is_constant(x) && throw(ArgumentError("Cannot compute variance of constant $x"))
+    window >= 2 || throw(ArgumentError("Got window=$window, but should be at least 2"))
+    Out = output_type(/, T, Int)
+    return obtain_node((x,), WindowCovMatrix{Out,corrected,emit_early}(window))
 end
