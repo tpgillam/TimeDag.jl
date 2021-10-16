@@ -29,6 +29,7 @@ using TimeDag: duplicate, get_up_to!, start_at
     @testset "ops" begin
         @testset "align" begin include("ops/align.jl") end
         @testset "conditional" begin include("ops/conditional.jl") end
+        @testset "history" begin include("ops/history.jl") end
         @testset "lagging" begin include("ops/lagging.jl") end
         @testset "simple" begin include("ops/simple.jl") end
         @testset "sources" begin include("ops/sources.jl") end
