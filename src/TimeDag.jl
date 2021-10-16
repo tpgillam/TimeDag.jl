@@ -12,6 +12,17 @@ using Statistics
 using Tables
 using TeaFiles
 
+# Types.
+export Block
+# Singletons.
+export INTERSECT, LEFT, UNION
+# Source nodes.
+export block_node, constant, empty_node
+# Other nodes.
+export align, history, lag, right, left, zap_missing
+# Evaluation & other utilities.
+export evaluate, value_type
+
 include("maybe.jl")
 
 include("core.jl")
@@ -26,10 +37,11 @@ include("evaluation.jl")
 
 include("alignment.jl")
 
-include("ops/core.jl")
+include("ops/core.jl")  # This defines macros useful for definition of other nodes.
 
 include("ops/align.jl")
 include("ops/conditional.jl")
+include("ops/history.jl")
 include("ops/lagging.jl")
 include("ops/simple.jl")
 include("ops/sources.jl")
