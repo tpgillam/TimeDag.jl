@@ -4,6 +4,8 @@
 #   not it would permit us to have views of an array.
 #   Possibly we need a more general type here which can package other representations?
 #   See Stheno ColVecs / RowVecs - they have the same problem.
+#
+#   Also see: https://juliaarrays.github.io/ArraysOfArrays.jl/stable/
 
 function _is_strictly_increasing(x::AbstractVector)
     length(x) < 2 && return true
