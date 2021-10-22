@@ -18,7 +18,7 @@ TeaFiles = "c40ccc24-2f2a-4785-85cd-06e8176bc8e2"
 
 [compat]
 AbstractTrees = "0.3"
-AssociativeWindowAggregation = "0.2"
+AssociativeWindowAggregation = "0.2, 0.3"
 Bijections = "0.1"
 DataStructures = "0.18"
 LightGraphs = "1"
