@@ -16,6 +16,15 @@ function Base.:-(x::Node)
     return obtain_node((x,), Negate{output_type(-, value_type(x))}())
 end
 
+@unary_define_without_op(Base.inv, Inv)
+function Base.inv(x::Node)
+    if isa(x.op, Inv)
+        # Optimisation: inverting a Inv node should yield the parent.
+        return only(parents(x))
+    end
+    return obtain_node((x,), Inv{output_type(inv, value_type(x))}())
+end
+
 @binary_define(Base.:+, Add)
 @binary_define(Base.:-, Subtract)
 @binary_define(Base.:*, Multiply)

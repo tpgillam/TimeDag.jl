@@ -6,6 +6,7 @@ const _UNARY_STUFF = [
     (:log2, :Log2, b1),
     (:sqrt, :Sqrt, b1),
     (:cbrt, :Cbrt, b1),
+    (:inv, :Inv, b1),
     (:!, :Not, b_boolean),
 ]
 
@@ -33,6 +34,7 @@ const _UNARY_STUFF = [
 
     @testset "inverse identities" begin
         @test -(-n1) === n1
+        @test inv(inv(n1)) === n1
         @test !(!n_boolean) === n_boolean
     end
 end
