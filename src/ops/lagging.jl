@@ -72,3 +72,13 @@ function lag(node::Node, n::Integer)
         obtain_node((node,), Lag{value_type(node)}(n))
     end
 end
+
+"""
+    diff(x::Node, n)
+
+Compute the `n`-knot difference of `x`, i.e. `x - lag(x, n)`.
+"""
+function Base.diff(x::Node, n::Integer)
+    n > 0 || throw(ArgumentError("n must be positive, got $n"))
+    return x - lag(x, n)
+end
