@@ -42,7 +42,7 @@ end
 const _BINARY_FUNCTIONS = [:+, :-, :*, :/, :^, :min, :max, :>, :<, :>=, :<=]
 
 @testset "binary" begin
-    for (f,) in _BINARY_FUNCTIONS
+    for f in _BINARY_FUNCTIONS
         @testset "$f" begin
             @eval begin
                 # Test evaluations with different alignments.
