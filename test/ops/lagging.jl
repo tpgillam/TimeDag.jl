@@ -45,6 +45,7 @@ end
     end
 
     @testset "general" begin
+        @test diff(n4, 1) === diff(n4)
         for n_lag in 1:10
             n = diff(n4, n_lag)
             @test value_type(n) == value_type(n4)
