@@ -1,33 +1,33 @@
 const _UNARY_STUFF = [
-    (:-, :Negate, b1),
-    (:exp, :Exp, b1),
-    (:log, :Log, b1),
-    (:log10, :Log10, b1),
-    (:log2, :Log2, b1),
-    (:sqrt, :Sqrt, b1),
-    (:cbrt, :Cbrt, b1),
-    (:inv, :Inv, b1),
-    (:!, :Not, b_boolean),
+    (:-, b1),
+    (:exp, b1),
+    (:log, b1),
+    (:log10, b1),
+    (:log2, b1),
+    (:sqrt, b1),
+    (:cbrt, b1),
+    (:inv, b1),
+    (:!, b_boolean),
 ]
 
 @testset "unary" begin
-    for (op, node_op, block) in _UNARY_STUFF
-        @testset "$op" begin
+    for (f, block) in _UNARY_STUFF
+        @testset "$f" begin
             @eval begin
                 # Check basic evaluation.
                 value = first($(block).values)
-                node = TimeDag.block_node($block)
-                @test _eval($op(node)) == _mapvalues($op, $block)
+                node = block_node($block)
+                @test _eval($f(node)) == _mapvalues($f, $block)
 
                 # Check constant propagation.
-                @test $op(constant(value)) === constant($op(value))
+                @test $f(constant(value)) === constant($f(value))
 
                 # Two instances of the NodeOp instance should compare equal for equal
                 # type parameters.
                 T = typeof(value)
-                @test TimeDag.$node_op{T}() == TimeDag.$node_op{T}()
+                @test TimeDag.SimpleUnary{$f,T}() == TimeDag.SimpleUnary{$f,T}()
                 @test T != Float32
-                @test TimeDag.$node_op{Float32}() != TimeDag.$node_op{T}()
+                @test TimeDag.SimpleUnary{$f,Float32}() != TimeDag.SimpleUnary{$f,T}()
             end
         end
     end
@@ -39,40 +39,29 @@ const _UNARY_STUFF = [
     end
 end
 
-const _BINARY_STUFF = [
-    (:+, :Add),
-    (:-, :Subtract),
-    (:*, :Multiply),
-    (:/, :Divide),
-    (:^, :Power),
-    (:min, :Min),
-    (:max, :Max),
-    (:>, :Greater),
-    (:<, :Less),
-    (:>=, :GreaterEqual),
-    (:<=, :LessEqual),
-]
+const _BINARY_FUNCTIONS = [:+, :-, :*, :/, :^, :min, :max, :>, :<, :>=, :<=]
 
 @testset "binary" begin
-    for (op, node_op) in _BINARY_STUFF
-        @testset "$op" begin
+    for (f,) in _BINARY_FUNCTIONS
+        @testset "$f" begin
             @eval begin
                 # Test evaluations with different alignments.
-                _test_binary_op($op)
+                _test_binary_op($f)
 
                 # Test constant propagation.
                 value = 2.0  # valid for all ops we're currently testing.
-                @test $op(constant(value), constant(value)) === constant($op(value, value))
-                @test $op(value, constant(value)) === constant($op(value, value))
-                @test $op(constant(value), value) === constant($op(value, value))
+                @test $f(constant(value), constant(value)) === constant($f(value, value))
+                @test $f(value, constant(value)) === constant($f(value, value))
+                @test $f(constant(value), value) === constant($f(value, value))
 
                 # Two instances of the NodeOp instance should compare equal for equal
                 # type parameters.
                 T = typeof(value)
                 for A in (UnionAlignment, IntersectAlignment, LeftAlignment)
-                    @test TimeDag.$node_op{T,A}() == TimeDag.$node_op{T,A}()
+                    @test TimeDag.SimpleBinary{$f,T,A}() == TimeDag.SimpleBinary{$f,T,A}()
                     @test T != Float32
-                    @test TimeDag.$node_op{Float32,A}() != TimeDag.$node_op{T,A}()
+                    @test TimeDag.SimpleBinary{$f,Float32,A}() !=
+                        TimeDag.SimpleBinary{$f,T,A}()
                 end
             end
         end

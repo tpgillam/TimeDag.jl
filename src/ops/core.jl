@@ -1,47 +1,80 @@
-macro unary_define_without_op(op, node_op)
-    op = esc(op)
-    node_op = esc(node_op)
+"""
+    SimpleUnary{f,T}
+
+Represents a stateless, time-independent unary operator that will always emit a value.
+"""
+struct SimpleUnary{f,T} <: UnaryNodeOp{T} end
+
+always_ticks(::SimpleUnary) = true
+stateless(::SimpleUnary) = true
+time_agnostic(::SimpleUnary) = true
+operator!(::SimpleUnary{f}, x) where {f} = f(x)
+
+"""
+    @simple_unary(f)
+
+Define a method `f(::Node)` that will obtain the correct instance of `SimpleUnary{f}`.
+
+This will internally infer the output value, and perform subgraph elimination.
+"""
+macro simple_unary(f, self_inverse::Bool=false)
+    f = esc(f)
     return quote
-        struct $node_op{T} <: UnaryNodeOp{T} end
-
-        TimeDag.always_ticks(::$node_op) = true
-        TimeDag.stateless(::$node_op) = true
-        TimeDag.time_agnostic(::$node_op) = true
-
-        TimeDag.operator!(::$node_op, x) = $op(x)
+        $f(x::Node) = obtain_node((x,), SimpleUnary{$f,output_type($f, value_type(x))}())
     end
 end
 
-macro unary_define(op, node_op)
-    op = esc(op)
-    node_op = esc(node_op)
+"""
+    @simple_unary_self_inverse(f)
+
+Define a method `f(::Node)` that will obtain the correct instance of `SimpleUnary{f}`.
+
+This must ONLY be used if `f(f(x)) == x` for all nodes `x`.
+
+This will internally infer the output value, and perform subgraph elimination.
+"""
+macro simple_unary_self_inverse(f)
+    f = esc(f)
     return quote
-        @unary_define_without_op($op, $node_op)
-        $op(x::Node) = obtain_node((x,), $node_op{output_type($op, value_type(x))}())
+        function $f(x::Node)
+            # Optimisation: self-inverse
+            isa(x.op, SimpleUnary{$f}) && return only(parents(x))
+            return obtain_node((x,), SimpleUnary{$f,output_type($f, value_type(x))}())
+        end
     end
 end
 
-macro binary_define(op, node_op)
-    op = esc(op)
-    node_op = esc(node_op)
+"""
+    SimpleBinary{f,T,A}
+
+Represents a stateless, time-independent binary operator that will always emit a value.
+"""
+struct SimpleBinary{f,T,A} <: BinaryAlignedNodeOp{T,A} end
+
+always_ticks(::SimpleBinary) = true
+stateless_operator(::SimpleBinary) = true
+time_agnostic(::SimpleBinary) = true
+operator!(::SimpleBinary{f}, x, y) where {f} = f(x, y)
+
+"""
+    @simple_binary(f)
+
+Define methods `f(x, y)` that will obtain the correct instance of `SimpleBinary{f}`.
+
+These will internally infer the output value, and perform subgraph elimination.
+"""
+macro simple_binary(f)
+    f = esc(f)
     return quote
-        struct $node_op{T,A} <: BinaryAlignedNodeOp{T,A} end
-
-        TimeDag.always_ticks(::$node_op) = true
-        TimeDag.stateless_operator(::$node_op) = true
-        TimeDag.time_agnostic(::$node_op) = true
-
-        TimeDag.operator!(::$node_op, x, y) = $op(x, y)
-
-        function $op(x, y, ::A) where {A<:Alignment}
+        function $f(x, y, ::A) where {A<:Alignment}
             x = _ensure_node(x)
             y = _ensure_node(y)
-            T = output_type($op, value_type(x), value_type(y))
-            return obtain_node((x, y), $node_op{T,A}())
+            T = output_type($f, value_type(x), value_type(y))
+            return obtain_node((x, y), SimpleBinary{$f,T,A}())
         end
 
-        $op(x::Node, y::Node) = $op(x, y, DEFAULT_ALIGNMENT)
-        $op(x::Node, y) = $op(x, y, DEFAULT_ALIGNMENT)
-        $op(x, y::Node) = $op(x, y, DEFAULT_ALIGNMENT)
+        $f(x::Node, y::Node) = $f(x, y, DEFAULT_ALIGNMENT)
+        $f(x::Node, y) = $f(x, y, DEFAULT_ALIGNMENT)
+        $f(x, y::Node) = $f(x, y, DEFAULT_ALIGNMENT)
     end
 end
