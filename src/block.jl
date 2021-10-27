@@ -95,7 +95,10 @@ duplicate_internal(x::Block, ::IdDict) = x
 
 # Equality & hash need to be defined, since we have defined an internal constructor.
 Base.hash(a::Block, h::UInt) = hash(a.values, hash(a.times, hash(:Block, h)))
-Base.:(==)(a::Block, b::Block) = a.times == b.times && a.values == b.values
+function Base.:(==)(a::Block, b::Block)
+    a === b && return true
+    return a.times == b.times && a.values == b.values
+end
 
 # Implement approximate equality in terms of exact equality for timestamps, but approximate
 # for values. Only blocks with the same value type should compare approximately equal.

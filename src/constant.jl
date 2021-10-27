@@ -3,6 +3,13 @@ struct Constant{T} <: NodeOp{T}
     value::T
 end
 
+Base.hash(x::Constant, h::UInt64) = hash(x.value, hash(:Constant, h))
+function Base.:(==)(x::Constant{T}, y::Constant{T}) where {T}
+    # Add short-circuit, in case Base.:(==)(::T, ::T) doesn't have one.
+    x.value === y.value && return true
+    return x.value == y.value
+end
+
 function Base.show(io::IO, op::Constant)
     return print(io, "$(typeof(op).name.name){$(value_type(op))}($(op.value))")
 end

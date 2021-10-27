@@ -8,9 +8,7 @@ function Base.show(io::IO, ::BlockNode{T}) where {T}
 end
 
 Base.hash(x::BlockNode, h::UInt64) = hash(x.block, hash(:BlockNode, h))
-function Base.:(==)(x::BlockNode{T}, y::BlockNode{T}) where {T}
-    return x.block === y.block
-end
+Base.:(==)(x::BlockNode{T}, y::BlockNode{T}) where {T} = x.block == y.block
 
 stateless(::BlockNode) = true
 
@@ -19,10 +17,6 @@ function run_node!(
 ) where {T}
     return _slice(op.block, time_start, time_end)
 end
-
-# TODO Need to think about equality for BlockNode. It is used in equality testing for node,
-# so we do *not* really want to do full equality checking on block's values since this could
-# really slow down identity mapping.
 
 block_node(block::Block) = obtain_node((), BlockNode(block))
 

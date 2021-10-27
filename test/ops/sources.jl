@@ -6,14 +6,12 @@
     @test x == y
     @test x === y
 
-    # Similar blocks that are non-identical shouldn't be identity mapped.
-    # TODO Maybe they should? The problem is that we don't want to be doing expensive
-    #   comparisons of large blocks for the sake of identity mapping.
+    # Similar blocks that are non-identical should be identity mapped.
     x = block_node(Block{Int64}())
     y = block_node(Block{Int64}())
-    @test x.op != y.op
-    @test x != y
-    @test x !== y
+    @test x.op == y.op
+    @test x == y
+    @test x === y
 end
 
 @testset "tea_file" begin
