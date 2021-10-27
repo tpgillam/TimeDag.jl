@@ -10,7 +10,9 @@
 #   longer duplicate information.
 
 """
-Represent a node-like object, that doesn't hold strong references to its parents.
+    WeakNode(parents, op)
+
+Represent a node-like object that doesn't hold strong references to its parents.
 
 This exists purely such that `hash` and `==` *do* allow multiple instances of
 `WeakNode` to compare equal if they have the same `parents` and `op`.
@@ -31,6 +33,8 @@ Base.:(==)(a::WeakNode, b::WeakNode) = isequal(a, b)
 abstract type IdentityMap end
 
 """
+    WeakIdentityMap
+
 Represent a collection of nodes which doesn't hold strong references to any nodes.
 
 This is useful, as it allows the existence of this cache to be somewhat transparent to the
@@ -65,7 +69,7 @@ function _cleanup!(id_map::WeakIdentityMap)
     # This is analogous to the implementation in WeakKeyDict.
     # Note that we use hidden functionality of Dict here. This is because we can no longer
     # rely on the keys to be a good indexer, since they contain weak references that may
-    # have gone stale
+    # have gone stale.
     idx = Base.skip_deleted_floor!(id_map.weak_to_ref)
     while idx != 0
         if id_map.weak_to_ref.vals[idx].value === nothing
