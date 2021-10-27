@@ -16,12 +16,6 @@
 @simple_binary(Base.:^)
 @simple_binary(Base.min)
 @simple_binary(Base.max)
-function Base.min(x::Node, y::Node, z::Node, args...)
-    return min(min(x, y), z, args...)
-end
-function Base.max(x::Node, y::Node, z::Node, args...)
-    return max(max(x, y), z, args...)
-end
 
 # Logical
 
