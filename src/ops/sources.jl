@@ -3,6 +3,10 @@ struct BlockNode{T} <: NodeOp{T}
     block::Block{T}
 end
 
+function Base.show(io::IO, ::BlockNode{T}) where {T}
+    return print(io, "BlockNode{$T}")
+end
+
 Base.hash(x::BlockNode, h::UInt64) = hash(x.block, hash(:BlockNode, h))
 function Base.:(==)(x::BlockNode{T}, y::BlockNode{T}) where {T}
     return x.block === y.block

@@ -24,10 +24,6 @@ duplicate_internal(x::NodeOp, ::IdDict) = x
 
 Base.show(io::IO, node::Node) = show(io, node.op)
 
-function Base.show(io::IO, op::NodeOp{T}) where {T}
-    return print(io, "$(typeof(op).name.name){$T}")
-end
-
 # Enable AbstractTrees to understand the graph.
 # TODO It might be nice to elide repeated subtrees. This would require modifying the
 #   iteration procedure within AbstractTrees, so ostriching for now.
