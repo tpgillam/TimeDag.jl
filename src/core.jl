@@ -1,14 +1,20 @@
-"""Represent a time-series operation."""
+"""
+    abstract type NodeOp{T}
+
+Represent a time-series operation whose output will be a time-series with value type `T`.
+"""
 abstract type NodeOp{T} end
 
 """
     Node(parents, op)
 
-Represent a node in the computational graph that combines zero or more `parents` with `op`
-to produce a timeseries.
+A node in the computational graph that combines zero or more `parents` with `op` to produce
+a timeseries.
 
-Note that a Node is only declared mutable so that we can attach finalizers to instances.
-Nodes should NEVER actually be mutated!
+!!! warning
+    Note that a `Node` is only declared mutable so that we can attach finalizers to
+    instances. This is required for the [`WeakIdentityMap`](@ref) to work.
+    Nodes should NEVER actually be mutated!
 
 Due to subgraph elimination, nodes that are equivalent should always be identical objects.
 We therefore leave `hash` & `==` defined in terms of the `objectid`.
