@@ -1,5 +1,5 @@
 """
-    abstract type NodeOp{T}
+    abstract type NodeOp{T} end
 
 Represent a time-series operation whose output will be a time-series with value type `T`.
 """
@@ -36,13 +36,30 @@ Base.show(io::IO, node::Node) = show(io, node.op)
 AbstractTrees.children(node::Node) = parents(node)
 AbstractTrees.nodetype(::Node) = Node
 
-"""The type of each value emitted for this node."""
+"""
+    value_type(node::Node{T}) -> T
+
+The type of each value emitted for this node.
+"""
 value_type(::Node{T}) where {T} = T
 value_type(::NodeOp{T}) where {T} = T
 
+"""
+    abstract type NodeEvaluationState end
+
+Represents any and all state that a node must retain between evaluating batches.
+
+Instances of subtypes of `NodeEvaluationState` are given to [`run_node!`](@ref).
+"""
 abstract type NodeEvaluationState end
 
-"""An evaluation state which has no contents."""
+"""
+    EmptyNodeEvaluationState()
+
+An evaluation state which has no contents, to be used by nodes which are not stateful.
+
+In practice, the common instance [`_EMPTY_NODE_STATE](@ref) can be used.
+"""
 struct EmptyNodeEvaluationState <: NodeEvaluationState end
 
 # Can have a singleton instance, since it is just a placeholder.

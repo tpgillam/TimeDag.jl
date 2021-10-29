@@ -30,6 +30,13 @@ function Base.isequal(a::WeakNode, b::WeakNode)
 end
 Base.:(==)(a::WeakNode, b::WeakNode) = isequal(a, b)
 
+"""
+    IdentityMap
+
+An abstract identity map.
+
+Any implementation of this type needs to implement [`obtain_node!`](@ref).
+"""
 abstract type IdentityMap end
 
 """
@@ -112,6 +119,13 @@ function _create_node!(id_map::WeakIdentityMap, parents, op, weak_node::WeakNode
     return node
 end
 
+"""
+    obtain_node!(id_map::IdentityMap, parents::NTuple{N,Node}, op::NodeOp) -> Node
+
+If a node with `parents` and `op` doesn't exist inside `id_map`, create and insert it.
+
+Return either the new or existing node.
+"""
 function obtain_node!(
     id_map::WeakIdentityMap, parents::NTuple{N,Node}, op::NodeOp
 ) where {N}

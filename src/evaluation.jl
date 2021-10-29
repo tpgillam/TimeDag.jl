@@ -1,12 +1,19 @@
 """
-All state necessary for the evaluation of a graph, and the persistence of a few nodes in
-this graph.
+    EvaluationState
 
-Some thoughts on requirements
-    - should know which nodes we *care* about, for keeping outputs.
-    - needs all ancestors & map to (mutable) states
-    - should keep track of the current time.
-    - should contain output blocks??
+All state necessary for the evaluation of some nodes.
+
+This should be created with [`start_at`](@ref).
+
+# Fields
+- `ordered_node_to_children::OrderedDict{Node,Set{Node}}`: a map from every node which we
+    need to run, to its children. The ordering of the elements is such that, if evaluated in
+    this order, all dependencies will be evaluated before they are required.
+- `node_to_state::IdDict{Node,NodeEvaluationState}`: maintain the state for every node
+    being evaluated.
+- `current_time::DateTime`: the time to which this state corresponds.
+- `evaluated_node_to_blocks::IdDict{Node,Vector{Block}}`: the output blocks that we care
+    about.
 """
 mutable struct EvaluationState
     ordered_node_to_children::OrderedDict{Node,Set{Node}}
@@ -37,6 +44,14 @@ function _create_evaluation_state(node)
     return stateless(node) ? _EMPTY_NODE_STATE : create_evaluation_state(node)
 end
 
+"""
+    start_at(nodes, time_start::DateTime) -> EvaluationState
+
+Create a sufficient [`EvaluationState`](@ref) for the evaluation of `nodes`.
+
+Internally, this will determine the subgraph that needs evaluating, i.e. all the ancestors
+of `nodes`, and create a [`NodeEvaluationState`](@ref) for each of these.
+"""
 function start_at(nodes, time_start::DateTime)::EvaluationState
     # Create empty evaluation state for all these, and return in some suitable pacakge.
     evaluation_order = ancestors(nodes)
@@ -114,11 +129,11 @@ function get_up_to!(state::EvaluationState, time_end::DateTime)::EvaluationState
 end
 
 """
-    evaluate(nodes::Vector{Node}, t0, t1; (batch_interval)) -> Vector{Block}
-    evaluate(node::Node, t0, t1; (batch_interval)) -> Block
+    evaluate(nodes::AbstractVector{Node}, t0, t1[; batch_interval]) -> Vector{Block}
+    evaluate(node::Node, t0, t1[; batch_interval]) -> Block
 
-Evaluate the specified node(s) over the specified time range [t0, t1), and return the
-corresponding Block(s).
+Evaluate the specified node(s) over the specified time range `[t0, t1)`, and return the
+corresponding [`Block`](@ref)(s).
 
 If `nodes` have common dependencies, work will not be repeated when performing this
 evaluation.
