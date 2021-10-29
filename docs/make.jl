@@ -25,7 +25,7 @@ makedocs(;
                 "reference/online_windowed.md",
                 "reference/sources.md",
             ],
-            "reference/creating_nodes.md",
+            "reference/creating_ops.md",
             "reference/internals.md",
         ]
     ],
