@@ -4,6 +4,8 @@
 #   not it would permit us to have views of an array.
 #   Possibly we need a more general type here which can package other representations?
 #   See Stheno ColVecs / RowVecs - they have the same problem.
+#
+#   Also see: https://juliaarrays.github.io/ArraysOfArrays.jl/stable/
 
 function _is_strictly_increasing(x::AbstractVector)
     length(x) < 2 && return true
@@ -93,7 +95,10 @@ duplicate_internal(x::Block, ::IdDict) = x
 
 # Equality & hash need to be defined, since we have defined an internal constructor.
 Base.hash(a::Block, h::UInt) = hash(a.values, hash(a.times, hash(:Block, h)))
-Base.:(==)(a::Block, b::Block) = a.times == b.times && a.values == b.values
+function Base.:(==)(a::Block, b::Block)
+    a === b && return true
+    return a.times == b.times && a.values == b.values
+end
 
 # Implement approximate equality in terms of exact equality for timestamps, but approximate
 # for values. Only blocks with the same value type should compare approximately equal.

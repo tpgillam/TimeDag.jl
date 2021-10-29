@@ -10,7 +10,9 @@
 #   longer duplicate information.
 
 """
-Represent a node-like object, that doesn't hold strong references to its parents.
+    WeakNode(parents, op)
+
+Represent a node-like object that doesn't hold strong references to its parents.
 
 This exists purely such that `hash` and `==` *do* allow multiple instances of
 `WeakNode` to compare equal if they have the same `parents` and `op`.
@@ -28,9 +30,18 @@ function Base.isequal(a::WeakNode, b::WeakNode)
 end
 Base.:(==)(a::WeakNode, b::WeakNode) = isequal(a, b)
 
+"""
+    IdentityMap
+
+An abstract identity map.
+
+Any implementation of this type needs to implement [`obtain_node!`](@ref).
+"""
 abstract type IdentityMap end
 
 """
+    WeakIdentityMap
+
 Represent a collection of nodes which doesn't hold strong references to any nodes.
 
 This is useful, as it allows the existence of this cache to be somewhat transparent to the
@@ -65,7 +76,7 @@ function _cleanup!(id_map::WeakIdentityMap)
     # This is analogous to the implementation in WeakKeyDict.
     # Note that we use hidden functionality of Dict here. This is because we can no longer
     # rely on the keys to be a good indexer, since they contain weak references that may
-    # have gone stale
+    # have gone stale.
     idx = Base.skip_deleted_floor!(id_map.weak_to_ref)
     while idx != 0
         if id_map.weak_to_ref.vals[idx].value === nothing
@@ -108,6 +119,13 @@ function _create_node!(id_map::WeakIdentityMap, parents, op, weak_node::WeakNode
     return node
 end
 
+"""
+    obtain_node!(id_map::IdentityMap, parents::NTuple{N,Node}, op::NodeOp) -> Node
+
+If a node with `parents` and `op` doesn't exist inside `id_map`, create and insert it.
+
+Return either the new or existing node.
+"""
 function obtain_node!(
     id_map::WeakIdentityMap, parents::NTuple{N,Node}, op::NodeOp
 ) where {N}

@@ -1,47 +1,149 @@
-macro unary_define_without_op(op, node_op)
-    op = esc(op)
-    node_op = esc(node_op)
+"""
+    SimpleUnary{f,T}
+
+Represents a stateless, time-independent unary operator that will always emit a value.
+"""
+struct SimpleUnary{f,T} <: UnaryNodeOp{T} end
+
+always_ticks(::SimpleUnary) = true
+stateless(::SimpleUnary) = true
+time_agnostic(::SimpleUnary) = true
+operator!(::SimpleUnary{f}, x) where {f} = f(x)
+
+"""
+    SimpleBinary{f,T,A}
+
+Represents a stateless, time-independent binary operator that will always emit a value.
+"""
+struct SimpleBinary{f,T,A} <: BinaryAlignedNodeOp{T,A} end
+
+always_ticks(::SimpleBinary) = true
+stateless_operator(::SimpleBinary) = true
+time_agnostic(::SimpleBinary) = true
+operator!(::SimpleBinary{f}, x, y) where {f} = f(x, y)
+
+"""
+    apply(f::Function, x)
+    apply(f::Function, x, y[, alignment=DEFAULT_ALIGNMENT])
+
+Obtain a node with values constructed by applying the pure function `f` to the input values.
+
+With more than one argument an alignment can optionally be specified.
+
+Internally this will infer the output type of `f` applied to the arguments, and will also
+ensure that subgraph elimination occurs when possible.
+"""
+function apply(f::Function, x)
+    x = _ensure_node(x)
+    return obtain_node((x,), SimpleUnary{f,output_type(f, value_type(x))}())
+end
+
+function apply(f::Function, x, y, ::A) where {A<:Alignment}
+    x = _ensure_node(x)
+    y = _ensure_node(y)
+    T = output_type(f, value_type(x), value_type(y))
+    return obtain_node((x, y), SimpleBinary{f,T,A}())
+end
+
+apply(f::Function, x::Node, y::Node) = apply(f, x, y, DEFAULT_ALIGNMENT)
+apply(f::Function, x::Node, y) = apply(f, x, y, DEFAULT_ALIGNMENT)
+apply(f::Function, x, y::Node) = apply(f, x, y, DEFAULT_ALIGNMENT)
+
+"""
+    BCast(f::Function)
+
+Represent a function which should be broadcasted when called.
+
+That is, `BCast{f}(x, y...)` is identical to `f.(x, y...)`.
+"""
+struct BCast{f} <: Function
+    BCast(f::Function) = new{f}()
+end
+@inline (::BCast{f})(args...; kwargs...) where {f} = f.(args...; kwargs...)
+
+"""
+    Wrapped{f}
+
+Represent a function that, when called, will expect its arguments to be nodes and try to
+convert them as such.
+"""
+struct Wrapped{f} end
+@inline (::Wrapped{f})(args...; kwargs...) where {f} = apply(f, args...; kwargs...)
+
+# TODO Would we like an identity map? Not important right now, but could be in the future
+#   if we allow stateful things?
+
+"""
+    wrap(f::Function)
+
+Return a callable object that acts on nodes, and returns a node.
+
+It is assumed that `f` is stateless and time-independent. We also assume that we will
+always emit a knot when the alignment semantics say we should — thus `f` must always return
+a valid output value.
+
+If the object is called with more than one node, alignment will be performed. In this case,
+the final argument can be an `Alignment` instance, otherwise `DEFAULT_ALIGNMENT` will be
+used.
+
+Internally this will call `TimeDag.apply(f, args...)`; see there for further details.
+"""
+wrap(f::Function) = Wrapped{f}()
+
+"""
+    wrapb(f::Function)
+
+Like `wrap(f)`, however `f` will be broadcasted over all input values.
+"""
+wrapb(f::Function) = Wrapped{BCast(f)}()
+
+"""
+    @simple_unary(f)
+
+Define a method `f(::Node)` that will obtain the correct instance of `SimpleUnary{f}`.
+
+This will internally infer the output value, and perform subgraph elimination.
+"""
+macro simple_unary(f, self_inverse::Bool=false)
+    f = esc(f)
     return quote
-        struct $node_op{T} <: UnaryNodeOp{T} end
-
-        TimeDag.always_ticks(::$node_op) = true
-        TimeDag.stateless(::$node_op) = true
-        TimeDag.time_agnostic(::$node_op) = true
-
-        TimeDag.operator!(::$node_op, x) = $op(x)
+        $f(x::Node) = apply($f, x)
     end
 end
 
-macro unary_define(op, node_op)
-    op = esc(op)
-    node_op = esc(node_op)
+"""
+    @simple_unary_self_inverse(f)
+
+Define a method `f(::Node)` that will obtain the correct instance of `SimpleUnary{f}`.
+
+This must ONLY be used if `f(f(x)) == x` for all nodes `x`.
+
+This will internally infer the output value, and perform subgraph elimination.
+"""
+macro simple_unary_self_inverse(f)
+    f = esc(f)
     return quote
-        @unary_define_without_op($op, $node_op)
-        $op(x::Node) = obtain_node((x,), $node_op{output_type($op, value_type(x))}())
-    end
-end
-
-macro binary_define(op, node_op)
-    op = esc(op)
-    node_op = esc(node_op)
-    return quote
-        struct $node_op{T,A} <: BinaryAlignedNodeOp{T,A} end
-
-        TimeDag.always_ticks(::$node_op) = true
-        TimeDag.stateless_operator(::$node_op) = true
-        TimeDag.time_agnostic(::$node_op) = true
-
-        TimeDag.operator!(::$node_op, x, y) = $op(x, y)
-
-        function $op(x, y, ::A) where {A<:Alignment}
-            x = _ensure_node(x)
-            y = _ensure_node(y)
-            T = output_type($op, value_type(x), value_type(y))
-            return obtain_node((x, y), $node_op{T,A}())
+        function $f(x::Node)
+            # Optimisation: self-inverse
+            isa(x.op, SimpleUnary{$f}) && return only(parents(x))
+            return apply($f, x)
         end
+    end
+end
 
-        $op(x::Node, y::Node) = $op(x, y, DEFAULT_ALIGNMENT)
-        $op(x::Node, y) = $op(x, y, DEFAULT_ALIGNMENT)
-        $op(x, y::Node) = $op(x, y, DEFAULT_ALIGNMENT)
+"""
+    @simple_binary(f)
+
+Define methods `f(x, y)` that will obtain the correct instance of `SimpleBinary{f}`.
+
+These will internally infer the output value, and perform subgraph elimination.
+"""
+macro simple_binary(f)
+    f = esc(f)
+    return quote
+        $f(x, y, alignment::Alignment) = apply($f, x, y, alignment)
+        $f(x::Node, y::Node) = $f(x, y, DEFAULT_ALIGNMENT)
+        $f(x::Node, y) = $f(x, y, DEFAULT_ALIGNMENT)
+        $f(x, y::Node) = $f(x, y, DEFAULT_ALIGNMENT)
     end
 end

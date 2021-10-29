@@ -16,6 +16,8 @@ using TeaFiles
 export Block
 # Singletons.
 export INTERSECT, LEFT, UNION
+# Node creation.
+export wrap, wrapb
 # Source nodes.
 export block_node, constant, empty_node
 # Other nodes.

@@ -125,56 +125,89 @@ function _get_rand_vec_block(rng::AbstractRNG, dim::Int, n_obs::Int)
     return Block(times, values)
 end
 
-function _test_binary_op(op_timedag, op=op_timedag)
+function _test_unary_op(f_timedag, block::Block, f=f_timedag)
+    # Check basic evaluation.
+    value = first(block.values)
+    node = block_node(block)
+    @test _eval(f_timedag(node)) == _mapvalues(f, block)
+
+    # Check constant propagation.
+    @test f_timedag(constant(value)) == constant(f(value))
+    @test f_timedag(constant(value)) === constant(f(value))
+
+    # Two instances of the NodeOp instance should compare equal for equal
+    # type parameters.
+    T = typeof(value)
+    @test TimeDag.SimpleUnary{f,T}() == TimeDag.SimpleUnary{f,T}()
+    @test T != Float32
+    @test TimeDag.SimpleUnary{f,Float32}() != TimeDag.SimpleUnary{f,T}()
+end
+
+function _test_binary_op(f_timedag, f=f_timedag)
     # Common (fast) alignment.
     # Should apply for *any* user choice of alignment.
     for alignment in (UNION, LEFT, INTERSECT)
-        n = op_timedag(n1, n1, alignment)
+        n = f_timedag(n1, n1, alignment)
         block = _eval(n)
         @test block == Block([
-            DateTime(2000, 1, 1) => op(1, 1),
-            DateTime(2000, 1, 2) => op(2, 2),
-            DateTime(2000, 1, 3) => op(3, 3),
-            DateTime(2000, 1, 4) => op(4, 4),
+            DateTime(2000, 1, 1) => f(1, 1),
+            DateTime(2000, 1, 2) => f(2, 2),
+            DateTime(2000, 1, 3) => f(3, 3),
+            DateTime(2000, 1, 4) => f(4, 4),
         ])
         # For fast alignment, we expect *identical* timestamps as on the input.
         @test block.times === b1.times
     end
 
     # Union alignment.
-    n = op_timedag(n1, n2)
-    @test n === op_timedag(n1, n2, UNION)
+    n = f_timedag(n1, n2)
+    @test n === f_timedag(n1, n2, UNION)
     block = _eval(n)
     @test block == Block([
-        DateTime(2000, 1, 2) => op(2, 5),
-        DateTime(2000, 1, 3) => op(3, 6),
-        DateTime(2000, 1, 4) => op(4, 6),
-        DateTime(2000, 1, 5) => op(4, 8),
+        DateTime(2000, 1, 2) => f(2, 5),
+        DateTime(2000, 1, 3) => f(3, 6),
+        DateTime(2000, 1, 4) => f(4, 6),
+        DateTime(2000, 1, 5) => f(4, 8),
     ])
 
     # Intersect alignment.
-    n = op_timedag(n1, n2, INTERSECT)
+    n = f_timedag(n1, n2, INTERSECT)
 
     @test _eval(n) == Block([
-        DateTime(2000, 1, 2) => op(2, 5),
-        DateTime(2000, 1, 3) => op(3, 6),
+        DateTime(2000, 1, 2) => f(2, 5),
+        DateTime(2000, 1, 3) => f(3, 6),
     ])
 
     # Left alignment
-    n = op_timedag(n1, n2, LEFT)
+    n = f_timedag(n1, n2, LEFT)
     @test _eval(n) == Block([
-        DateTime(2000, 1, 2) => op(2, 5),
-        DateTime(2000, 1, 3) => op(3, 6),
-        DateTime(2000, 1, 4) => op(4, 6),
+        DateTime(2000, 1, 2) => f(2, 5),
+        DateTime(2000, 1, 3) => f(3, 6),
+        DateTime(2000, 1, 4) => f(4, 6),
     ])
 
     # Catch edge-case in which there was a bug.
-    @test _eval(op_timedag(n2, n3, LEFT)) == Block([
-        DateTime(2000, 1, 2) => op(5, 15),
-        DateTime(2000, 1, 3) => op(6, 15),
-        DateTime(2000, 1, 5) => op(8, 15),
+    @test _eval(f_timedag(n2, n3, LEFT)) == Block([
+        DateTime(2000, 1, 2) => f(5, 15),
+        DateTime(2000, 1, 3) => f(6, 15),
+        DateTime(2000, 1, 5) => f(8, 15),
     ])
-    @test _eval(op_timedag(n3, n2, LEFT)) == Block{Int64}()
+    @test _eval(f_timedag(n3, n2, LEFT)) == Block{Int64}()
+
+    # Test constant propagation.
+    value = 2.0  # valid for all ops we're currently testing.
+    @test f_timedag(constant(value), constant(value)) === constant(f(value, value))
+    @test f_timedag(value, constant(value)) === constant(f(value, value))
+    @test f_timedag(constant(value), value) === constant(f(value, value))
+
+    # Two instances of the NodeOp instance should compare equal for equal
+    # type parameters.
+    T = typeof(value)
+    for A in (UnionAlignment, IntersectAlignment, LeftAlignment)
+        @test TimeDag.SimpleBinary{f,T,A}() == TimeDag.SimpleBinary{f,T,A}()
+        @test T != Float32
+        @test TimeDag.SimpleBinary{f,Float32,A}() != TimeDag.SimpleBinary{f,T,A}()
+    end
 end
 
 #! format: on

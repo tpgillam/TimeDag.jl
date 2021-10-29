@@ -1,14 +1,20 @@
-"""Represent a time-series operation."""
+"""
+    abstract type NodeOp{T} end
+
+Represent a time-series operation whose output will be a time-series with value type `T`.
+"""
 abstract type NodeOp{T} end
 
 """
     Node(parents, op)
 
-Represent a node in the computational graph that combines zero or more `parents` with `op`
-to produce a timeseries.
+A node in the computational graph that combines zero or more `parents` with `op` to produce
+a timeseries.
 
-Note that a Node is only declared mutable so that we can attach finalizers to instances.
-Nodes should NEVER actually be mutated!
+!!! warning
+    Note that a `Node` is only declared mutable so that we can attach finalizers to
+    instances. This is required for the [`WeakIdentityMap`](@ref) to work.
+    Nodes should NEVER actually be mutated!
 
 Due to subgraph elimination, nodes that are equivalent should always be identical objects.
 We therefore leave `hash` & `==` defined in terms of the `objectid`.
@@ -24,23 +30,36 @@ duplicate_internal(x::NodeOp, ::IdDict) = x
 
 Base.show(io::IO, node::Node) = show(io, node.op)
 
-function Base.show(io::IO, op::NodeOp{T}) where {T}
-    return print(io, "$(typeof(op).name.name){$T}")
-end
-
 # Enable AbstractTrees to understand the graph.
 # TODO It might be nice to elide repeated subtrees. This would require modifying the
 #   iteration procedure within AbstractTrees, so ostriching for now.
 AbstractTrees.children(node::Node) = parents(node)
 AbstractTrees.nodetype(::Node) = Node
 
-"""The type of each value emitted for this node."""
+"""
+    value_type(node::Node{T}) -> T
+
+The type of each value emitted for this node.
+"""
 value_type(::Node{T}) where {T} = T
 value_type(::NodeOp{T}) where {T} = T
 
+"""
+    abstract type NodeEvaluationState end
+
+Represents any and all state that a node must retain between evaluating batches.
+
+Instances of subtypes of `NodeEvaluationState` are given to [`run_node!`](@ref).
+"""
 abstract type NodeEvaluationState end
 
-"""An evaluation state which has no contents."""
+"""
+    EmptyNodeEvaluationState()
+
+An evaluation state which has no contents, to be used by nodes which are not stateful.
+
+In practice, the common instance [`_EMPTY_NODE_STATE](@ref) can be used.
+"""
 struct EmptyNodeEvaluationState <: NodeEvaluationState end
 
 # Can have a singleton instance, since it is just a placeholder.
@@ -62,6 +81,8 @@ specified time.
 """
 create_evaluation_state(node::Node) = create_evaluation_state(node.parents, node.op)
 
+# TODO reverse the order of state & op arguments? Would be clearer, even though the state is
+#   mutated.
 """
     run_node!(
         state::NodeEvaluationState,
@@ -75,7 +96,11 @@ Evaluate the given node from `time_start` to `time_end`, with the initial `state
 Zero or more blocks will be passed as an input; these correspond to the parents of a node,
 and are passed in the same order as that returned by `parents(node)`.
 
-We return a new Block of output knots from this node.
+We return a new `Block` of output knots from this node.
+
+!!! warning
+    The implementer of `run_node!` must ensure that no future peeking occurs.
+    That is, that no output knot is dependent on input knots that occur subsequently.
 """
 function run_node! end
 

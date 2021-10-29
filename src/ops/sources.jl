@@ -3,10 +3,12 @@ struct BlockNode{T} <: NodeOp{T}
     block::Block{T}
 end
 
-Base.hash(x::BlockNode, h::UInt64) = hash(x.block, hash(:BlockNode, h))
-function Base.:(==)(x::BlockNode{T}, y::BlockNode{T}) where {T}
-    return x.block === y.block
+function Base.show(io::IO, ::BlockNode{T}) where {T}
+    return print(io, "BlockNode{$T}")
 end
+
+Base.hash(x::BlockNode, h::UInt64) = hash(x.block, hash(:BlockNode, h))
+Base.:(==)(x::BlockNode{T}, y::BlockNode{T}) where {T} = x.block == y.block
 
 stateless(::BlockNode) = true
 
@@ -16,13 +18,19 @@ function run_node!(
     return _slice(op.block, time_start, time_end)
 end
 
-# TODO Need to think about equality for BlockNode. It is used in equality testing for node,
-# so we do *not* really want to do full equality checking on block's values since this could
-# really slow down identity mapping.
+"""
+    block_node(block::Block)
 
+Construct a node whose values are read directly from the given `block`.
+"""
 block_node(block::Block) = obtain_node((), BlockNode(block))
 
 # TODO Identity mapping... probably just want a cache of empty blocks by T somewhere?
+"""
+    empty_node(T)
+
+Construct a node with value type `T` which, if evaluated, will never tick.
+"""
 empty_node(T) = block_node(Block{T}())
 
 # TODO We may want to generalise or otherwise refactor to allow reading multiple value
@@ -100,12 +108,16 @@ end
 Get a node that will read data from the tea file at `path`.
 
 Such a tea file must observe the following properties, which will be verified at runtime:
-    * Have a primary time field which is compatible with a Julia `DateTime`.
-    * Have exactly one column with name `value_field_name`.
-    * Have *strictly* increasing times.
+* Have a primary time field which is compatible with a Julia `DateTime`.
+* Have exactly one column with name `value_field_name`.
+* Have *strictly* increasing times.
 
 Upon node creation, the metadata section of the file will be parsed to infer the value type
-of the resulting node.
+of the resulting node. However, the bulk of the data will only be read at evaluation time.
+
+# See also
+* The [tea file spec](http://discretelogics.com/resources/teafilespec/)
+* [TeaFiles.jl](https://github.com/tpgillam/TeaFiles.jl)
 """
 function tea_file(path::AbstractString, value_field_name::AbstractString)
     return obtain_node((), TeaFileNode(path, value_field_name))

@@ -59,16 +59,34 @@ function run_node!(
     return Block(unchecked, times, values)
 end
 
-function lag(node::Node, n::Integer)
+"""
+    lag(x::Node, n::Integer)
+
+Construct a node which takes values from `x`, but lags them by `n` knots.
+
+This means that we do not introduce any new timestamps that do not appear in `x`, however
+we will not emit knots for the first `n` values that appear when evaluating `x`.
+"""
+function lag(x::Node, n::Integer)
     return if n == 0
         # Optimisation.
-        node
+        x
     elseif n < 0
         throw(ArgumentError("Cannot lag by $n."))
-    elseif _is_constant(node)
+    elseif _is_constant(x)
         # Constant nodes shouldn't be affected by lagging.
-        node
+        x
     else
-        obtain_node((node,), Lag{value_type(node)}(n))
+        obtain_node((x,), Lag{value_type(x)}(n))
     end
+end
+
+"""
+    diff(x::Node[, n=1])
+
+Compute the `n`-knot difference of `x`, i.e. `x - lag(x, n)`.
+"""
+function Base.diff(x::Node, n::Integer=1)
+    n > 0 || throw(ArgumentError("n must be positive, got $n"))
+    return x - lag(x, n)
 end

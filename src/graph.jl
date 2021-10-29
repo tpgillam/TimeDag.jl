@@ -14,11 +14,16 @@ This assumes that `_can_propagate_constant(op)` is true.
 function _propagate_constant_value end
 
 """
-    obtain_node(parents, op) -> Node
+    obtain_node(parents::NTuple{N,Node}, op::NodeOp) -> Node
 
-Get a node for the given NodeOp and parents. If an equivalent node already exists in the
-identity map, use that one, otherwise create a new node, add to the identity map, and return
-it.
+Get a node for the given `op` and `parents`. If an equivalent node already exists in the
+global identity map, use that one, otherwise create a new node, add to the identity map, and
+return it.
+
+# Constant propagation
+If all `parents` are constant nodes, and `op` has a well-defined operation on constant
+inputs, we will immediately perform the computation and return a constant node wrapping the
+computed value.
 """
 function obtain_node(parents::NTuple{N,Node}, op::NodeOp) where {N}
     if !isempty(parents) && _can_propagate_constant(op) && all(_is_constant, parents)
