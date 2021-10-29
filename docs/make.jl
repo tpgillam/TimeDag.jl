@@ -27,7 +27,7 @@ makedocs(;
             ],
             "reference/creating_ops.md",
             "reference/internals.md",
-        ]
+        ],
     ],
     checkdocs=:exports,
     strict=true,
