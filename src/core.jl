@@ -81,6 +81,8 @@ specified time.
 """
 create_evaluation_state(node::Node) = create_evaluation_state(node.parents, node.op)
 
+# TODO reverse the order of state & op arguments? Would be clearer, even though the state is
+#   mutated.
 """
     run_node!(
         state::NodeEvaluationState,
@@ -94,7 +96,11 @@ Evaluate the given node from `time_start` to `time_end`, with the initial `state
 Zero or more blocks will be passed as an input; these correspond to the parents of a node,
 and are passed in the same order as that returned by `parents(node)`.
 
-We return a new Block of output knots from this node.
+We return a new `Block` of output knots from this node.
+
+!!! warning
+    The implementer of `run_node!` must ensure that no future peeking occurs.
+    That is, that no output knot is dependent on input knots that occur subsequently.
 """
 function run_node! end
 
