@@ -45,7 +45,7 @@ This will not directly indicated repeated nodes, but for small graphs the output
 In order to get a concrete time-series (as a [`Block`](@ref)) for a node, it must be evaluated with [`evaluate`](@ref).
 Evaluation additionally requires a time range, and involves pulling data corresponding to this interval through the graph of ancestors of the given node(s).
 
-!!! info
+!!! tip
     When evaluating a graph in a production system, it may be desirable to have more control over evaluation.
     If this sounds like you, please read the [Advanced evaluation](@ref) section!
 

@@ -48,3 +48,10 @@ TimeDag.start_at
 TimeDag.get_up_to!
 TimeDag.run_node!
 ```
+
+## Other
+
+```@docs
+TimeDag.output_type
+TimeDag.duplicate
+```

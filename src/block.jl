@@ -40,6 +40,11 @@ The constructor `Block(times, values)` will verify that the input data satisfies
 constraint, however `Block(unchecked, times, values)` will skip the checks. This is
 primarily intended for internal use, where the caller assumes responsibility for the
 validity of `times` & `values`.
+
+!!! danger
+    `TimeDag` considers instances of `Block` to be completely immutable. Thus, when working
+    with functions that accept blocks (e.g. [`TimeDag.run_node!`](@ref)), you must not
+    modify `times` or `values` members.
 """
 struct Block{T,VTimes<:AbstractVector{DateTime},VValues<:AbstractVector{T}}
     times::VTimes

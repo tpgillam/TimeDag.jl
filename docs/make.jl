@@ -1,10 +1,11 @@
-using TimeDag
 using Documenter
+using Statistics
+using TimeDag
 
 DocMeta.setdocmeta!(TimeDag, :DocTestSetup, :(using TimeDag); recursive=true)
 
 makedocs(;
-    # modules=[TimeDag],  # FIXME
+    modules=[TimeDag],
     authors="Invenia Technical Computing Corporation",
     repo="https://github.com/invenia/TimeDag.jl/blob/{commit}{path}#{line}",
     sitename="TimeDag.jl",
@@ -19,7 +20,7 @@ makedocs(;
         "examples.md",
         "Reference" => [
             "reference/fundamentals.md",
-            "Nodes" => [
+            "Node ops" => [
                 "reference/align.md",
                 "reference/arithmetic.md",
                 "reference/online_windowed.md",

@@ -1,4 +1,4 @@
-# Alignment
+# Alignment ops
 
 ```@docs
 left

@@ -126,10 +126,10 @@ time_agnostic(::NodeOp) = false
 """
     duplicate(x)
 
-Return an object that is equal to x, but fully independent of it.
+Return an object that is equal to `x`, but fully independent of it.
 
-Note that for any parts of x that are considered to be immutable (e.g. `Block`s), this can
-return the identical object.
+Note that for any parts of `x` that `TimeDag` considers to be immutable (e.g. `Block`s),
+this can return the identical object.
 
 Conceptually this is otherwise very similar to `deepcopy(x)`.
 """

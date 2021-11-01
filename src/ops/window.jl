@@ -159,6 +159,11 @@ _unfiltered(::Sum) = true
 _combine(::Sum, x, y) = x + y
 _extract(::Sum, data) = data
 Base.show(io::IO, ::Sum{T}) where {T} = print(io, "Sum{$T}")
+"""
+    sum(x::Node) -> Node
+
+Create a node which ticks when `x` ticks, with values of the cumulative sum of `x`.
+"""
 function Base.sum(x::Node)
     _is_constant(x) && return x
     return obtain_node((x,), Sum{value_type(x)}())
@@ -172,6 +177,15 @@ _unfiltered(::WindowSum) = true
 _combine(::WindowSum, x, y) = x + y
 _extract(::WindowSum, data) = data
 Base.show(io::IO, op::WindowSum{T}) where {T} = print(io, "WindowSum{$T}($(_window(op)))")
+
+"""
+    sum(x::Node, window::Int; emit_early::Bool=false) -> Node
+
+Create a node of the rolling sum of `x` over the last `window` knots.
+
+If `emit_early` is false, then the node returned will only start ticking once the window is
+full. Otherwise, it will tick immediately with a partially-filled window.
+"""
 function Base.sum(x::Node, window::Int; emit_early::Bool=false)
     return obtain_node((x,), WindowSum{value_type(x),emit_early}(window))
 end
@@ -182,6 +196,11 @@ _unfiltered(::Prod) = true
 _combine(::Prod, x, y) = x * y
 _extract(::Prod, data) = data
 Base.show(io::IO, ::Prod{T}) where {T} = print(io, "Prod{$T}")
+"""
+    prod(x::Node) -> Node
+
+Create a node which ticks when `x` ticks, with values of the cumulative product of `x`.
+"""
 function Base.prod(x::Node)
     _is_constant(x) && return x
     return obtain_node((x,), Prod{value_type(x)}())
@@ -195,6 +214,14 @@ _unfiltered(::WindowProd) = true
 _combine(::WindowProd, x, y) = x * y
 _extract(::WindowProd, data) = data
 Base.show(io::IO, op::WindowProd{T}) where {T} = print(io, "WindowProd{$T}($(_window(op)))")
+"""
+    prod(x::Node, window::Int; emit_early::Bool=false) -> Node
+
+Create a node of the rolling product of `x` over the last `window` knots.
+
+If `emit_early` is false, then the node returned will only start ticking once the window is
+full. Otherwise, it will tick immediately with a partially-filled window.
+"""
 function Base.prod(x::Node, window::Int; emit_early::Bool=false)
     return obtain_node((x,), WindowProd{value_type(x),emit_early}(window))
 end
@@ -217,6 +244,11 @@ end
 _combine(::Mean, x::MeanData, y::MeanData) = _combine(x, y)
 _extract(::Mean, data::MeanData) = data.mean
 Base.show(io::IO, ::Mean{T}) where {T} = print(io, "Mean{$T}")
+"""
+    mean(x::Node) -> Node
+
+Create a node which ticks when `x` ticks, with values of the running mean of `x`.
+"""
 function Statistics.mean(x::Node)
     _is_constant(x) && return x
     T = output_type(/, value_type(x), Int)
@@ -231,6 +263,14 @@ _unfiltered(::WindowMean) = true
 _combine(::WindowMean, x::MeanData, y::MeanData) = _combine(x, y)
 _extract(::WindowMean, data::MeanData) = data.mean
 Base.show(io::IO, op::WindowMean{T}) where {T} = print(io, "WindowMean{$T}($(_window(op)))")
+"""
+    mean(x::Node, window::Int; emit_early::Bool=false) -> Node
+
+Create a node of the rolling mean of `x` over the last `window` knots.
+
+If `emit_early` is false, then the node returned will only start ticking once the window is
+full. Otherwise, it will tick immediately with a partially-filled window.
+"""
 function Statistics.mean(x::Node, window::Int; emit_early::Bool=false)
     T = output_type(/, value_type(x), Int)
     return obtain_node((x,), WindowMean{T,emit_early}(window))
@@ -263,6 +303,15 @@ _combine(::Var, x::VarData, y::VarData) = _combine(x, y)
 _extract(::Var{T,true}, data::VarData) where {T} = data.s / (data.n - 1)
 _extract(::Var{T,false}, data::VarData) where {T} = data.s / data.n
 Base.show(io::IO, ::Var{T}) where {T} = print(io, "Var{$T}")
+"""
+    var(x::Node; corrected::Bool=true) -> Node
+
+Create a node which ticks when `x` ticks, with values of the running variance of `x`.
+
+This is equivalent to a sample variance over the `n` values of `x` observed at and before a
+given time. If `corrected` is `true` (the default), we normalise by `n-1`, otherwise we
+normalise by `n`.
+"""
 function Statistics.var(x::Node; corrected::Bool=true)
     _is_constant(x) && throw(ArgumentError("Cannot compute variance of constant $x"))
     T = output_type(/, value_type(x), Int)
@@ -278,6 +327,18 @@ _combine(::WindowVar, x::VarData, y::VarData) = _combine(x, y)
 _extract(::WindowVar{T,true}, data::VarData) where {T} = data.s / (data.n - 1)
 _extract(::WindowVar{T,false}, data::VarData) where {T} = data.s / data.n
 Base.show(io::IO, op::WindowVar{T}) where {T} = print(io, "WindowVar{$T}($(_window(op)))")
+"""
+    var(x::Node, window::Int; emit_early::Bool=false, corrected::Bool=true) -> Node
+
+Create a node of the rolling variance of `x` over the last `window` knots.
+
+If `emit_early` is false, then the node returned will only start ticking once the window is
+full. Otherwise, it will tick immediately with a partially-filled window.
+
+This is equivalent to a sample variance over the `n` values of `x` (capped at `window`),
+observed at and before a given time. If `corrected` is `true` (the default), we normalise by
+`n-1`, otherwise we normalise by `n`.
+"""
 function Statistics.var(x::Node, window::Int; emit_early::Bool=false, corrected::Bool=true)
     _is_constant(x) && throw(ArgumentError("Cannot compute variance of constant $x"))
     window >= 2 || throw(ArgumentError("Got window=$window, but should be at least 2"))
@@ -286,7 +347,25 @@ function Statistics.var(x::Node, window::Int; emit_early::Bool=false, corrected:
 end
 
 # Standard deviation.
+"""
+    std(x::Node; corrected::Bool=true) -> Node
+
+Create a node which ticks when `x` ticks, with values of the running standard deviation of
+`x`.
+
+This is equivalent to `sqrt(var(x; corrected))`.
+"""
 Statistics.std(x::Node; corrected::Bool=true) = sqrt(var(x; corrected))
+"""
+    std(x::Node, window::Int; emit_early::Bool=false, corrected::Bool=true) -> Node
+
+Create a node of the rolling standard deviation of `x` over the last `window` knots.
+
+If `emit_early` is false, then the node returned will only start ticking once the window is
+full. Otherwise, it will tick immediately with a partially-filled window.
+
+This is equivalent to `sqrt(var(x; emit_early, corrected))`.
+"""
 function Statistics.std(x::Node, window::Int; emit_early::Bool=false, corrected::Bool=true)
     return sqrt(var(x, window; emit_early, corrected))
 end
@@ -323,6 +402,19 @@ _combine(::Cov, x::CovData, y::CovData) = _combine(x, y)
 _extract(::Cov{T,true}, data::CovData) where {T} = data.c / (data.n - 1)
 _extract(::Cov{T,false}, data::CovData) where {T} = data.c / data.n
 Base.show(io::IO, ::Cov{T}) where {T} = print(io, "Cov{$T}")
+"""
+    cov(x, y[, alignment]; corrected::Bool=true) -> Node
+
+Create a node which ticks with values of the running covariance of `x` and `y`.
+
+The specified `alignment` controls the behaviour when `x` and `y` tick at different times,
+as per the documentation in [Alignment](@ref). When not specified, it defaults to
+[`UNION`](@ref).
+
+This is equivalent to a sample covariance over the `n` values of `(x, y)` pairs observed at
+and before a given time. If `corrected` is `true` (the default), we normalise by `n-1`,
+otherwise we normalise by `n`.
+"""
 function Statistics.cov(x, y, ::A; corrected::Bool=true) where {A<:Alignment}
     x = _ensure_node(x)
     y = _ensure_node(y)
@@ -348,6 +440,22 @@ _extract(::WindowCov{T,true}, data::CovData) where {T} = data.c / (data.n - 1)
 _extract(::WindowCov{T,false}, data::CovData) where {T} = data.c / data.n
 Base.show(io::IO, op::WindowCov{T}) where {T} = print(io, "WindowCov{$T}($(_window(op)))")
 
+"""
+    cov(x, y, window::Int[, alignment]; emit_early=false, corrected=true) -> Node
+
+Create a node of the rolling covariance of `x` and `y` over the last `window` knots.
+
+The specified `alignment` controls the behaviour when `x` and `y` tick at different times,
+as per the documentation in [Alignment](@ref). When not specified, it defaults to
+[`UNION`](@ref).
+
+If `emit_early` is false, then the node returned will only start ticking once the window is
+full. Otherwise, it will tick immediately with a partially-filled window.
+
+This is equivalent to a sample covariance over the `n` values of `(x, y)` pairs observed at
+and before a given time, with `n` capped at `window`. If `corrected` is `true` (the
+default), we normalise by `n-1`, otherwise we normalise by `n`.
+"""
 function Statistics.cov(
     x, y, window::Int, ::A; emit_early::Bool=false, corrected::Bool=true
 ) where {A<:Alignment}
@@ -424,6 +532,15 @@ function Base.show(io::IO, ::CovMatrixStatic{N,L,T}) where {N,L,T}
     return print(io, "CovMatrixStatic{$T,$(N)x$(N)}")
 end
 
+"""
+    cov(x::Node{<:AbstractVector}; corrected::Bool=true) -> Node
+
+Create a node which ticks with values of the running covariance of `x`.
+
+!!! warning
+    If the values of `x` change shape over time, this node will throw an exception during
+    evaluation.
+"""
 function Statistics.cov(
     x::Node{<:StaticVector{N,T}}; corrected::Bool=true
 ) where {N,T<:Number}
@@ -454,6 +571,18 @@ end
 function Base.show(io::IO, op::WindowCovMatrixStatic{N,L,T}) where {N,L,T}
     return print(io, "WindowCovMatrixStatic{$T,$(N)x$(N)}($(_window(op)))")
 end
+"""
+    cov(x::Node{<:AbstractVector}, window::Int; corrected::Bool=true) -> Node
+
+Create a node of the rolling covariance of `x` over the last `window` knots.
+
+If `emit_early` is false, then the node returned will only start ticking once the window is
+full. Otherwise, it will tick immediately with a partially-filled window.
+
+!!! warning
+    If the values of `x` change shape over time, this node will throw an exception during
+    evaluation.
+"""
 function Statistics.cov(
     x::Node{<:StaticVector{N,T}}, window::Int; emit_early::Bool=false, corrected::Bool=true
 ) where {N,T<:Number}

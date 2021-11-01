@@ -168,6 +168,11 @@ TODO
 Immediately, we note that ``\mathcal{T}_z \subset \mathcal{T}_x \cup \mathcal{T}_y``.
 That is, ``z(t)`` can only be defined 
 
+```@docs
+UNION
+INTERSECT
+LEFT
+```
 
 ## Why a computational graph?
 
