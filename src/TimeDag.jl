@@ -7,6 +7,7 @@ using DataStructures
 using Dates
 using LightGraphs
 using PrettyTables
+using RecipesBase
 using StaticArrays
 using Statistics
 using Tables
@@ -36,6 +37,7 @@ include("output_type.jl")
 include("block.jl")
 include("graph.jl")
 include("evaluation.jl")
+include("plotting.jl")
 
 include("alignment.jl")
 
