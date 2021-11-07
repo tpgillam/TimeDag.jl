@@ -39,9 +39,9 @@ function _evaluate(node::Node, t0::DateTime, t1::DateTime)
     # Re-evaluation, and copying state.
     state = start_at([node], t0)
     copied_state = duplicate(state)
-    get_up_to!(state, t1)
+    evaluate_until!(state, t1)
     test_equivalent(only(state.evaluated_node_to_blocks[node]), block)
-    get_up_to!(copied_state, t1)
+    evaluate_until!(copied_state, t1)
     test_equivalent(only(copied_state.evaluated_node_to_blocks[node]), block)
 
     return block

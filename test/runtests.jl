@@ -11,7 +11,7 @@ using TimeDag
 
 using TimeDag: Block, Node
 using TimeDag: IntersectAlignment, LeftAlignment, UnionAlignment
-using TimeDag: duplicate, get_up_to!, start_at
+using TimeDag: duplicate, evaluate_until!, start_at
 
 #! format: off
 

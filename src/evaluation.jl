@@ -75,11 +75,11 @@ function start_at(nodes, time_start::DateTime)::EvaluationState
 end
 
 """
-    get_up_to!(state::EvaluationState, time_end::DateTime)
+    evaluate_until!(state::EvaluationState, time_end::DateTime)
 
 Update the evaluation state by performing the evalution for each node.
 """
-function get_up_to!(state::EvaluationState, time_end::DateTime)::EvaluationState
+function evaluate_until!(state::EvaluationState, time_end::DateTime)::EvaluationState
     # TODO Could we use dagger here to solve this & parallelism for us? I think the problem
     #   with this could be mutation - needs thought.
     #
@@ -147,12 +147,12 @@ function evaluate(
     state = start_at(nodes, time_start)
     if isnothing(batch_interval)
         # Evaluate in one go.
-        get_up_to!(state, time_end)
+        evaluate_until!(state, time_end)
     else
         t = time_start
         while true
             t = min(time_end, t + batch_interval)
-            get_up_to!(state, t)
+            evaluate_until!(state, t)
             # Break when we have evaluated up to the end of the interval.
             t < time_end || break
         end

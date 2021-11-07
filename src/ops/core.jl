@@ -23,8 +23,8 @@ time_agnostic(::SimpleBinary) = true
 operator!(::SimpleBinary{f}, x, y) where {f} = f(x, y)
 
 """
-    apply(f::Function, x)
-    apply(f::Function, x, y[, alignment=DEFAULT_ALIGNMENT])
+    apply(f::Function, x; out_type=nothing)
+    apply(f::Function, x, y[, alignment=DEFAULT_ALIGNMENT]; out_type=nothing)
 
 Obtain a node with values constructed by applying the pure function `f` to the input values.
 
@@ -32,22 +32,31 @@ With more than one argument an alignment can optionally be specified.
 
 Internally this will infer the output type of `f` applied to the arguments, and will also
 ensure that subgraph elimination occurs when possible.
+
+If `out_type` is not specified, we attempt to infer the value type of the resulting node
+automatically, using [`output_type`](@ref). Alternatively, if `out_type` is given as
+anything other than `nothing`, it will be used instead.
 """
-function apply(f::Function, x)
+function apply(f::Function, x; out_type::Union{Nothing,Type}=nothing)
     x = _ensure_node(x)
-    return obtain_node((x,), SimpleUnary{f,output_type(f, value_type(x))}())
+    T = isnothing(out_type) ? output_type(f, value_type(x)) : out_type
+    return obtain_node((x,), SimpleUnary{f,T}())
 end
 
-function apply(f::Function, x, y, ::A) where {A<:Alignment}
+function apply(
+    f::Function, x, y, ::A; out_type::Union{Nothing,Type}=nothing
+) where {A<:Alignment}
     x = _ensure_node(x)
     y = _ensure_node(y)
-    T = output_type(f, value_type(x), value_type(y))
+    T = isnothing(out_type) ? output_type(f, value_type(x), value_type(y)) : out_type
     return obtain_node((x, y), SimpleBinary{f,T,A}())
 end
 
-apply(f::Function, x::Node, y::Node) = apply(f, x, y, DEFAULT_ALIGNMENT)
-apply(f::Function, x::Node, y) = apply(f, x, y, DEFAULT_ALIGNMENT)
-apply(f::Function, x, y::Node) = apply(f, x, y, DEFAULT_ALIGNMENT)
+function apply(f::Function, x::Node, y::Node; kwargs...)
+    return apply(f, x, y, DEFAULT_ALIGNMENT; kwargs...)
+end
+apply(f::Function, x::Node, y; kwargs...) = apply(f, x, y, DEFAULT_ALIGNMENT; kwargs...)
+apply(f::Function, x, y::Node; kwargs...) = apply(f, x, y, DEFAULT_ALIGNMENT; kwargs...)
 
 """
     BCast(f::Function)
