@@ -36,6 +36,10 @@ We define the [`TimeDag.value_type`](@ref) of ``x`` to be the set ``\mathcal{X}`
 `TimeDag` primarily represents a time-series as a [`TimeDag.Node`](@ref). 
 It also stores time-series data in memory in the [`Block`](@ref) type.
 
+Here is a visualisation of a time-series ``x``:
+
+![A time series](assets/time_series.png)
+
 ### Functional interpretation
 We can also consider ``x`` to be a function, ``x : \mathcal{T}_x \rightarrow \mathcal{X}``.
 This is defined ``x(t) = \max_i\ x_i\ \textrm{s.t.}\ t_i \leq t``.
@@ -161,22 +165,74 @@ See [Creating operations](@ref) for more details.
 ### Single input (lag)
 
 A [`lag`](@ref) is a slightly more complex unary function.
-TODO
+Rather than explain it mathematically, a visualisation can help:
+
+![lag](assets/lag.png)
+
+Time is increasing to the right.
+Each grey arrow indicates that one value is used in computing another — in the case of [`lag`](@ref), the value is simply used directly.
+Note how, for this function, we never introduce new timestamps — we simply 'lag' the previous value onto the next timestamp. 
+
+A related concept is a time-lag, where each knot would be delayed by some fixed period of time ``\partial t``:
+
+![Time lag](assets/tlag.png)
+
+### Single input (cumulative sum)
+
+Similarly to a simple function operation on values, a cumulative sum over time ([`Base.sum`](@ref)) ticks whenever the input ticks.
+However, this time each value is a function of all preceding knots:
+
+![sum](assets/sum.png)
+
 
 ### Alignment
 
-TODO
-Immediately, we note that ``\mathcal{T}_z \subset \mathcal{T}_x \cup \mathcal{T}_y``.
-That is, ``z(t)`` can only be defined 
+When considering a function of two or more time-series, a useful special-case is where the output ticks at some subset of the times that all the inputs tick.
+We consider _alignment_, which is a selection process with semantics similar (but not identical) to "joins" in database terminology.
+
+#### Binary alignment
+First consider the base of exactly two inputs, for example the binary [`Base.:+`](@ref).
+We define three ways of performing alignment.
+For each one we document the `TimeDag` constant which should be used in function calls that accept an alignment, and give a graphical interpretation.
+
+Functions in `TimeDag` that accept multiple nodes typically default to using [`UNION`](@ref) alignment.
+
+##### Union
+Similar to an "outer join", with the key difference that we only emit knots once _both_ inputs have started ticking.
 
 ```@docs
 UNION
+```
+![Union alignment](assets/union_align.png)
+
+##### Intersect
+Tick if and only if both inputs tick.
+This is identical to an "inner join".
+```@docs
 INTERSECT
+```
+![Intersect alignment](assets/intersect_align.png)
+
+##### Left
+Similar to a "left join", with the key difference that we only emit knots once _both_ inputs have started ticking.
+
+```@docs
 LEFT
 ```
+![Left alignment](assets/left_align.png)
+
+
+#### N-ary alignment
+
+!!! warning 
+    Currently `TimeDag` does not support n-ary functions. 
+    These represent the intended semantics for when it does.
+
+For functions accepting more than two arguments, we extend the alignment logic above in the hopefully obvious way:
+* **UNION**: Tick whenever any input ticks, so long as all inputs are active.
+* **INTERSECT**: Tick whenever all inputs tick.
+* **LEFT**: Tick whenever the first input ticks, so long as all inputs are active.
 
 ## Why a computational graph?
-
-
 
 

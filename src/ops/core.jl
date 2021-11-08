@@ -116,6 +116,11 @@ This will internally infer the output value, and perform subgraph elimination.
 macro simple_unary(f, self_inverse::Bool=false)
     f = esc(f)
     return quote
+        """
+            $($f)(x::Node)
+
+        Obtain a node with values constructed by applying `$($f)` to each input value.
+        """
         $f(x::Node) = apply($f, x)
     end
 end
@@ -132,6 +137,11 @@ This will internally infer the output value, and perform subgraph elimination.
 macro simple_unary_self_inverse(f)
     f = esc(f)
     return quote
+        """
+            $($f)(x::Node)
+
+        Obtain a node with values constructed by applying `$($f)` to each input value.
+        """
         function $f(x::Node)
             # Optimisation: self-inverse
             isa(x.op, SimpleUnary{$f}) && return only(parents(x))
@@ -150,6 +160,14 @@ These will internally infer the output value, and perform subgraph elimination.
 macro simple_binary(f)
     f = esc(f)
     return quote
+        """
+            $($f)(x, y[, alignment=DEFAULT_ALIGNMENT])
+
+        Obtain a node with values constructed by applying `$($f)` to the input values.
+
+        An `alignment` can optionally be specified. `x` and `y` should be nodes, or
+        constants that can be converted to nodes.
+        """
         $f(x, y, alignment::Alignment) = apply($f, x, y, alignment)
         $f(x::Node, y::Node) = $f(x, y, DEFAULT_ALIGNMENT)
         $f(x::Node, y) = $f(x, y, DEFAULT_ALIGNMENT)

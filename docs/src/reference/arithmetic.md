@@ -1,10 +1,23 @@
 # Arithmetic
 
+```@docs
+Base.log
+Base.log10
+Base.log2
+Base.sqrt
+Base.cbrt
+Base.inv
 
-
-```@autodocs
-Modules = [TimeDag]
-Pages = [
-    "ops/simple.jl",
-]
+Base.:+
+Base.:-
+Base.:*
+Base.:/
+Base.:^
+Base.min
+Base.max
+Base.:!
+Base.:>
+Base.:<
+Base.:>=
+Base.:<=
 ```
