@@ -114,8 +114,9 @@ z[\delta_i], \zeta_{\sup \delta_i} = f_b(\delta_i, \zeta_{\sup \delta_{i-1}}, x[
 ```
 This function outputs knots — time-value pairs — rather than just the values, and hence performs the roles of both ``f_t`` and ``f_v`` previously.
 
-**NB** The state ``\zeta`` is only subscripted by the _upper bound_ of a given interval; i.e. by a time.
-This is because the state should not be path-dependent.
+**NB** ``\sup\delta_i`` indicates the supremum of the interval ``\delta_i``, i.e. the upper bound.
+The state ``\zeta`` is only subscripted by this upper bound; i.e. by a time, because it should not be path dependent.
+i.e. for a given time-series operation, we should always end up with the same state at a particular time, regardless of how many batches we have used to get there.
 
 !!! info
     It is useful to emphasise this distinction:
