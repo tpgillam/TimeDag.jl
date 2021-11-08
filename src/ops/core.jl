@@ -102,7 +102,7 @@ wrap(f::Function) = Wrapped{f}()
 """
     wrapb(f::Function)
 
-Like `wrap(f)`, however `f` will be broadcasted over all input values.
+`wrapb` is like [`wrap`](@ref), however `f` will be broadcasted over all input values.
 """
 wrapb(f::Function) = Wrapped{BCast(f)}()
 
