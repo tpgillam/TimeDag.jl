@@ -55,24 +55,24 @@ _mapvalues(f, block::Block) = Block([time => f(value) for (time, value) in block
 # Common functionality for testing binary operators that also perform alignment.
 # Disable formatting, so as to permit more consistent layout of timeseries.
 #! format: off
-b1 = Block([
+const b1 = Block([
     DateTime(2000, 1, 1) => 1,
     DateTime(2000, 1, 2) => 2,
     DateTime(2000, 1, 3) => 3,
     DateTime(2000, 1, 4) => 4,
 ])
 
-b2 = Block([
+const b2 = Block([
     DateTime(2000, 1, 2) => 5,
     DateTime(2000, 1, 3) => 6,
     DateTime(2000, 1, 5) => 8,
 ])
 
-b3 = Block([
+const b3 = Block([
     DateTime(2000, 1, 1) => 15,
 ])
 
-b4 = Block([
+const b4 = Block([
     DateTime(2000, 1, 1) => 1,
     DateTime(2000, 1, 2) => 2,
     DateTime(2000, 1, 3) => 3,
@@ -82,19 +82,18 @@ b4 = Block([
     DateTime(2000, 1, 7) => 7,
 ])
 
-b_boolean = Block([
+const b_boolean = Block([
     DateTime(2000, 1, 1) => true,
     DateTime(2000, 1, 2) => false,
     DateTime(2000, 1, 3) => true,
     DateTime(2000, 1, 4) => true,
 ])
 
-
-n1 = block_node(b1)
-n2 = block_node(b2)
-n3 = block_node(b3)
-n4 = block_node(b4)
-n_boolean = TimeDag.block_node(b_boolean)
+const n1 = block_node(b1)
+const n2 = block_node(b2)
+const n3 = block_node(b3)
+const n4 = block_node(b4)
+const n_boolean = TimeDag.block_node(b_boolean)
 
 const _T_START = DateTime(2000, 1, 1)
 const _T_END = DateTime(2001, 1, 1)
