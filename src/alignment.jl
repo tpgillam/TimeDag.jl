@@ -4,13 +4,25 @@ struct LeftAlignment <: Alignment end
 struct UnionAlignment <: Alignment end
 struct IntersectAlignment <: Alignment end
 
-"""For a pair (A, B), tick whenever A ticks so long as both nodes are active."""
+"""
+    LEFT
+
+For inputs `(A, B, ...)`, tick whenever `A` ticks so long as all inputs are active.
+"""
 const LEFT = LeftAlignment()
 
-"""For a pair (A, B), tick whenever A or B ticks so long as both nodes are active."""
+"""
+    UNION
+
+For inputs `(A, B, ...)`, tick whenever any input ticks so long as all inputs are active.
+"""
 const UNION = UnionAlignment()
 
-"""For a pair (A, B), tick whenever A and B tick simultaneously."""
+"""
+    INTERSECT
+
+For inputs `(A, B, ...)`, tick whenever all inputs tick simultaneously.
+"""
 const INTERSECT = IntersectAlignment()
 
 """The default alignment for operators when not specified."""
@@ -19,7 +31,7 @@ const DEFAULT_ALIGNMENT = UNION
 abstract type UnaryNodeOp{T} <: NodeOp{T} end
 abstract type BinaryAlignedNodeOp{T,A<:Alignment} <: NodeOp{T} end
 
-# A note on the design choice here, which is motivated for performance reasons.
+# A note on the design choice here, which is motivated by performance reasons & profiling.
 #
 # Options considered:
 #   1. Return `(value::T, should_tick::Bool)` pair always

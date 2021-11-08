@@ -190,10 +190,9 @@ However, this time each value is a function of all preceding knots:
 When considering a function of two or more time-series, a useful special-case is where the output ticks at some subset of the times that all the inputs tick.
 We consider _alignment_, which is a selection process with semantics similar (but not identical) to "joins" in database terminology.
 
-#### Binary alignment
-First consider the base of exactly two inputs, for example the binary [`Base.:+`](@ref).
 We define three ways of performing alignment.
 For each one we document the `TimeDag` constant which should be used in function calls that accept an alignment, and give a graphical interpretation.
+Each diagram is shown for the case of two inputs; the docstrings describe the general case with more inputs.
 
 Functions in `TimeDag` that accept multiple nodes typically default to using [`UNION`](@ref) alignment.
 
@@ -221,17 +220,6 @@ LEFT
 ```
 ![Left alignment](assets/left_align.png)
 
-
-#### N-ary alignment
-
-!!! warning 
-    Currently `TimeDag` does not support n-ary functions. 
-    These represent the intended semantics for when it does.
-
-For functions accepting more than two arguments, we extend the alignment logic above in the hopefully obvious way:
-* **UNION**: Tick whenever any input ticks, so long as all inputs are active.
-* **INTERSECT**: Tick whenever all inputs tick.
-* **LEFT**: Tick whenever the first input ticks, so long as all inputs are active.
 
 ## Why a computational graph?
 
