@@ -207,6 +207,7 @@ UNION
 ##### Intersect
 Tick if and only if both inputs tick.
 This is identical to an "inner join".
+
 ```@docs
 INTERSECT
 ```
@@ -221,6 +222,18 @@ LEFT
 ![Left alignment](assets/left_align.png)
 
 
-## Why a computational graph?
+## Computational graph
 
+### Nodes
+So far we have introduced the notion of time-series operations.
+By working purely with [`TimeDag.NodeOp`](@ref)s, we build up an abstract representation of the computation we want to do.
+A [`TimeDag.Node`](@ref) contains both some inputs, as well as a [`TimeDag.NodeOp`](@ref) defining how they should be combined.
 
+### Evaluation
+When we wish to evaluate a node over some interval ``\delta``, we first evaluate all input nodes over the same interval, recursively.
+Given all inputs, we can evaluate a particular node using ``f_b``, as defined previously.
+The practicalities of this are discussed further in [Advanced evaluation](@ref).
+
+### Subgraph elimination
+By using an [Identity map](@ref) we ensure that we never create duplicate nodes.
+This effectively eliminates the creation of common subgraphs, which means that when performing evaluation we never repeat work.
