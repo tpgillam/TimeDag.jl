@@ -49,6 +49,11 @@ TimeDag.evaluate_until!
 TimeDag.run_node!
 ```
 
+```@docs
+TimeDag.EmptyNodeEvaluationState
+TimeDag.EMPTY_NODE_STATE
+```
+
 ## Other
 
 ```@docs

@@ -125,7 +125,7 @@ end
 # An unary node has no alignment state, so any state comes purely from the operator.
 function create_evaluation_state(parents::Tuple{Node}, op::UnaryNodeOp)
     return if stateless_operator(op)
-        _EMPTY_NODE_STATE
+        EMPTY_NODE_STATE
     else
         create_operator_evaluation_state(parents, op)
     end
@@ -220,7 +220,7 @@ mutable struct UnionWithoutOpState{L,R} <: UnionAlignmentState{L,R}
     end
 end
 
-operator_state(::UnionWithoutOpState) = _EMPTY_NODE_STATE
+operator_state(::UnionWithoutOpState) = EMPTY_NODE_STATE
 operator_state(state::UnionWithOpState) = state.operator_state
 
 function _set_l!(state::UnionAlignmentState{L}, x::L) where {L}
@@ -387,7 +387,7 @@ function create_evaluation_state(
     # Intersect alignment doesn't require remembering any previous state, so just return
     # the operator state.
     return if stateless_operator(op)
-        _EMPTY_NODE_STATE
+        EMPTY_NODE_STATE
     else
         create_operator_evaluation_state(parents, op)
     end
@@ -482,7 +482,7 @@ mutable struct LeftWithoutOpState{R} <: LeftAlignmentState{R}
     LeftWithoutOpState{R}() where {R} = new{R}(false)
 end
 
-operator_state(::LeftWithoutOpState) = _EMPTY_NODE_STATE
+operator_state(::LeftWithoutOpState) = EMPTY_NODE_STATE
 operator_state(state::LeftWithOpState) = state.operator_state
 
 function _set_r!(state::LeftAlignmentState{R}, x::R) where {R}

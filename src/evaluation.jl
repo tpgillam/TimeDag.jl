@@ -41,7 +41,7 @@ end
 Wrapper that avoids the need to define `create_evaluation_state` for stateless nodes.
 """
 function _create_evaluation_state(node)
-    return stateless(node) ? _EMPTY_NODE_STATE : create_evaluation_state(node)
+    return stateless(node) ? EMPTY_NODE_STATE : create_evaluation_state(node)
 end
 
 """

@@ -56,14 +56,19 @@ abstract type NodeEvaluationState end
 """
     EmptyNodeEvaluationState()
 
-An evaluation state which has no contents, to be used by nodes which are not stateful.
+A [`NodeEvaluationState`](@ref) which has no content, to be used by non-stateful nodes.
 
-In practice, the common instance [`_EMPTY_NODE_STATE](@ref) can be used.
+In practice, the common instance [`TimeDag.EMPTY_NODE_STATE`](@ref) can be used.
 """
 struct EmptyNodeEvaluationState <: NodeEvaluationState end
 
 # Can have a singleton instance, since it is just a placeholder.
-_EMPTY_NODE_STATE = EmptyNodeEvaluationState()
+"""
+    const EMPTY_NODE_STATE
+
+A singleton instance of [`TimeDag.EmptyNodeEvaluationState`](@ref).
+"""
+const EMPTY_NODE_STATE = EmptyNodeEvaluationState()
 
 """
     parents(node::Node) -> NTuple{N, Node} where {N}
@@ -92,15 +97,22 @@ create_evaluation_state(node::Node) = create_evaluation_state(node.parents, node
         input_blocks::Block...
     ) -> Block{T}
 
-Evaluate the given node from `time_start` to `time_end`, with the initial `state`.
+Evaluate the given node from `time_start` until `time_end`, with the initial `state`.
 Zero or more blocks will be passed as an input; these correspond to the parents of a node,
 and are passed in the same order as that returned by `parents(node)`.
 
 We return a new `Block` of output knots from this node.
 
 !!! warning
-    The implementer of `run_node!` must ensure that no future peeking occurs.
-    That is, that no output knot is dependent on input knots that occur subsequently.
+    The implementer of `run_node!` must ensure:
+    * **No future peeking** occurs: i.e. that no output knot is dependent on input knots
+        that occur subsequently.
+    * **Correct time range**: all output timestamps must be in the interval
+        `[time_start, time_end)`.
+    * **Consistency**: Calling `run_node!` over a single interval should give the same
+        result as calling it multiple times over a decomposition of that same interval.
+    * **Determinism**: `run_node!` should *always* be fully deterministi. If a pseudo-random
+        number generator is required, it should be held on the evaluation state.
 """
 function run_node! end
 
@@ -109,7 +121,7 @@ function run_node! end
     stateless(op) -> Bool
 
 Returns true iff `op` can be assumed to be stateless; that is, if the node evaluation state
-is _EMPTY_NODE_STATE.
+is EMPTY_NODE_STATE.
 """
 stateless(node::Node) = stateless(node.op)
 stateless(::NodeOp) = false
