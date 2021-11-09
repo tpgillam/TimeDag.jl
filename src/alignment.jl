@@ -144,8 +144,8 @@ function create_evaluation_state(parents::Tuple{Node}, op::UnaryNodeOp)
 end
 
 function run_node!(
-    state::NodeEvaluationState,
     node_op::UnaryNodeOp{T},
+    state::NodeEvaluationState,
     ::DateTime,  # time_start
     ::DateTime,  # time_end
     input::Block{L},
@@ -291,8 +291,8 @@ end
 end
 
 function run_node!(
-    state::UnionAlignmentState{L,R},
     node_op::BinaryAlignedNodeOp{T,UnionAlignment},
+    state::UnionAlignmentState{L,R},
     ::DateTime,  # time_start
     ::DateTime,  # time_end
     input_l::Block{L},
@@ -406,8 +406,8 @@ function create_evaluation_state(
 end
 
 function run_node!(
-    operator_state::NodeEvaluationState,
     node_op::BinaryAlignedNodeOp{T,IntersectAlignment},
+    operator_state::NodeEvaluationState,
     ::DateTime,  # time_start
     ::DateTime,  # time_end
     input_l::Block{L},
@@ -516,8 +516,8 @@ function create_evaluation_state(
 end
 
 function run_node!(
-    state::LeftAlignmentState,
     node_op::BinaryAlignedNodeOp{T,LeftAlignment},
+    state::LeftAlignmentState,
     ::DateTime,  # time_start
     ::DateTime,  # time_end
     input_l::Block{L},

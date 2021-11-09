@@ -33,8 +33,8 @@ struct MySource <: TimeDag.NodeOp{Int64} end
 TimeDag.stateless(::MySource) = true
 
 TimeDag.run_node!(
-    ::TimeDag.EmptyNodeEvaluationState, 
     ::MySource, 
+    ::TimeDag.EmptyNodeEvaluationState, 
     time_start::DateTime, 
     time_end::DateTime,
 )

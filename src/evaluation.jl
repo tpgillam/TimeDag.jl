@@ -105,7 +105,7 @@ function evaluate_until!(state::EvaluationState, time_end::DateTime)::Evaluation
 
         # Run the node.
         block = run_node!(
-            node_state, node.op, state.current_time, time_end, input_blocks...
+            node.op, node_state, state.current_time, time_end, input_blocks...
         )
         for child in state.ordered_node_to_children[node]
             # Place the block in the location(s) that this child expects to find it.

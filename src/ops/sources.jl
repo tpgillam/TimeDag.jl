@@ -13,7 +13,7 @@ Base.:(==)(x::BlockNode{T}, y::BlockNode{T}) where {T} = x.block == y.block
 stateless(::BlockNode) = true
 
 function run_node!(
-    ::EmptyNodeEvaluationState, op::BlockNode{T}, time_start::DateTime, time_end::DateTime
+    op::BlockNode{T}, ::EmptyNodeEvaluationState, time_start::DateTime, time_end::DateTime
 ) where {T}
     return _slice(op.block, time_start, time_end)
 end
@@ -43,7 +43,7 @@ end
 stateless(::Iterdates) = true
 
 function run_node!(
-    ::EmptyNodeEvaluationState, op::Iterdates, time_start::DateTime, time_end::DateTime
+    op::Iterdates, ::EmptyNodeEvaluationState, time_start::DateTime, time_end::DateTime
 )
     # Figure out the first time at the appropriate time of day.
     t1 = Date(time_start) + op.time_of_day
@@ -122,7 +122,7 @@ end
 stateless(::TeaFileNode) = true
 
 function run_node!(
-    ::EmptyNodeEvaluationState, op::TeaFileNode{T}, time_start::DateTime, time_end::DateTime
+    op::TeaFileNode{T}, ::EmptyNodeEvaluationState, time_start::DateTime, time_end::DateTime
 ) where {T}
     rows = TeaFiles.read(op.path; lower=time_start, upper=time_end)
     times = Vector{DateTime}(undef, length(rows))

@@ -86,12 +86,10 @@ specified time.
 """
 create_evaluation_state(node::Node) = create_evaluation_state(node.parents, node.op)
 
-# FIXME reverse the order of state & op arguments? Would be clearer, even though the state is
-#   mutated. It would also be consistent with operator!
 """
     run_node!(
-        state::NodeEvaluationState,
         op::NodeOp{T},
+        state::NodeEvaluationState,
         time_start::DateTime,
         time_end::DateTime,
         input_blocks::Block...
