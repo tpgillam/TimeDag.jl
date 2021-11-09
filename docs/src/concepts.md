@@ -224,7 +224,8 @@ LEFT
 
 ## Computational graph
 
-### Nodes
+### Nodes
+
 So far we have introduced the notion of time-series operations.
 By working purely with [`TimeDag.NodeOp`](@ref)s, we build up an abstract representation of the computation we want to do.
 A [`TimeDag.Node`](@ref) contains both some inputs, as well as a [`TimeDag.NodeOp`](@ref) defining how they should be combined.
