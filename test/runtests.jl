@@ -32,6 +32,7 @@ using TimeDag: duplicate, evaluate_until!, start_at
         @testset "core" begin include("ops/core.jl") end
         @testset "history" begin include("ops/history.jl") end
         @testset "lagging" begin include("ops/lagging.jl") end
+        @testset "random" begin include("ops/random.jl") end
         @testset "simple" begin include("ops/simple.jl") end
         @testset "sources" begin include("ops/sources.jl") end
         @testset "window" begin include("ops/window.jl") end

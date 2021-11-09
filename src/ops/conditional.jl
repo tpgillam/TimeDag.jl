@@ -11,6 +11,17 @@ function operator!(::ZapMissing{T}, x::Union{Missing,T}) where {T}
     end
 end
 
+"""
+    zap_missing(x::Node)
+
+Obtain a node which ticks with the values of `x`, so long as that value is not `missing`.
+
+The [`value_type`](@ref) of the node that is returned will always be the `nonmissingtype` of
+the `value_type` of `x`.
+
+In the case that `x` cannot tick with `missing` (based on its `value_type`), we just return
+`x`.
+"""
 function zap_missing(x::Node)
     if !(Missing <: value_type(x))
         # There are provably no missing values in the input, so return the same node.

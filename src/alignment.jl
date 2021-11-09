@@ -107,11 +107,11 @@ function create_operator_evaluation_state end
 """Convenience method to dispatch to reduced-argument `operator!` calls."""
 function _operator!(op::NodeOp, state::NodeEvaluationState, time::DateTime, values...)
     return if stateless_operator(op) && time_agnostic(op)
-        operator!(op, values...)
+        value_agnostic(op) ? operator!(op) : operator!(op, values...)
     elseif stateless_operator(op) && !time_agnostic(op)
-        operator!(op, time, values...)
+        value_agnostic(op) ? operator!(op, time) : operator!(op, time, values...)
     elseif !stateless_operator(op) && time_agnostic(op)
-        operator!(op, state, values...)
+        value_agnostic(op) ? operator!(op, state) : operator!(op, state, values...)
     else
         error("Error! We should have dispatched to a more specialised method.")
     end

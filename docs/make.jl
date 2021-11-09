@@ -24,6 +24,7 @@ makedocs(;
                 "reference/align.md",
                 "reference/arithmetic.md",
                 "reference/online_windowed.md",
+                "reference/misc_ops.md",
                 "reference/sources.md",
             ],
             "reference/creating_ops.md",

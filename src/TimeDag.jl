@@ -7,6 +7,7 @@ using DataStructures
 using Dates
 using LightGraphs
 using PrettyTables
+using Random
 using RecipesBase
 using StaticArrays
 using Statistics
@@ -47,6 +48,7 @@ include("ops/align.jl")
 include("ops/conditional.jl")
 include("ops/history.jl")
 include("ops/lagging.jl")
+include("ops/random.jl")
 include("ops/simple.jl")
 include("ops/sources.jl")
 include("ops/window.jl")

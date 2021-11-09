@@ -86,8 +86,8 @@ specified time.
 """
 create_evaluation_state(node::Node) = create_evaluation_state(node.parents, node.op)
 
-# TODO reverse the order of state & op arguments? Would be clearer, even though the state is
-#   mutated.
+# FIXME reverse the order of state & op arguments? Would be clearer, even though the state is
+#   mutated. It would also be consistent with operator!
 """
     run_node!(
         state::NodeEvaluationState,
@@ -130,10 +130,19 @@ stateless(::NodeOp) = false
     time_agnostic(node) -> Bool
     time_agnostic(op) -> Bool
 
-Returns true iff `op` does not care about the time of the input knot(s), but just the value.
+Returns true iff `op` does not care about the time of the input knot(s).
 """
 time_agnostic(node::Node) = time_agnostic(node.op)
 time_agnostic(::NodeOp) = false
+
+"""
+    value_agnostic(node) -> Bool
+    value_agnostic(op) -> Bool
+
+Returns true iff `op` does not care about the value(s) of the input knot(s).
+"""
+value_agnostic(node::Node) = value_agnostic(node.op)
+value_agnostic(::NodeOp) = false
 
 """
     duplicate(x)
