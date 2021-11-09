@@ -1,6 +1,6 @@
 struct ZapMissing{T} <: UnaryNodeOp{T} end
 
-stateless(::ZapMissing) = true
+stateless_operator(::ZapMissing) = true
 time_agnostic(::ZapMissing) = true
 
 function operator!(::ZapMissing{T}, x::Union{Missing,T}) where {T}

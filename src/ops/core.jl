@@ -6,7 +6,7 @@ Represents a stateless, time-independent unary operator that will always emit a 
 struct SimpleUnary{f,T} <: UnaryNodeOp{T} end
 
 always_ticks(::SimpleUnary) = true
-stateless(::SimpleUnary) = true
+stateless_operator(::SimpleUnary) = true
 time_agnostic(::SimpleUnary) = true
 operator!(::SimpleUnary{f}, x) where {f} = f(x)
 
