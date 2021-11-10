@@ -37,6 +37,13 @@
         @test n != rand(rng, x, (3,))
         @test n != rand(rng, x, (2, 3))
 
+        @test rand(rng, x, (2,)) === rand(rng, x, 2)
+        @test rand(rng, x, Float64, (2,)) === rand(rng, x, 2)
+        @test rand(rng, x, (2,)) === rand(rng, x, Float64, 2)
+        @test rand(rng, x, (2, 3)) === rand(rng, x, 2, 3)
+        @test rand(rng, x, Float64, (2, 3)) === rand(rng, x, 2, 3)
+        @test rand(rng, x, (2, 3)) === rand(rng, x, Float64, 2, 3)
+
         @test value_type(n) == Vector{Float64}
         block = _eval(n)
         @test block.times == expected_times
