@@ -45,6 +45,18 @@ This section goes into more detail about how evaluation works, and in particular
 TimeDag.EvaluationState
 TimeDag.NodeEvaluationState
 TimeDag.start_at
-TimeDag.get_up_to!
+TimeDag.evaluate_until!
 TimeDag.run_node!
+```
+
+```@docs
+TimeDag.EmptyNodeEvaluationState
+TimeDag.EMPTY_NODE_STATE
+```
+
+## Other
+
+```@docs
+TimeDag.output_type
+TimeDag.duplicate
 ```

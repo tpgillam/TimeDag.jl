@@ -33,8 +33,8 @@ _ensure_node(node::Node) = node
 _ensure_node(value::Any) = obtain_node((), Constant(value))
 
 function run_node!(
-    state::ConstantState,
     op::Constant{T},
+    state::ConstantState,
     time_start::DateTime,
     ::DateTime,  # time_end
 ) where {T}

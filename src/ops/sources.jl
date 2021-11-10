@@ -13,7 +13,7 @@ Base.:(==)(x::BlockNode{T}, y::BlockNode{T}) where {T} = x.block == y.block
 stateless(::BlockNode) = true
 
 function run_node!(
-    ::EmptyNodeEvaluationState, op::BlockNode{T}, time_start::DateTime, time_end::DateTime
+    op::BlockNode{T}, ::EmptyNodeEvaluationState, time_start::DateTime, time_end::DateTime
 ) where {T}
     return _slice(op.block, time_start, time_end)
 end
@@ -32,6 +32,42 @@ block_node(block::Block) = obtain_node((), BlockNode(block))
 Construct a node with value type `T` which, if evaluated, will never tick.
 """
 empty_node(T) = block_node(Block{T}())
+
+"""
+A node op which ticks once a day at the specified time.
+"""
+struct Iterdates <: NodeOp{DateTime}
+    time_of_day::Time
+end
+
+stateless(::Iterdates) = true
+
+function run_node!(
+    op::Iterdates, ::EmptyNodeEvaluationState, time_start::DateTime, time_end::DateTime
+)
+    # Figure out the first time at the appropriate time of day.
+    t1 = Date(time_start) + op.time_of_day
+    t1 = t1 < time_start ? t1 + Day(1) : t1
+
+    # Figure out the last time to emit.
+    t2 = Date(time_end) + op.time_of_day
+    t2 = t2 >= time_end ? t2 - Day(1) : t2
+
+    times = t1:Day(1):t2
+    return Block(unchecked, times, times)
+end
+
+# TODO add the equivalent of an RDate step & offset, for valid steps. Not sure what the
+#   equivalent of these in Julia would be...
+# TODO deal with timezones. Semantics here would be that the `time_of_day` would apply in
+#   a particular timezone.
+"""
+    iterdates(time_of_day::Time=Time(0))
+
+Create a node which ticks exactly once a day at `time_of_day`, which defaults to midnight.
+In a given knot, each value will be of type `DateTime`, and equal the time of the knot.
+"""
+iterdates(time_of_day::Time=Time(0)) = obtain_node((), Iterdates(time_of_day))
 
 # TODO We may want to generalise or otherwise refactor to allow reading multiple value
 # fields.
@@ -86,7 +122,7 @@ end
 stateless(::TeaFileNode) = true
 
 function run_node!(
-    ::EmptyNodeEvaluationState, op::TeaFileNode{T}, time_start::DateTime, time_end::DateTime
+    op::TeaFileNode{T}, ::EmptyNodeEvaluationState, time_start::DateTime, time_end::DateTime
 ) where {T}
     rows = TeaFiles.read(op.path; lower=time_start, upper=time_end)
     times = Vector{DateTime}(undef, length(rows))

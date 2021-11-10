@@ -13,8 +13,8 @@ function create_evaluation_state(::Tuple{Node}, op::Lag{T}) where {T}
 end
 
 function run_node!(
-    state::LagState{T},
     op::Lag{T},
+    state::LagState{T},
     ::DateTime,  # time_start
     ::DateTime,  # time_end
     input::Block{T},

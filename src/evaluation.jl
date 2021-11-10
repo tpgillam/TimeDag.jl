@@ -41,7 +41,7 @@ end
 Wrapper that avoids the need to define `create_evaluation_state` for stateless nodes.
 """
 function _create_evaluation_state(node)
-    return stateless(node) ? _EMPTY_NODE_STATE : create_evaluation_state(node)
+    return stateless(node) ? EMPTY_NODE_STATE : create_evaluation_state(node)
 end
 
 """
@@ -75,11 +75,11 @@ function start_at(nodes, time_start::DateTime)::EvaluationState
 end
 
 """
-    get_up_to!(state::EvaluationState, time_end::DateTime)
+    evaluate_until!(state::EvaluationState, time_end::DateTime)
 
 Update the evaluation state by performing the evalution for each node.
 """
-function get_up_to!(state::EvaluationState, time_end::DateTime)::EvaluationState
+function evaluate_until!(state::EvaluationState, time_end::DateTime)::EvaluationState
     # TODO Could we use dagger here to solve this & parallelism for us? I think the problem
     #   with this could be mutation - needs thought.
     #
@@ -105,7 +105,7 @@ function get_up_to!(state::EvaluationState, time_end::DateTime)::EvaluationState
 
         # Run the node.
         block = run_node!(
-            node_state, node.op, state.current_time, time_end, input_blocks...
+            node.op, node_state, state.current_time, time_end, input_blocks...
         )
         for child in state.ordered_node_to_children[node]
             # Place the block in the location(s) that this child expects to find it.
@@ -147,12 +147,12 @@ function evaluate(
     state = start_at(nodes, time_start)
     if isnothing(batch_interval)
         # Evaluate in one go.
-        get_up_to!(state, time_end)
+        evaluate_until!(state, time_end)
     else
         t = time_start
         while true
             t = min(time_end, t + batch_interval)
-            get_up_to!(state, t)
+            evaluate_until!(state, t)
             # Break when we have evaluated up to the end of the interval.
             t < time_end || break
         end

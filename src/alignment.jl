@@ -4,13 +4,25 @@ struct LeftAlignment <: Alignment end
 struct UnionAlignment <: Alignment end
 struct IntersectAlignment <: Alignment end
 
-"""For a pair (A, B), tick whenever A ticks so long as both nodes are active."""
+"""
+    LEFT
+
+For inputs `(A, B, ...)`, tick whenever `A` ticks so long as all inputs are active.
+"""
 const LEFT = LeftAlignment()
 
-"""For a pair (A, B), tick whenever A or B ticks so long as both nodes are active."""
+"""
+    UNION
+
+For inputs `(A, B, ...)`, tick whenever any input ticks so long as all inputs are active.
+"""
 const UNION = UnionAlignment()
 
-"""For a pair (A, B), tick whenever A and B tick simultaneously."""
+"""
+    INTERSECT
+
+For inputs `(A, B, ...)`, tick whenever all inputs tick simultaneously.
+"""
 const INTERSECT = IntersectAlignment()
 
 """The default alignment for operators when not specified."""
@@ -19,7 +31,7 @@ const DEFAULT_ALIGNMENT = UNION
 abstract type UnaryNodeOp{T} <: NodeOp{T} end
 abstract type BinaryAlignedNodeOp{T,A<:Alignment} <: NodeOp{T} end
 
-# A note on the design choice here, which is motivated for performance reasons.
+# A note on the design choice here, which is motivated by performance reasons & profiling.
 #
 # Options considered:
 #   1. Return `(value::T, should_tick::Bool)` pair always
@@ -95,11 +107,11 @@ function create_operator_evaluation_state end
 """Convenience method to dispatch to reduced-argument `operator!` calls."""
 function _operator!(op::NodeOp, state::NodeEvaluationState, time::DateTime, values...)
     return if stateless_operator(op) && time_agnostic(op)
-        operator!(op, values...)
+        value_agnostic(op) ? operator!(op) : operator!(op, values...)
     elseif stateless_operator(op) && !time_agnostic(op)
-        operator!(op, time, values...)
+        value_agnostic(op) ? operator!(op, time) : operator!(op, time, values...)
     elseif !stateless_operator(op) && time_agnostic(op)
-        operator!(op, state, values...)
+        value_agnostic(op) ? operator!(op, state) : operator!(op, state, values...)
     else
         error("Error! We should have dispatched to a more specialised method.")
     end
@@ -125,15 +137,15 @@ end
 # An unary node has no alignment state, so any state comes purely from the operator.
 function create_evaluation_state(parents::Tuple{Node}, op::UnaryNodeOp)
     return if stateless_operator(op)
-        _EMPTY_NODE_STATE
+        EMPTY_NODE_STATE
     else
         create_operator_evaluation_state(parents, op)
     end
 end
 
 function run_node!(
-    state::NodeEvaluationState,
     node_op::UnaryNodeOp{T},
+    state::NodeEvaluationState,
     ::DateTime,  # time_start
     ::DateTime,  # time_end
     input::Block{L},
@@ -220,7 +232,7 @@ mutable struct UnionWithoutOpState{L,R} <: UnionAlignmentState{L,R}
     end
 end
 
-operator_state(::UnionWithoutOpState) = _EMPTY_NODE_STATE
+operator_state(::UnionWithoutOpState) = EMPTY_NODE_STATE
 operator_state(state::UnionWithOpState) = state.operator_state
 
 function _set_l!(state::UnionAlignmentState{L}, x::L) where {L}
@@ -279,8 +291,8 @@ end
 end
 
 function run_node!(
-    state::UnionAlignmentState{L,R},
     node_op::BinaryAlignedNodeOp{T,UnionAlignment},
+    state::UnionAlignmentState{L,R},
     ::DateTime,  # time_start
     ::DateTime,  # time_end
     input_l::Block{L},
@@ -387,15 +399,15 @@ function create_evaluation_state(
     # Intersect alignment doesn't require remembering any previous state, so just return
     # the operator state.
     return if stateless_operator(op)
-        _EMPTY_NODE_STATE
+        EMPTY_NODE_STATE
     else
         create_operator_evaluation_state(parents, op)
     end
 end
 
 function run_node!(
-    operator_state::NodeEvaluationState,
     node_op::BinaryAlignedNodeOp{T,IntersectAlignment},
+    operator_state::NodeEvaluationState,
     ::DateTime,  # time_start
     ::DateTime,  # time_end
     input_l::Block{L},
@@ -482,7 +494,7 @@ mutable struct LeftWithoutOpState{R} <: LeftAlignmentState{R}
     LeftWithoutOpState{R}() where {R} = new{R}(false)
 end
 
-operator_state(::LeftWithoutOpState) = _EMPTY_NODE_STATE
+operator_state(::LeftWithoutOpState) = EMPTY_NODE_STATE
 operator_state(state::LeftWithOpState) = state.operator_state
 
 function _set_r!(state::LeftAlignmentState{R}, x::R) where {R}
@@ -504,8 +516,8 @@ function create_evaluation_state(
 end
 
 function run_node!(
-    state::LeftAlignmentState,
     node_op::BinaryAlignedNodeOp{T,LeftAlignment},
+    state::LeftAlignmentState,
     ::DateTime,  # time_start
     ::DateTime,  # time_end
     input_l::Block{L},

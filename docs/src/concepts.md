@@ -36,6 +36,10 @@ We define the [`TimeDag.value_type`](@ref) of ``x`` to be the set ``\mathcal{X}`
 `TimeDag` primarily represents a time-series as a [`TimeDag.Node`](@ref). 
 It also stores time-series data in memory in the [`Block`](@ref) type.
 
+Here is a visualisation of a time-series ``x``:
+
+![A time series](assets/time_series.png)
+
 ### Functional interpretation
 We can also consider ``x`` to be a function, ``x : \mathcal{T}_x \rightarrow \mathcal{X}``.
 This is defined ``x(t) = \max_i\ x_i\ \textrm{s.t.}\ t_i \leq t``.
@@ -114,8 +118,9 @@ z[\delta_i], \zeta_{\sup \delta_i} = f_b(\delta_i, \zeta_{\sup \delta_{i-1}}, x[
 ```
 This function outputs knots — time-value pairs — rather than just the values, and hence performs the roles of both ``f_t`` and ``f_v`` previously.
 
-**NB** The state ``\zeta`` is only subscripted by the _upper bound_ of a given interval; i.e. by a time.
-This is because the state should not be path-dependent.
+**NB** ``\sup\delta_i`` indicates the supremum of the interval ``\delta_i``, i.e. the upper bound.
+The state ``\zeta`` is only subscripted by this upper bound; i.e. by a time, because it should not be path dependent.
+i.e. for a given time-series operation, we should always end up with the same state at a particular time, regardless of how many batches we have used to get there.
 
 !!! info
     It is useful to emphasise this distinction:
@@ -160,17 +165,76 @@ See [Creating operations](@ref) for more details.
 ### Single input (lag)
 
 A [`lag`](@ref) is a slightly more complex unary function.
-TODO
+Rather than explain it mathematically, a visualisation can help:
+
+![lag](assets/lag.png)
+
+Time is increasing to the right.
+Each grey arrow indicates that one value is used in computing another — in the case of [`lag`](@ref), the value is simply used directly.
+Note how, for this function, we never introduce new timestamps — we simply 'lag' the previous value onto the next timestamp. 
+
+A related concept is a time-lag, where each knot would be delayed by some fixed period of time ``\partial t``:
+
+![Time lag](assets/tlag.png)
+
+### Single input (cumulative sum)
+
+Similarly to a simple function operation on values, a cumulative sum over time ([`Base.sum`](@ref)) ticks whenever the input ticks.
+However, this time each value is a function of all preceding knots:
+
+![sum](assets/sum.png)
+
 
 ### Alignment
 
-TODO
-Immediately, we note that ``\mathcal{T}_z \subset \mathcal{T}_x \cup \mathcal{T}_y``.
-That is, ``z(t)`` can only be defined 
+When considering a function of two or more time-series, a useful special-case is where the output ticks at some subset of the times that all the inputs tick.
+We consider _alignment_, which is a selection process with semantics similar (but not identical) to "joins" in database terminology.
+
+We define three ways of performing alignment.
+For each one we document the `TimeDag` constant which should be used in function calls that accept an alignment, and give a graphical interpretation.
+Each diagram is shown for the case of two inputs; the docstrings describe the general case with more inputs.
+
+Functions in `TimeDag` that accept multiple nodes typically default to using [`UNION`](@ref) alignment.
+
+##### Union
+Similar to an "outer join", with the key difference that we only emit knots once _both_ inputs have started ticking.
+
+```@docs
+UNION
+```
+![Union alignment](assets/union_align.png)
+
+##### Intersect
+Tick if and only if both inputs tick.
+This is identical to an "inner join".
+
+```@docs
+INTERSECT
+```
+![Intersect alignment](assets/intersect_align.png)
+
+##### Left
+Similar to a "left join", with the key difference that we only emit knots once _both_ inputs have started ticking.
+
+```@docs
+LEFT
+```
+![Left alignment](assets/left_align.png)
 
 
-## Why a computational graph?
+## Computational graph
 
+### Nodes
 
+So far we have introduced the notion of time-series operations.
+By working purely with [`TimeDag.NodeOp`](@ref)s, we build up an abstract representation of the computation we want to do.
+A [`TimeDag.Node`](@ref) contains both some inputs, as well as a [`TimeDag.NodeOp`](@ref) defining how they should be combined.
 
+### Evaluation
+When we wish to evaluate a node over some interval ``\delta``, we first evaluate all input nodes over the same interval, recursively.
+Given all inputs, we can evaluate a particular node using ``f_b``, as defined previously.
+The practicalities of this are discussed further in [Advanced evaluation](@ref).
 
+### Subgraph elimination
+By using an [Identity map](@ref) we ensure that we never create duplicate nodes.
+This effectively eliminates the creation of common subgraphs, which means that when performing evaluation we never repeat work.

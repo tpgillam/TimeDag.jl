@@ -7,6 +7,8 @@ using DataStructures
 using Dates
 using LightGraphs
 using PrettyTables
+using Random
+using RecipesBase
 using StaticArrays
 using Statistics
 using Tables
@@ -19,7 +21,7 @@ export INTERSECT, LEFT, UNION
 # Node creation.
 export wrap, wrapb
 # Source nodes.
-export block_node, constant, empty_node
+export block_node, constant, empty_node, iterdates, tea_file
 # Other nodes.
 export align, history, lag, right, left, zap_missing
 # Evaluation & other utilities.
@@ -36,6 +38,7 @@ include("output_type.jl")
 include("block.jl")
 include("graph.jl")
 include("evaluation.jl")
+include("plotting.jl")
 
 include("alignment.jl")
 
@@ -45,6 +48,7 @@ include("ops/align.jl")
 include("ops/conditional.jl")
 include("ops/history.jl")
 include("ops/lagging.jl")
+include("ops/random.jl")
 include("ops/simple.jl")
 include("ops/sources.jl")
 include("ops/window.jl")
