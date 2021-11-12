@@ -24,7 +24,8 @@ const _UNARY_STUFF = [
     end
 end
 
-const _BINARY_FUNCTIONS = [+, -, *, /, ^, min, max, >, <, >=, <=]
+# FIXME: really need extended tests (especially for dot) where we use vector inputs too.
+const _BINARY_FUNCTIONS = [+, -, *, /, ^, min, max, >, <, >=, <=, dot]
 
 @testset "binary" begin
     for f in _BINARY_FUNCTIONS

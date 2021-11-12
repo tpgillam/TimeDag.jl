@@ -25,3 +25,7 @@
 @simple_binary(Base.:<)
 @simple_binary(Base.:>=)
 @simple_binary(Base.:<=)
+
+# Linear algebra
+
+@simple_binary(LinearAlgebra.dot)

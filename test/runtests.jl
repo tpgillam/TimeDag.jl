@@ -2,6 +2,7 @@ using DataFrames
 using DataStructures
 using Dates
 using LightGraphs
+using LinearAlgebra
 using Random
 using StaticArrays
 using Statistics

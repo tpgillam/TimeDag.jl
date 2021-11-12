@@ -6,6 +6,7 @@ using Bijections
 using DataStructures
 using Dates
 using LightGraphs
+using LinearAlgebra
 using PrettyTables
 using Random
 using RecipesBase
