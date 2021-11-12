@@ -107,7 +107,7 @@ One cannot directly implement it — otherwise one has to call ``f_t`` for every
 
 First, let us introduce the notion of slicing.
 Define an interval ``\delta = [t_1,t_2) \subset \mathcal{T}``.[^3]
-Then, the slice of ``x`` over ``delta``, which we'll write as ``x' = x[\delta]``, is a new time-series with support ``\mathcal{T}_{x'} = \delta \cap \mathcal{T}_x``.
+Then, the slice of ``x`` over ``\delta``, which we'll write as ``x' = x[\delta]``, is a new time-series with support ``\mathcal{T}_{x'} = \delta \cap \mathcal{T}_x``.
 
 [^3]: One is free to choose the open/closed-ness of each bound, however the use of an closed-open interval helps in subsequent analysis.
 
