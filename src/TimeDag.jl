@@ -46,6 +46,7 @@ include("alignment.jl")
 include("ops/core.jl")  # This defines macros useful for definition of other nodes.
 
 include("ops/align.jl")
+include("ops/array.jl")
 include("ops/conditional.jl")
 include("ops/history.jl")
 include("ops/lagging.jl")

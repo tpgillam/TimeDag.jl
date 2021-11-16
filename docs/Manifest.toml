@@ -295,7 +295,7 @@ deps = ["InteractiveUtils", "Logging", "Random", "Serialization"]
 uuid = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [[TimeDag]]
-deps = ["AbstractTrees", "AssociativeWindowAggregation", "Bijections", "DataStructures", "Dates", "LightGraphs", "PrettyTables", "Random", "RecipesBase", "StaticArrays", "Statistics", "Tables", "TeaFiles"]
+deps = ["AbstractTrees", "AssociativeWindowAggregation", "Bijections", "DataStructures", "Dates", "LightGraphs", "LinearAlgebra", "PrettyTables", "Random", "RecipesBase", "StaticArrays", "Statistics", "Tables", "TeaFiles"]
 path = "/Users/gillam/.julia/dev/TimeDag"
 uuid = "91963e24-6e66-4132-aeb8-436d9f37dbc7"
 version = "0.1.0"
