@@ -1,5 +1,6 @@
 const _UNARY_STUFF = [
     (-, b1),
+    (abs, b1),
     (exp, b1),
     (log, b1),
     (log10, b1),

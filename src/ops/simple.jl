@@ -1,5 +1,6 @@
 # Arithmetic
 
+@simple_unary(Base.abs)
 @simple_unary(Base.exp)
 @simple_unary(Base.log)
 @simple_unary(Base.log10)
