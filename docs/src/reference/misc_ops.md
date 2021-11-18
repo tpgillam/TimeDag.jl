@@ -16,5 +16,6 @@ Base.rand
 ## Conditional
 
 ```@docs
+Base.filter
 zap_missing
 ```

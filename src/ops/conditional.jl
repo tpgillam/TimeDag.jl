@@ -1,18 +1,29 @@
+struct Filter{f,T} <: UnaryNodeOp{T} end
+
+stateless_operator(::Filter) = true
+time_agnostic(::Filter) = true
+operator!(::Filter{f,T}, x) where {f,T} = f(x) ? Maybe(x) : Maybe{T}()
+
+"""
+    filter(f::Function, x::Node) -> Node
+
+Obtain a node that removes knots for which `f(value)` is false.
+
+The [`value_type`](@ref) of the returned node is the same as that for the input `x`.
+"""
+Base.filter(f::Function, x::Node) = obtain_node((x,), Filter{f,value_type(x)}())
+
 struct ZapMissing{T} <: UnaryNodeOp{T} end
 
 stateless_operator(::ZapMissing) = true
 time_agnostic(::ZapMissing) = true
 
 function operator!(::ZapMissing{T}, x::Union{Missing,T}) where {T}
-    return if ismissing(x)
-        Maybe{T}()
-    else
-        Maybe(x)
-    end
+    return ismissing(x) ? Maybe{T}() : Maybe(x)
 end
 
 """
-    zap_missing(x::Node)
+    zap_missing(x::Node{T}) -> Node{nonmissingtype(T)}
 
 Obtain a node which ticks with the values of `x`, so long as that value is not `missing`.
 
