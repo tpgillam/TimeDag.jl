@@ -18,3 +18,52 @@ end
         DateTime(2000, 1, 7) => 4,
     ])
 end
+
+@testset "coalign" begin
+    @testset "unary" begin
+        @test coalign(n4) === n4
+        @test coalign(n4; alignment=INTERSECT) === n4
+        @test coalign(n4; alignment=LEFT) === n4
+        @test coalign(n4; alignment=UNION) === n4
+    end
+
+    @testset "binary" begin
+        for alignment in (INTERSECT, LEFT, UNION)
+            na, nb = coalign(n1, n2; alignment)
+            @test _eval(na) == _eval(left(n1, n2, alignment))
+            @test _eval(nb) == _eval(right(n1, n2, alignment))
+        end
+    end
+
+    @testset "ternary" begin
+        for alignment in (INTERSECT, LEFT, UNION)
+            na, nb, nc = coalign(n1, n2, n3; alignment)
+
+            l(x, y) = left(x, y, alignment)
+            r(x, y) = right(x, y, alignment)
+
+            @test _eval(na) == _eval(l(n1, l(n2, n3)))
+            @test _eval(nb) == _eval(r(n1, l(n2, n3)))
+            @test _eval(nc) == _eval(r(n1, r(n2, n3)))
+        end
+    end
+
+    @testset "ordering" begin
+        # We don't want to generate new different nodes if we coalign the same nodes in a
+        # different order, when alignment is order-independent.
+        nodes = [n1, n2, n3]
+        for alignment in (INTERSECT, UNION)
+            for indices in permutations([1, 2, 3])
+                new_nodes = coalign(nodes[indices]...; alignment)
+                @test new_nodes === coalign(nodes...; alignment)[indices]
+            end
+        end
+
+        # For the case of LEFT, the first node must stay in place, but we should be able to
+        # permute the order of the others and not change the answer.
+        for indices in permutations([1, 2, 3])
+            new_nodes = coalign(n4, nodes[indices]...; alignment=LEFT)
+            @test new_nodes === coalign(n4, nodes...; alignment=LEFT)[[1; 1 .+ indices]]
+        end
+    end
+end

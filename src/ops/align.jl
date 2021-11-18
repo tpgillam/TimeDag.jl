@@ -1,20 +1,8 @@
-struct Left{T,A} <: BinaryAlignedNodeOp{T,A} end
+_left(x, _) = x
+const Left{T,A} = SimpleBinary{_left,T,A}
 
-always_ticks(::Left) = true
-stateless_operator(::Left) = true
-time_agnostic(::Left) = true
-
-operator!(::Left, x, y) = x
-
-struct Right{T,A} <: BinaryAlignedNodeOp{T,A} end
-
-always_ticks(::Right) = true
-stateless_operator(::Right) = true
-time_agnostic(::Right) = true
-
-operator!(::Right, x, y) = y
-
-# API
+_right(_, y) = y
+const Right{T,A} = SimpleBinary{_right,T,A}
 
 # TODO We should add the concept of alignment_base, i.e. an ancestor that provably has the
 #   same alignment as a particular node. This can allow for extra pruning of the graph.
@@ -51,3 +39,45 @@ end
 Form a node that ticks with the values of `x` whenever `y` ticks.
 """
 align(x, y) = right(y, x, LEFT)
+
+"""
+    coalign(node_1, [node_2...; alignment::Alignment]) -> Node...
+
+Given at least one node(s) `x`, or values that are convertible to nodes, align all of them.
+
+We guarantee that all nodes that are returned will have the same alignment. The values of
+each node will correspond to the values of the input nodes.
+
+The choice of alignment is controlled by `alignment`, which defaults to [`UNION`](@ref).
+"""
+function coalign(x, x_rest...; alignment::Alignment=DEFAULT_ALIGNMENT)
+    x = map(_ensure_node, [x, x_rest...])
+
+    # Deal with simple case where we only have one input. There is no aligning to do.
+    length(x) == 1 && return only(x)
+
+    # Find a well-defined ordering of the inputs -- this is an optimisation designed to
+    # avoid creating equivalent nodes if `coalign` is called multiple times.
+    # As such we use objectid. Strictly this is a hash, and so there could be clashes. We
+    # accept this, since if such a clash were to occur it would result only in sub-optimal
+    # performance, and most likely in a very minor way.
+    index = if isa(alignment, LeftAlignment)
+        # For left alignment we must leave the first node in place.
+        [1; 1 .+ sortperm(@view(x[2:end]); by=objectid)]
+    else
+        sortperm(x; by=objectid)
+    end
+    x, x_rest... = x[index]
+
+    # Construct one node with the correct alignment. This will also have the correct values
+    # for the first node to return.
+    for node in x_rest
+        x = left(x, node, alignment)
+    end
+
+    # For all of the remaining nodes, align them.
+    new_nodes = (x, (align(node, x) for node in x_rest)...)
+
+    # Convert nodes back to original order.
+    return new_nodes[invperm(index)]
+end
