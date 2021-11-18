@@ -15,4 +15,5 @@ Statistics.mean
 Statistics.var
 Statistics.std
 Statistics.cov
+Statistics.cor
 ```

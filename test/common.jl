@@ -17,7 +17,7 @@ function test_equivalent(x::Block, y::Block)
     # Convert the blocks to a standard representation.
     x = Block(collect(x))
     y = Block(collect(y))
-    @test x == y
+    @test isequal(x, y)
 end
 
 """

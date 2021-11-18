@@ -124,13 +124,13 @@ function _test_binary_inception_op(
 )
     # TODO test other alignments
     # pre-align outputs so the reduction operation is simpler
-    # TODO write & use `coalign` (or maybe `align_all`?)
-    # na, nb = coalign(n1, n4)
-    na = n4
-    nb = TimeDag.align(n1, n4)
+    na, nb = coalign(n1, n4)
     block_a, block_b = _eval_fast([na, nb])
-    @test _eval(f_timedag(n1, n4)) ≈
-          _naive_inception_reduce(T, f_normal, block_a, block_b, min_window)
+    @test isapprox(
+        _eval(f_timedag(n1, n4)),
+        _naive_inception_reduce(T, f_normal, block_a, block_b, min_window);
+        nans=true,
+    )
 end
 
 function _test_window_op(
@@ -144,11 +144,17 @@ function _test_window_op(
         block_ee_false = _eval(f_timedag(n_in, window; emit_early=false))
         block_ee_true = _eval(f_timedag(n_in, window; emit_early=true))
 
-        @test block_default == block_ee_false
-        @test block_ee_false ≈
-              _naive_window_reduce(T, f_normal, block, window, false, min_window)
-        @test block_ee_true ≈
-              _naive_window_reduce(T, f_normal, block, window, true, min_window)
+        @test isequal(block_default, block_ee_false)
+        @test isapprox(
+            block_ee_false,
+            _naive_window_reduce(T, f_normal, block, window, false, min_window);
+            nans=true,
+        )
+        @test isapprox(
+            block_ee_true,
+            _naive_window_reduce(T, f_normal, block, window, true, min_window);
+            nans=true,
+        )
     end
     return nothing
 end
@@ -166,11 +172,17 @@ function _test_binary_window_op(
         block_ee_false = _eval(f_timedag(n1, n4, window; emit_early=false))
         block_ee_true = _eval(f_timedag(n1, n4, window; emit_early=true))
 
-        @test block == block_ee_false
-        @test block_ee_false ≈
-              _naive_window_reduce(T, f_normal, block_a, block_b, window, false, min_window)
-        @test block_ee_true ≈
-              _naive_window_reduce(T, f_normal, block_a, block_b, window, true, min_window)
+        @test isequal(block, block_ee_false)
+        @test isapprox(
+            block_ee_false,
+            _naive_window_reduce(T, f_normal, block_a, block_b, window, false, min_window);
+            nans=true,
+        )
+        @test isapprox(
+            block_ee_true,
+            _naive_window_reduce(T, f_normal, block_a, block_b, window, true, min_window);
+            nans=true,
+        )
     end
     return nothing
 end
@@ -320,5 +332,22 @@ end
         _test_window_op(T, cov; min_window=2, block)
         _test_window_op(T, partial(cov; corrected=false); min_window=2, block)
         _test_window_op(T, partial(cov; corrected=true); min_window=2, block)
+    end
+end
+
+@testset "cor" begin
+    @testset "inception" begin
+        @test_throws ArgumentError cor(constant(42.0), constant(24.0))
+        _test_binary_inception_op(Float64, cor; min_window=2)
+    end
+
+    @testset "window" begin
+        # Windows that are too small should trigger an exception when attempting to create
+        # the node.
+        @test_throws ArgumentError cor(n1, n4, 0)
+        @test_throws ArgumentError cor(n1, n4, 1)
+        @test_throws ArgumentError cor(constant(42.0), constant(24.0), 2)
+
+        _test_binary_window_op(Float64, cor; min_window=2)
     end
 end
