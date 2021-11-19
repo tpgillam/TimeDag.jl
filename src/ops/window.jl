@@ -40,7 +40,7 @@ function _extract end
 abstract type UnaryInceptionOp{T,Data} <: UnaryNodeOp{T} end
 
 """Binary operator accumulated from inception."""
-abstract type BinaryInceptionOp{T,Data,A} <: BinaryAlignedNodeOp{T,A} end
+abstract type BinaryInceptionOp{T,Data,A} <: BinaryNodeOp{T,A} end
 
 const InceptionOp{T,Data} = Union{UnaryInceptionOp{T,Data},BinaryInceptionOp{T,Data}}
 
@@ -90,7 +90,7 @@ Windowed associative binary operator, potentially emitting early before the wind
 """
 abstract type UnaryWindowOp{T,Data,EmitEarly} <: UnaryNodeOp{T} end
 
-abstract type BinaryWindowOp{T,Data,EmitEarly,A} <: BinaryAlignedNodeOp{T,A} end
+abstract type BinaryWindowOp{T,Data,EmitEarly,A} <: BinaryNodeOp{T,A} end
 
 const WindowOp{T,Data,EmitEarly} = Union{
     UnaryWindowOp{T,Data,EmitEarly},BinaryWindowOp{T,Data,EmitEarly}

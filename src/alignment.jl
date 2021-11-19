@@ -29,7 +29,7 @@ const INTERSECT = IntersectAlignment()
 const DEFAULT_ALIGNMENT = UNION
 
 abstract type UnaryNodeOp{T} <: NodeOp{T} end
-abstract type BinaryAlignedNodeOp{T,A<:Alignment} <: NodeOp{T} end
+abstract type BinaryNodeOp{T,A<:Alignment} <: NodeOp{T} end
 
 # A note on the design choice here, which is motivated by performance reasons & profiling.
 #
@@ -48,7 +48,7 @@ abstract type BinaryAlignedNodeOp{T,A<:Alignment} <: NodeOp{T} end
 # just return a raw `T`, as the extra information will not be used.
 """
     operator!(op::UnaryNodeOp{T}, (state,), (time,) x) -> T / Maybe{T}
-    operator!(op::BinaryAlignedNodeOp{T}, (state,), (time,) x, y) -> T / Maybe{T}
+    operator!(op::BinaryNodeOp{T}, (state,), (time,) x, y) -> T / Maybe{T}
 
 Perform the operation for this node.
 
@@ -120,17 +120,15 @@ end
 function _can_propagate_constant(op::UnaryNodeOp)
     return always_ticks(op) && stateless_operator(op) && time_agnostic(op)
 end
-function _propagate_constant_value(op::UnaryNodeOp{T}, parents::Tuple{Node}) where {T}
+function _propagate_constant_value(op::UnaryNodeOp, parents::Tuple{Node})
     # NB, we know that time & state is ignored (due to _can_propagate_constant).
     return operator!(op, value(@inbounds(parents[1])))
 end
 
-function _can_propagate_constant(op::BinaryAlignedNodeOp)
+function _can_propagate_constant(op::BinaryNodeOp)
     return always_ticks(op) && stateless_operator(op) && time_agnostic(op)
 end
-function _propagate_constant_value(
-    op::BinaryAlignedNodeOp{T}, parents::Tuple{Node,Node}
-) where {T}
+function _propagate_constant_value(op::BinaryNodeOp, parents::Tuple{Node,Node})
     return operator!(op, value(@inbounds(parents[1])), value(@inbounds(parents[2])))
 end
 
@@ -180,10 +178,7 @@ end
 
 """Apply, assuming `input_l` and `input_r` have identical alignment."""
 function _apply_fast_align_binary!(
-    op::BinaryAlignedNodeOp{T},
-    operator_state::NodeEvaluationState,
-    input_l::Block,
-    input_r::Block,
+    op::BinaryNodeOp{T}, operator_state::NodeEvaluationState, input_l::Block, input_r::Block
 ) where {T}
     n = length(input_l)
     values = _allocate_values(T, n)
@@ -248,7 +243,7 @@ function _set_r!(state::UnionAlignmentState{L,R}, x::R) where {L,R}
 end
 
 function create_evaluation_state(
-    parents::Tuple{Node,Node}, op::BinaryAlignedNodeOp{T,UnionAlignment}
+    parents::Tuple{Node,Node}, op::BinaryNodeOp{T,UnionAlignment}
 ) where {T}
     L = value_type(parents[1])
     R = value_type(parents[2])
@@ -291,7 +286,7 @@ end
 end
 
 function run_node!(
-    node_op::BinaryAlignedNodeOp{T,UnionAlignment},
+    node_op::BinaryNodeOp{T,UnionAlignment},
     state::UnionAlignmentState{L,R},
     ::DateTime,  # time_start
     ::DateTime,  # time_end
@@ -394,7 +389,7 @@ function run_node!(
 end
 
 function create_evaluation_state(
-    parents::Tuple{Node,Node}, op::BinaryAlignedNodeOp{T,IntersectAlignment}
+    parents::Tuple{Node,Node}, op::BinaryNodeOp{T,IntersectAlignment}
 ) where {T}
     # Intersect alignment doesn't require remembering any previous state, so just return
     # the operator state.
@@ -406,7 +401,7 @@ function create_evaluation_state(
 end
 
 function run_node!(
-    node_op::BinaryAlignedNodeOp{T,IntersectAlignment},
+    node_op::BinaryNodeOp{T,IntersectAlignment},
     operator_state::NodeEvaluationState,
     ::DateTime,  # time_start
     ::DateTime,  # time_end
@@ -504,7 +499,7 @@ function _set_r!(state::LeftAlignmentState{R}, x::R) where {R}
 end
 
 function create_evaluation_state(
-    parents::Tuple{Node,Node}, op::BinaryAlignedNodeOp{T,LeftAlignment}
+    parents::Tuple{Node,Node}, op::BinaryNodeOp{T,LeftAlignment}
 ) where {T}
     R = value_type(parents[2])
     return if stateless_operator(op)
@@ -516,7 +511,7 @@ function create_evaluation_state(
 end
 
 function run_node!(
-    node_op::BinaryAlignedNodeOp{T,LeftAlignment},
+    node_op::BinaryNodeOp{T,LeftAlignment},
     state::LeftAlignmentState,
     ::DateTime,  # time_start
     ::DateTime,  # time_end

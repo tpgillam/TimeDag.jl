@@ -15,7 +15,7 @@ operator!(::SimpleUnary{f}, x) where {f} = f(x)
 
 Represents a stateless, time-independent binary operator that will always emit a value.
 """
-struct SimpleBinary{f,T,A} <: BinaryAlignedNodeOp{T,A} end
+struct SimpleBinary{f,T,A} <: BinaryNodeOp{T,A} end
 
 always_ticks(::SimpleBinary) = true
 stateless_operator(::SimpleBinary) = true
