@@ -293,9 +293,7 @@ function create_evaluation_state(
     else
         operator_state = create_operator_evaluation_state(parents, op)
         if has_initial_values(op)
-            UnionWithOpState{L,R}(
-                operator_state, initial_left(op), initial_right(op)
-            )
+            UnionWithOpState{L,R}(operator_state, initial_left(op), initial_right(op))
         else
             UnionWithOpState{L,R}(operator_state)
         end
