@@ -1,36 +1,29 @@
 _left(x, _) = x
-const Left{T,A} = SimpleBinary{_left,T,A}
-
 _right(_, y) = y
-const Right{T,A} = SimpleBinary{_right,T,A}
 
 # TODO We should add the concept of alignment_base, i.e. an ancestor that provably has the
 #   same alignment as a particular node. This can allow for extra pruning of the graph.
 
 """
-    left(x, y[, alignment::Alignment])
+    left(x, y[, alignment::Alignment; initial_values=nothing])
 
 Construct a node that ticks according to `alignment` with the latest value of `x`.
 
 It is "left", in the sense of picking the left-hand of the two arguments `x` and `y`.
 """
-function left(x, y, ::A=DEFAULT_ALIGNMENT) where {A<:Alignment}
-    x = _ensure_node(x)
-    y = _ensure_node(y)
-    return obtain_node((x, y), Left{value_type(x),A}())
+function left(x, y, alignment::Alignment=DEFAULT_ALIGNMENT; initial_values=nothing)
+    return apply(_left, x, y, alignment; initial_values)
 end
 
 """
-    right(x, y[, alignment::Alignment])
+    right(x, y[, alignment::Alignment; initial_values=nothing])
 
 Construct a node that ticks according to `alignment` with the latest value of `y`.
 
 It is "right", in the sense of picking the right-hand of the two arguments `x` and `y`.
 """
-function right(x, y, ::A=DEFAULT_ALIGNMENT) where {A<:Alignment}
-    x = _ensure_node(x)
-    y = _ensure_node(y)
-    return obtain_node((x, y), Right{value_type(y),A}())
+function right(x, y, alignment::Alignment=DEFAULT_ALIGNMENT; initial_values=nothing)
+    return apply(_right, x, y, alignment; initial_values)
 end
 
 """
@@ -40,6 +33,7 @@ Form a node that ticks with the values of `x` whenever `y` ticks.
 """
 align(x, y) = right(y, x, LEFT)
 
+# TODO support initial_values in coalign.
 """
     coalign(node_1, [node_2...; alignment::Alignment]) -> Node...
 

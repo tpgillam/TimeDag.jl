@@ -104,6 +104,35 @@ wrap this state with further state, if this is necessary for e.g. alignment.
 """
 function create_operator_evaluation_state end
 
+"""
+    has_initial_values(op) -> Bool
+
+If this returns true, it indicates that initial values for the `op`'s parents are specified.
+
+See the documentation on [Initial values](@ref) for further information.
+"""
+has_initial_values(::BinaryNodeOp) = false
+
+"""
+    initial_left(op::BinaryNodeOp) -> L
+
+Specify the initial value to use for the first parent of the given `op`.
+
+Needs to be defined if `has_initial_values(op)` returns true, and alignment is
+[`UNION`](@ref). For other alignments it is not required.
+"""
+function initial_left end
+
+"""
+    initial_right(op::BinaryNodeOp) -> R
+
+Specify the initial value to use for the second parent of the given `op`.
+
+Needs to be defined if `has_initial_values(op)` returns true, and alignment is
+[`UNION`](@ref) or [`LEFT`](@ref). For [`INTERSECT`](@ref) alignment it is not required.
+"""
+function initial_right end
+
 """Convenience method to dispatch to reduced-argument `operator!` calls."""
 function _operator!(op::NodeOp, state::NodeEvaluationState, time::DateTime, values...)
     return if stateless_operator(op) && time_agnostic(op)
@@ -198,32 +227,40 @@ function _apply_fast_align_binary!(
     end
 end
 
-# TODO Add initial_values, and support for this.
-
 abstract type UnionAlignmentState{L,R} <: NodeEvaluationState end
 
 mutable struct UnionWithOpState{L,R,OperatorState} <: UnionAlignmentState{L,R}
     valid_l::Bool
     valid_r::Bool
     operator_state::OperatorState
-    # These fields will initially be uninitialised.
+    # These fields may initially be uninitialised.
     latest_l::L
     latest_r::R
 
     function UnionWithOpState{L,R}(operator_state::OperatorState) where {L,R,OperatorState}
         return new{L,R,OperatorState}(false, false, operator_state)
     end
+
+    function UnionWithOpState{L,R}(
+        operator_state::OperatorState, initial_l::L, initial_r::R
+    ) where {L,R,OperatorState}
+        return new{L,R,OperatorState}(true, true, operator_state, initial_l, initial_r)
+    end
 end
 
 mutable struct UnionWithoutOpState{L,R} <: UnionAlignmentState{L,R}
     valid_l::Bool
     valid_r::Bool
-    # These fields will initially be uninitialised.
+    # These fields may initially be uninitialised.
     latest_l::L
     latest_r::R
 
     function UnionWithoutOpState{L,R}() where {L,R}
         return new{L,R}(false, false)
+    end
+
+    function UnionWithoutOpState{L,R}(initial_l::L, initial_r::R) where {L,R}
+        return new{L,R}(true, true, initial_l, initial_r)
     end
 end
 
@@ -248,10 +285,20 @@ function create_evaluation_state(
     L = value_type(parents[1])
     R = value_type(parents[2])
     return if stateless_operator(op)
-        UnionWithoutOpState{L,R}()
+        if has_initial_values(op)
+            UnionWithoutOpState{L,R}(initial_left(op), initial_right(op))
+        else
+            UnionWithoutOpState{L,R}()
+        end
     else
         operator_state = create_operator_evaluation_state(parents, op)
-        UnionWithOpState{L,R}(operator_state)
+        if has_initial_values(op)
+            UnionWithOpState{L,R}(
+                operator_state, initial_left(op), initial_right(op)
+            )
+        else
+            UnionWithOpState{L,R}(operator_state)
+        end
     end
 end
 
@@ -480,6 +527,12 @@ mutable struct LeftWithOpState{R,OperatorState} <: LeftAlignmentState{R}
     function LeftWithOpState{R}(operator_state::OperatorState) where {R,OperatorState}
         return new{R,OperatorState}(false, operator_state)
     end
+
+    function LeftWithOpState{R}(
+        operator_state::OperatorState, initial_r::R
+    ) where {R,OperatorState}
+        return new{R,OperatorState}(true, operator_state, initial_r)
+    end
 end
 
 mutable struct LeftWithoutOpState{R} <: LeftAlignmentState{R}
@@ -487,6 +540,7 @@ mutable struct LeftWithoutOpState{R} <: LeftAlignmentState{R}
     latest_r::R
 
     LeftWithoutOpState{R}() where {R} = new{R}(false)
+    LeftWithoutOpState{R}(initial_r::R) where {R} = new{R}(true, initial_r)
 end
 
 operator_state(::LeftWithoutOpState) = EMPTY_NODE_STATE
@@ -503,10 +557,18 @@ function create_evaluation_state(
 ) where {T}
     R = value_type(parents[2])
     return if stateless_operator(op)
-        LeftWithoutOpState{R}()
+        if has_initial_values(op)
+            LeftWithoutOpState{R}(initial_right(op))
+        else
+            LeftWithoutOpState{R}()
+        end
     else
         operator_state = create_operator_evaluation_state(parents, op)
-        LeftWithOpState{R}(operator_state)
+        if has_initial_values(op)
+            LeftWithOpState{R}(operator_state, initial_right(op))
+        else
+            LeftWithOpState{R}(operator_state)
+        end
     end
 end
 

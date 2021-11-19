@@ -54,6 +54,14 @@ TimeDag.EmptyNodeEvaluationState
 TimeDag.EMPTY_NODE_STATE
 ```
 
+## Alignment implementation
+
+```@docs
+TimeDag.has_initial_values
+TimeDag.initial_left
+TimeDag.initial_right
+```
+
 ## Other
 
 ```@docs

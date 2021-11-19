@@ -221,6 +221,18 @@ LEFT
 ```
 ![Left alignment](assets/left_align.png)
 
+#### Initial values
+
+For the alignments above, it was noted that we have to wait for both inputs to start ticking before the output ticks.
+
+It is possible to tell `TimeDag` that a given operation should consider its inputs to have some _initial value_.
+This behaves a little like a knot at the start of the evaluation window, however does *not* result in the creation of an output knot at that time.
+In the notation above, it is the definition of a value for ``x(t_{-})`` which isn't ``\oslash``.
+
+Initial values are set seperately for each input.
+Most functions of two or more nodes will take an `initial_values` keyword argument to specify these.
+
+Some more implementation details on the lower-level functionality that controls this is provided in [Alignment implementation](@ref).
 
 ## Computational graph
 
