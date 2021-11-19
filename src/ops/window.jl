@@ -688,7 +688,6 @@ function Statistics.cor(x, y::Node, window::Int; emit_early::Bool=false)
     return cor(x, y, window, DEFAULT_ALIGNMENT; emit_early)
 end
 
-
 # TODO for time windows, it is safe to dispatch on the same functions with a TimePeriod
 #   In the future, if we want to support more general types of time, we could introduce a
 #   TimeDelta wrapper, that could server to distinguish between an Int64 "time" and an Int64
