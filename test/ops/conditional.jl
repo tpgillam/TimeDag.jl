@@ -14,15 +14,15 @@
     ])
 end
 
-@testset "zap_missing" begin
+@testset "skipmissing" begin
     # If no missing inputs, should be a no-op.
     n = empty_node(Int64)
     @test value_type(n) == Int64
-    @test n === TimeDag.zap_missing(n)
+    @test n === skipmissing(n)
 
     # Constant semantics.
-    @test constant(1) === TimeDag.zap_missing(constant(1))
-    @test TimeDag.zap_missing(constant(missing)).op isa TimeDag.ZapMissing
+    @test constant(1) === skipmissing(constant(1))
+    @test skipmissing(constant(missing)).op isa TimeDag.SkipMissing
 
     # Standard case.
     n = block_node(
@@ -34,7 +34,7 @@ end
         ]),
     )
     @test value_type(n) == Union{Missing,Int64}
-    n2 = TimeDag.zap_missing(n)
+    n2 = skipmissing(n)
     @test value_type(n2) == Int64
 
     result = _evaluate(n2, DateTime(2000, 1, 1), DateTime(2000, 1, 5))

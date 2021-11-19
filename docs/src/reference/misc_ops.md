@@ -17,5 +17,5 @@ Base.rand
 
 ```@docs
 Base.filter
-zap_missing
+Base.skipmissing
 ```
