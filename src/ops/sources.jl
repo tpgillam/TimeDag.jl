@@ -88,7 +88,7 @@ function run_node!(
     rem_ = (time_end - op.epoch) % Millisecond(op.delta)
     pulse_end = rem_ == Millisecond(0) ? time_end - op.delta : time_end - rem_
 
-    times = collect(pulse_start:op.delta:pulse_end)
+    times = collect(pulse_start:(op.delta):pulse_end)
     return Block(unchecked, times, times)
 end
 
@@ -108,7 +108,6 @@ function pulse(delta::TimePeriod; epoch::DateTime=_JULIA_EPOCH)
     delta > Millisecond(0) || throw(ArgumentError("delta must be positive, got $delta"))
     return obtain_node((), Pulse{typeof(delta)}(delta, epoch))
 end
-
 
 # TODO We may want to generalise or otherwise refactor to allow reading multiple value
 # fields.
