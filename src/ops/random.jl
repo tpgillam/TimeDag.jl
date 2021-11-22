@@ -35,10 +35,9 @@ operator!(op::RandArray{T}, state::RandState) where {T} = rand(state.rng, T, op.
 Generate random numbers aligned to `alignment`, with the given `rng` if provided.
 
 Semantics are otherwise very similar to the usual `Base.rand`:
-
-If specified, `S` will be the element type, and will default to `Float64` otherwise.
-If specified, `dims` should be a tuple or vararg of integers representing the dimensions of
-an array.
+* If specified, `S` will be the element type, and will default to `Float64` otherwise.
+* If specified, `dims` should be a tuple or vararg of integers representing the dimensions
+    of an array.
 
 **NB** The values of `alignment` will be ignored.
 

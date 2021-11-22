@@ -1,7 +1,9 @@
+using Combinatorics
 using DataFrames
 using DataStructures
 using Dates
 using LightGraphs
+using LinearAlgebra
 using Random
 using StaticArrays
 using Statistics
@@ -9,7 +11,7 @@ using TeaFiles
 using Test
 using TimeDag
 
-using TimeDag: Block, Node
+using TimeDag: Node
 using TimeDag: IntersectAlignment, LeftAlignment, UnionAlignment
 using TimeDag: duplicate, evaluate_until!, start_at
 
@@ -28,6 +30,7 @@ using TimeDag: duplicate, evaluate_until!, start_at
 
     @testset "ops" begin
         @testset "align" begin include("ops/align.jl") end
+        @testset "array" begin include("ops/array.jl") end
         @testset "conditional" begin include("ops/conditional.jl") end
         @testset "core" begin include("ops/core.jl") end
         @testset "history" begin include("ops/history.jl") end

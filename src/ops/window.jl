@@ -40,7 +40,7 @@ function _extract end
 abstract type UnaryInceptionOp{T,Data} <: UnaryNodeOp{T} end
 
 """Binary operator accumulated from inception."""
-abstract type BinaryInceptionOp{T,Data,A} <: BinaryAlignedNodeOp{T,A} end
+abstract type BinaryInceptionOp{T,Data,A} <: BinaryNodeOp{T,A} end
 
 const InceptionOp{T,Data} = Union{UnaryInceptionOp{T,Data},BinaryInceptionOp{T,Data}}
 
@@ -90,7 +90,7 @@ Windowed associative binary operator, potentially emitting early before the wind
 """
 abstract type UnaryWindowOp{T,Data,EmitEarly} <: UnaryNodeOp{T} end
 
-abstract type BinaryWindowOp{T,Data,EmitEarly,A} <: BinaryAlignedNodeOp{T,A} end
+abstract type BinaryWindowOp{T,Data,EmitEarly,A} <: BinaryNodeOp{T,A} end
 
 const WindowOp{T,Data,EmitEarly} = Union{
     UnaryWindowOp{T,Data,EmitEarly},BinaryWindowOp{T,Data,EmitEarly}
@@ -356,6 +356,7 @@ Create a node which ticks when `x` ticks, with values of the running standard de
 This is equivalent to `sqrt(var(x; corrected))`.
 """
 Statistics.std(x::Node; corrected::Bool=true) = sqrt(var(x; corrected))
+
 """
     std(x::Node, window::Int; emit_early::Bool=false, corrected::Bool=true) -> Node
 
@@ -629,3 +630,65 @@ function Statistics.cov(
     Out = output_type(/, T, Int)
     return obtain_node((x,), WindowCovMatrix{Out,corrected,emit_early}(window))
 end
+
+# Correlation, cumulative over time.
+
+"""
+    cor(x, y[, alignment]; corrected::Bool=true) -> Node
+
+
+Create a node which ticks with values of the running correlation of `x` and `y`.
+
+The specified `alignment` controls the behaviour when `x` and `y` tick at different times,
+as per the documentation in [Alignment](@ref). When not specified, it defaults to
+[`UNION`](@ref).
+
+This is equivalent to a sample correlation over the `n` values of `(x, y)` pairs observed at
+and before a given time.
+"""
+function Statistics.cor(x, y, alignment::Alignment)
+    # Do alignment first so that calls to cov & std so that we only do aligning work once.
+    # Calls to cov & std should then be (relatively) trivial.
+    x, y = coalign(x, y, alignment)
+    return cov(x, y) / (std(x) * std(y))
+end
+Statistics.cor(x::Node, y::Node) = cor(x, y, DEFAULT_ALIGNMENT)
+Statistics.cor(x::Node, y) = cov(x, y, DEFAULT_ALIGNMENT)
+Statistics.cor(x, y::Node) = cov(x, y, DEFAULT_ALIGNMENT)
+
+# Correlation over fixed window.
+
+"""
+    cor(x, y, window::Int[, alignment]; emit_early=false) -> Node
+
+Create a node of the rolling covariance of `x` and `y` over the last `window` knots.
+
+The specified `alignment` controls the behaviour when `x` and `y` tick at different times,
+as per the documentation in [Alignment](@ref). When not specified, it defaults to
+[`UNION`](@ref).
+
+If `emit_early` is false, then the node returned will only start ticking once the window is
+full. Otherwise, it will tick immediately with a partially-filled window.
+
+This is equivalent to a sample correlation over the `n` values of `(x, y)` pairs observed at
+and before a given time, with `n` capped at `window`.
+"""
+function Statistics.cor(x, y, window::Int, alignment::Alignment; emit_early::Bool=false)
+    x, y = coalign(x, y, alignment)
+    return cov(x, y, window; emit_early) /
+           (std(x, window; emit_early) * std(y, window; emit_early))
+end
+function Statistics.cor(x::Node, y::Node, window::Int; emit_early::Bool=false)
+    return cor(x, y, window, DEFAULT_ALIGNMENT; emit_early)
+end
+function Statistics.cor(x::Node, y, window::Int; emit_early::Bool=false)
+    return cor(x, y, window, DEFAULT_ALIGNMENT; emit_early)
+end
+function Statistics.cor(x, y::Node, window::Int; emit_early::Bool=false)
+    return cor(x, y, window, DEFAULT_ALIGNMENT; emit_early)
+end
+
+# TODO for time windows, it is safe to dispatch on the same functions with a TimePeriod
+#   In the future, if we want to support more general types of time, we could introduce a
+#   TimeDelta wrapper, that could server to distinguish between an Int64 "time" and an Int64
+#   "number of knots".

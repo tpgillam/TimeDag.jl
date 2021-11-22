@@ -6,6 +6,7 @@ using Bijections
 using DataStructures
 using Dates
 using LightGraphs
+using LinearAlgebra
 using PrettyTables
 using Random
 using RecipesBase
@@ -21,9 +22,9 @@ export INTERSECT, LEFT, UNION
 # Node creation.
 export wrap, wrapb
 # Source nodes.
-export block_node, constant, empty_node, iterdates, tea_file
+export block_node, constant, empty_node, iterdates, pulse, tea_file
 # Other nodes.
-export align, history, lag, right, left, zap_missing
+export align, coalign, history, lag, right, left
 # Evaluation & other utilities.
 export evaluate, value_type
 
@@ -45,6 +46,7 @@ include("alignment.jl")
 include("ops/core.jl")  # This defines macros useful for definition of other nodes.
 
 include("ops/align.jl")
+include("ops/array.jl")
 include("ops/conditional.jl")
 include("ops/history.jl")
 include("ops/lagging.jl")

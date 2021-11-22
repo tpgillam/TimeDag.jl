@@ -100,6 +100,10 @@ duplicate_internal(x::Block, ::IdDict) = x
 
 # Equality & hash need to be defined, since we have defined an internal constructor.
 Base.hash(a::Block, h::UInt) = hash(a.values, hash(a.times, hash(:Block, h)))
+function Base.isequal(a::Block, b::Block)
+    a === b && return true
+    return isequal(a.times, b.times) && isequal(a.values, b.values)
+end
 function Base.:(==)(a::Block, b::Block)
     a === b && return true
     return a.times == b.times && a.values == b.values

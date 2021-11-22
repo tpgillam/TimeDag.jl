@@ -6,5 +6,6 @@ The following functions construct nodes with no parents.
 block_node
 empty_node
 iterdates
+pulse
 tea_file
 ```

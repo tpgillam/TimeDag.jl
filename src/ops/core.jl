@@ -15,7 +15,7 @@ operator!(::SimpleUnary{f}, x) where {f} = f(x)
 
 Represents a stateless, time-independent binary operator that will always emit a value.
 """
-struct SimpleBinary{f,T,A} <: BinaryAlignedNodeOp{T,A} end
+struct SimpleBinary{f,T,A} <: BinaryNodeOp{T,A} end
 
 always_ticks(::SimpleBinary) = true
 stateless_operator(::SimpleBinary) = true
@@ -23,8 +23,51 @@ time_agnostic(::SimpleBinary) = true
 operator!(::SimpleBinary{f}, x, y) where {f} = f(x, y)
 
 """
+    SimpleBinaryUnionInitial{f,T,L,R}
+
+Represents a stateless, time-independent binary operator that will always emit a value.
+
+Unlike [`SimpleBinary`](@ref), this also contains initial values for its parent nodes.
+See [Initial values](@ref) for more details.
+"""
+struct SimpleBinaryUnionInitial{f,T,L,R} <: BinaryNodeOp{T,UnionAlignment}
+    initial_l::L
+    initial_r::R
+end
+
+always_ticks(::SimpleBinaryUnionInitial) = true
+stateless_operator(::SimpleBinaryUnionInitial) = true
+time_agnostic(::SimpleBinaryUnionInitial) = true
+operator!(::SimpleBinaryUnionInitial{f}, x, y) where {f} = f(x, y)
+has_initial_values(::SimpleBinaryUnionInitial) = true
+initial_left(op::SimpleBinaryUnionInitial) = op.initial_l
+initial_right(op::SimpleBinaryUnionInitial) = op.initial_r
+
+"""
+    SimpleBinaryLeftInitial{f,T,R}
+
+Represents a stateless, time-independent binary operator that will always emit a value.
+
+Unlike [`SimpleBinary`](@ref), this also contains initial values for its right parent.
+See [Initial values](@ref) for more details.
+"""
+struct SimpleBinaryLeftInitial{f,T,R} <: BinaryNodeOp{T,LeftAlignment}
+    initial_r::R
+end
+
+always_ticks(::SimpleBinaryLeftInitial) = true
+stateless_operator(::SimpleBinaryLeftInitial) = true
+time_agnostic(::SimpleBinaryLeftInitial) = true
+operator!(::SimpleBinaryLeftInitial{f}, x, y) where {f} = f(x, y)
+has_initial_values(::SimpleBinaryLeftInitial) = true
+initial_right(op::SimpleBinaryLeftInitial) = op.initial_r
+
+"""
     apply(f::Function, x; out_type=nothing)
-    apply(f::Function, x, y[, alignment=DEFAULT_ALIGNMENT]; out_type=nothing)
+    apply(
+        f::Function, x, y[, alignment=DEFAULT_ALIGNMENT];
+        out_type=nothing, initial_values=nothing
+    )
 
 Obtain a node with values constructed by applying the pure function `f` to the input values.
 
@@ -43,13 +86,36 @@ function apply(f::Function, x; out_type::Union{Nothing,Type}=nothing)
     return obtain_node((x,), SimpleUnary{f,T}())
 end
 
+function _get_op(f, T, ::UnionAlignment, l::L, r::R) where {L,R}
+    return SimpleBinaryUnionInitial{f,T,L,R}(l, r)
+end
+function _get_op(f, T, ::LeftAlignment, l, r::R) where {R}
+    return SimpleBinaryLeftInitial{f,T,R}(r)
+end
+_get_op(f, T, ::IntersectAlignment, l, r) = SimpleBinary{f,T,IntersectAlignment}()
+
 function apply(
-    f::Function, x, y, ::A; out_type::Union{Nothing,Type}=nothing
+    f::Function,
+    x,
+    y,
+    alignment::A;
+    out_type::Union{Nothing,Type}=nothing,
+    initial_values::Union{Nothing,Tuple{<:Any,<:Any}}=nothing,
 ) where {A<:Alignment}
     x = _ensure_node(x)
     y = _ensure_node(y)
     T = isnothing(out_type) ? output_type(f, value_type(x), value_type(y)) : out_type
-    return obtain_node((x, y), SimpleBinary{f,T,A}())
+    op = if isnothing(initial_values)
+        SimpleBinary{f,T,A}()
+    else
+        initial_l, initial_r = initial_values
+        L = value_type(x)
+        R = value_type(y)
+        isa(initial_l, L) || throw(ArgumentError("$initial_l should be of type $L"))
+        isa(initial_r, R) || throw(ArgumentError("$initial_r should be of type $R"))
+        _get_op(f, T, alignment, initial_l, initial_r)
+    end
+    return obtain_node((x, y), op)
 end
 
 function apply(f::Function, x::Node, y::Node; kwargs...)
@@ -161,16 +227,18 @@ macro simple_binary(f)
     f = esc(f)
     return quote
         """
-            $($f)(x, y[, alignment=DEFAULT_ALIGNMENT])
+            $($f)(x, y[, alignment=DEFAULT_ALIGNMENT; kwargs...])
 
         Obtain a node with values constructed by applying `$($f)` to the input values.
 
         An `alignment` can optionally be specified. `x` and `y` should be nodes, or
         constants that can be converted to nodes.
+
+        Other keyword arguments are passed to [`apply`](@ref).
         """
-        $f(x, y, alignment::Alignment) = apply($f, x, y, alignment)
-        $f(x::Node, y::Node) = $f(x, y, DEFAULT_ALIGNMENT)
-        $f(x::Node, y) = $f(x, y, DEFAULT_ALIGNMENT)
-        $f(x, y::Node) = $f(x, y, DEFAULT_ALIGNMENT)
+        $f(x, y, alignment::Alignment; kwargs...) = apply($f, x, y, alignment; kwargs...)
+        $f(x::Node, y::Node; kwargs...) = $f(x, y, DEFAULT_ALIGNMENT; kwargs...)
+        $f(x::Node, y; kwargs...) = $f(x, y, DEFAULT_ALIGNMENT; kwargs...)
+        $f(x, y::Node; kwargs...) = $f(x, y, DEFAULT_ALIGNMENT; kwargs...)
     end
 end

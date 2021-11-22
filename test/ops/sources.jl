@@ -36,6 +36,64 @@ end
     end
 end
 
+@testset "pulse" begin
+    @testset "invalid" begin
+        @test_throws ArgumentError pulse(Hour(0))
+        @test_throws ArgumentError pulse(Hour(-1))
+    end
+
+    @testset "1 day" begin
+        n = pulse(Hour(24))
+        expected_times = collect(_T_START:Day(1):(_T_END - Day(1)))
+        @test _eval(n) == Block(expected_times, expected_times)
+    end
+
+    @testset "arbitrary" begin
+        # By default, our pulses should be aligned with the default epoch, which is the same
+        # as Julia's internal epoch.
+        epoch = DateTime(0, 1, 1) - Millisecond(Dates.DATETIMEEPOCH)
+        @test epoch.instant.periods == Millisecond(0)
+
+        for delta in (Second(3), Minute(10), Hour(2))
+            n = pulse(delta)
+
+            # We expect to be aligned to the Julia epoch. Work in terms of milliseconds
+            # since this epoch.
+            start = _T_START.instant.periods
+            remainder = start % Millisecond(delta)
+
+            pulse_start = remainder == Millisecond(0) ? start : start + (delta - remainder)
+            expected_times = [epoch + pulse_start]
+            while true
+                prev_time = last(expected_times)
+                next_time = prev_time + delta
+                next_time < _T_END || break
+                push!(expected_times, next_time)
+            end
+
+            @test _eval(n) == Block(expected_times, expected_times)
+        end
+    end
+
+    @testset "custom epoch" begin
+        delta = Minute(10)
+        for offset in Minute(0):Minute(30):Minute(Hour(24))
+            epoch = _T_START + offset
+            n = pulse(delta; epoch)
+
+            rem_ = (_T_START - epoch) % Millisecond(delta)
+            pulse_start = rem_ == Millisecond(0) ? _T_START : _T_START + (delta - rem_)
+            expected_times = [pulse_start]
+            while true
+                prev_time = last(expected_times)
+                next_time = prev_time + delta
+                next_time < _T_END || break
+                push!(expected_times, next_time)
+            end
+        end
+    end
+end
+
 @testset "tea_file" begin
     mktempdir() do prefix
         # Write some basic data to a file, then read it back.

@@ -29,7 +29,7 @@ const INTERSECT = IntersectAlignment()
 const DEFAULT_ALIGNMENT = UNION
 
 abstract type UnaryNodeOp{T} <: NodeOp{T} end
-abstract type BinaryAlignedNodeOp{T,A<:Alignment} <: NodeOp{T} end
+abstract type BinaryNodeOp{T,A<:Alignment} <: NodeOp{T} end
 
 # A note on the design choice here, which is motivated by performance reasons & profiling.
 #
@@ -48,7 +48,7 @@ abstract type BinaryAlignedNodeOp{T,A<:Alignment} <: NodeOp{T} end
 # just return a raw `T`, as the extra information will not be used.
 """
     operator!(op::UnaryNodeOp{T}, (state,), (time,) x) -> T / Maybe{T}
-    operator!(op::BinaryAlignedNodeOp{T}, (state,), (time,) x, y) -> T / Maybe{T}
+    operator!(op::BinaryNodeOp{T}, (state,), (time,) x, y) -> T / Maybe{T}
 
 Perform the operation for this node.
 
@@ -104,6 +104,35 @@ wrap this state with further state, if this is necessary for e.g. alignment.
 """
 function create_operator_evaluation_state end
 
+"""
+    has_initial_values(op) -> Bool
+
+If this returns true, it indicates that initial values for the `op`'s parents are specified.
+
+See the documentation on [Initial values](@ref) for further information.
+"""
+has_initial_values(::BinaryNodeOp) = false
+
+"""
+    initial_left(op::BinaryNodeOp) -> L
+
+Specify the initial value to use for the first parent of the given `op`.
+
+Needs to be defined if `has_initial_values(op)` returns true, and alignment is
+[`UNION`](@ref). For other alignments it is not required.
+"""
+function initial_left end
+
+"""
+    initial_right(op::BinaryNodeOp) -> R
+
+Specify the initial value to use for the second parent of the given `op`.
+
+Needs to be defined if `has_initial_values(op)` returns true, and alignment is
+[`UNION`](@ref) or [`LEFT`](@ref). For [`INTERSECT`](@ref) alignment it is not required.
+"""
+function initial_right end
+
 """Convenience method to dispatch to reduced-argument `operator!` calls."""
 function _operator!(op::NodeOp, state::NodeEvaluationState, time::DateTime, values...)
     return if stateless_operator(op) && time_agnostic(op)
@@ -120,17 +149,15 @@ end
 function _can_propagate_constant(op::UnaryNodeOp)
     return always_ticks(op) && stateless_operator(op) && time_agnostic(op)
 end
-function _propagate_constant_value(op::UnaryNodeOp{T}, parents::Tuple{Node}) where {T}
+function _propagate_constant_value(op::UnaryNodeOp, parents::Tuple{Node})
     # NB, we know that time & state is ignored (due to _can_propagate_constant).
     return operator!(op, value(@inbounds(parents[1])))
 end
 
-function _can_propagate_constant(op::BinaryAlignedNodeOp)
+function _can_propagate_constant(op::BinaryNodeOp)
     return always_ticks(op) && stateless_operator(op) && time_agnostic(op)
 end
-function _propagate_constant_value(
-    op::BinaryAlignedNodeOp{T}, parents::Tuple{Node,Node}
-) where {T}
+function _propagate_constant_value(op::BinaryNodeOp, parents::Tuple{Node,Node})
     return operator!(op, value(@inbounds(parents[1])), value(@inbounds(parents[2])))
 end
 
@@ -180,10 +207,7 @@ end
 
 """Apply, assuming `input_l` and `input_r` have identical alignment."""
 function _apply_fast_align_binary!(
-    op::BinaryAlignedNodeOp{T},
-    operator_state::NodeEvaluationState,
-    input_l::Block,
-    input_r::Block,
+    op::BinaryNodeOp{T}, operator_state::NodeEvaluationState, input_l::Block, input_r::Block
 ) where {T}
     n = length(input_l)
     values = _allocate_values(T, n)
@@ -203,32 +227,40 @@ function _apply_fast_align_binary!(
     end
 end
 
-# TODO Add initial_values, and support for this.
-
 abstract type UnionAlignmentState{L,R} <: NodeEvaluationState end
 
 mutable struct UnionWithOpState{L,R,OperatorState} <: UnionAlignmentState{L,R}
     valid_l::Bool
     valid_r::Bool
     operator_state::OperatorState
-    # These fields will initially be uninitialised.
+    # These fields may initially be uninitialised.
     latest_l::L
     latest_r::R
 
     function UnionWithOpState{L,R}(operator_state::OperatorState) where {L,R,OperatorState}
         return new{L,R,OperatorState}(false, false, operator_state)
     end
+
+    function UnionWithOpState{L,R}(
+        operator_state::OperatorState, initial_l::L, initial_r::R
+    ) where {L,R,OperatorState}
+        return new{L,R,OperatorState}(true, true, operator_state, initial_l, initial_r)
+    end
 end
 
 mutable struct UnionWithoutOpState{L,R} <: UnionAlignmentState{L,R}
     valid_l::Bool
     valid_r::Bool
-    # These fields will initially be uninitialised.
+    # These fields may initially be uninitialised.
     latest_l::L
     latest_r::R
 
     function UnionWithoutOpState{L,R}() where {L,R}
         return new{L,R}(false, false)
+    end
+
+    function UnionWithoutOpState{L,R}(initial_l::L, initial_r::R) where {L,R}
+        return new{L,R}(true, true, initial_l, initial_r)
     end
 end
 
@@ -248,15 +280,23 @@ function _set_r!(state::UnionAlignmentState{L,R}, x::R) where {L,R}
 end
 
 function create_evaluation_state(
-    parents::Tuple{Node,Node}, op::BinaryAlignedNodeOp{T,UnionAlignment}
+    parents::Tuple{Node,Node}, op::BinaryNodeOp{T,UnionAlignment}
 ) where {T}
     L = value_type(parents[1])
     R = value_type(parents[2])
     return if stateless_operator(op)
-        UnionWithoutOpState{L,R}()
+        if has_initial_values(op)
+            UnionWithoutOpState{L,R}(initial_left(op), initial_right(op))
+        else
+            UnionWithoutOpState{L,R}()
+        end
     else
         operator_state = create_operator_evaluation_state(parents, op)
-        UnionWithOpState{L,R}(operator_state)
+        if has_initial_values(op)
+            UnionWithOpState{L,R}(operator_state, initial_left(op), initial_right(op))
+        else
+            UnionWithOpState{L,R}(operator_state)
+        end
     end
 end
 
@@ -291,7 +331,7 @@ end
 end
 
 function run_node!(
-    node_op::BinaryAlignedNodeOp{T,UnionAlignment},
+    node_op::BinaryNodeOp{T,UnionAlignment},
     state::UnionAlignmentState{L,R},
     ::DateTime,  # time_start
     ::DateTime,  # time_end
@@ -394,7 +434,7 @@ function run_node!(
 end
 
 function create_evaluation_state(
-    parents::Tuple{Node,Node}, op::BinaryAlignedNodeOp{T,IntersectAlignment}
+    parents::Tuple{Node,Node}, op::BinaryNodeOp{T,IntersectAlignment}
 ) where {T}
     # Intersect alignment doesn't require remembering any previous state, so just return
     # the operator state.
@@ -406,7 +446,7 @@ function create_evaluation_state(
 end
 
 function run_node!(
-    node_op::BinaryAlignedNodeOp{T,IntersectAlignment},
+    node_op::BinaryNodeOp{T,IntersectAlignment},
     operator_state::NodeEvaluationState,
     ::DateTime,  # time_start
     ::DateTime,  # time_end
@@ -485,6 +525,12 @@ mutable struct LeftWithOpState{R,OperatorState} <: LeftAlignmentState{R}
     function LeftWithOpState{R}(operator_state::OperatorState) where {R,OperatorState}
         return new{R,OperatorState}(false, operator_state)
     end
+
+    function LeftWithOpState{R}(
+        operator_state::OperatorState, initial_r::R
+    ) where {R,OperatorState}
+        return new{R,OperatorState}(true, operator_state, initial_r)
+    end
 end
 
 mutable struct LeftWithoutOpState{R} <: LeftAlignmentState{R}
@@ -492,6 +538,7 @@ mutable struct LeftWithoutOpState{R} <: LeftAlignmentState{R}
     latest_r::R
 
     LeftWithoutOpState{R}() where {R} = new{R}(false)
+    LeftWithoutOpState{R}(initial_r::R) where {R} = new{R}(true, initial_r)
 end
 
 operator_state(::LeftWithoutOpState) = EMPTY_NODE_STATE
@@ -504,19 +551,27 @@ function _set_r!(state::LeftAlignmentState{R}, x::R) where {R}
 end
 
 function create_evaluation_state(
-    parents::Tuple{Node,Node}, op::BinaryAlignedNodeOp{T,LeftAlignment}
+    parents::Tuple{Node,Node}, op::BinaryNodeOp{T,LeftAlignment}
 ) where {T}
     R = value_type(parents[2])
     return if stateless_operator(op)
-        LeftWithoutOpState{R}()
+        if has_initial_values(op)
+            LeftWithoutOpState{R}(initial_right(op))
+        else
+            LeftWithoutOpState{R}()
+        end
     else
         operator_state = create_operator_evaluation_state(parents, op)
-        LeftWithOpState{R}(operator_state)
+        if has_initial_values(op)
+            LeftWithOpState{R}(operator_state, initial_right(op))
+        else
+            LeftWithOpState{R}(operator_state)
+        end
     end
 end
 
 function run_node!(
-    node_op::BinaryAlignedNodeOp{T,LeftAlignment},
+    node_op::BinaryNodeOp{T,LeftAlignment},
     state::LeftAlignmentState,
     ::DateTime,  # time_start
     ::DateTime,  # time_end

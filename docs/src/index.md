@@ -21,5 +21,5 @@ Other domains that could be suitable include sensor, system monitoring, and fina
 
 ## Getting started
 
-It might be helpful to begin with the [Concepts](@ref).
-
+It might be helpful to begin with the [Concepts](@ref), and then to look at the [Examples](@ref).
+After that, the documentation under `Reference->Node ops` should give an idea of what functionality is available.

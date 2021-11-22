@@ -30,28 +30,98 @@ TimeDag.WeakIdentityMap
 
 ## Advanced evaluation
 
-Sometimes [`evaluate`](@ref) does not provide enough control.
-This section goes into more detail about how evaluation works, and in particular how this can be useful for live systems.
+This section goes into more detail about how evaluation works. 
+We explain evaluation state, and discuss how to use the API in a [Live system](@ref).
 
 ### Evaluation state
 
-### Batching
+Recall from the discussion in [Concepts](@ref) that we have the concept of [Explicit state](@ref).
+For a particular node, this state will be a subtype of [`TimeDag.NodeEvaluationState`](@ref).
+For consistency, all nodes have an evaluation state — for nodes that are fundamentally stateless, we use [`TimeDag.EMPTY_NODE_STATE`](@ref).
 
-
-### Scheduling
-
+A fresh evaluation state is created by a call to [`TimeDag.create_evaluation_state`](@ref).
+When creating a new [`TimeDag.NodeOp`](@ref), a new method of this function should be defined to return the appropriate state.
+The state is subsequently mutated in calls [`TimeDag.run_node!`](@ref), to reflect any changes induced over the time interval.
 
 ```@docs
-TimeDag.EvaluationState
 TimeDag.NodeEvaluationState
-TimeDag.start_at
-TimeDag.evaluate_until!
+TimeDag.EmptyNodeEvaluationState
+TimeDag.EMPTY_NODE_STATE
+TimeDag.create_evaluation_state
 TimeDag.run_node!
 ```
 
+When an evaluation is performed, we need to save the state of all the nodes in the graph.
+We package this into an [`TimeDag.EvaluationState`](@ref) instance.
+This object also retains the blocks from the nodes in whose output we're interested.
+
 ```@docs
-TimeDag.EmptyNodeEvaluationState
-TimeDag.EMPTY_NODE_STATE
+TimeDag.EvaluationState
+```
+
+### Deconstructing evaluation
+
+Whilst [`evaluate`](@ref) is the primary API for `TimeDag`, it is in fact a thin wrapper around a lower level API.
+Roughly, the steps involved are:
+1. Call [`TimeDag.start_at`](@ref) to create a new [`TimeDag.EvaluationState`](@ref) for a collection of nodes.
+    This will work out all the ancestors of the given nodes that also need to be evaluated.
+1. Perform one or more calls to [`TimeDag.evaluate_until!`](@ref), depending on the batch interval.
+    Each call will update the evaluation state.
+    Interenally, this calls [`TimeDag.run_node!`](@ref) for every ancestor node.
+1. Once the end of the evaluation interval has been reached, we extract the blocks for the nodes of interest from the evaluation state.
+    These are concatenated and returned to the user.
+
+```@docs
+TimeDag.start_at
+TimeDag.evaluate_until!
+```
+
+#### Live system
+Consider the case where some history of data is available, say in a database, and new data is added continually, e.g. as it is recorded from a sensor.
+Suppose we have built a `TimeDag` graph representing the computation we wish to perform on this data.
+We can perform the following steps:
+1. Initialise the state with [`TimeDag.start_at`](@ref).
+1. Initialise the model with one (or more) calls to [`TimeDag.evaluate_until!`](@ref).
+    This is used to pull through historical data, e.g. to initialise stateful nodes like moving averages.
+1. In real time, poll for new data with repeated calls to [`TimeDag.evaluate_until!`](@ref)
+
+The performance of this setup is naturally dependent upon the complexity of the model being evaluated.
+However, if models are appropriately designed to have efficient online updates, then the underlying overhead of `TimeDag` is sufficiently small for this to be usable with latencies of down to O(milliseconds).
+
+```@example
+using Dates  # hide
+using Statistics  # hide
+using TimeDag  # hide
+# Some arbitrary data source - here just use random numbers.
+x = rand(pulse(Second(1)))
+
+# Compute a rolling mean and standard deviation.
+# Corresponds to 24-hour rolling windows, given one data point per second.
+n1, n2 = mean(x, 86400), std(x, 86400)
+
+# Initialise state over a long history.
+state = TimeDag.start_at([n1, n2], DateTime(2019))
+state = TimeDag.evaluate_until!(state, DateTime(2020))
+
+# Simulate an incremental update over a few hours.
+@time state = TimeDag.evaluate_until!(state, DateTime(2020, 1, 1, 3))
+nothing  # hide
+```
+
+Note that this approach is unlikely to be suitable for lower latency applications (e.g. microseconds).
+For that case, one may benefit from a "push mode" evaluation, where new data are pushed onto the graph, and only affected nodes are re-evaluated.
+Such a feature isn't currently planned.
+
+### Scheduling
+
+`TimeDag` currently runs all nodes in a single thread, however this is subject to change in the future.
+
+## Alignment implementation
+
+```@docs
+TimeDag.has_initial_values
+TimeDag.initial_left
+TimeDag.initial_right
 ```
 
 ## Other

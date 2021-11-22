@@ -1,5 +1,6 @@
 # Arithmetic
 
+@simple_unary(Base.abs)
 @simple_unary(Base.exp)
 @simple_unary(Base.log)
 @simple_unary(Base.log10)
@@ -25,3 +26,7 @@
 @simple_binary(Base.:<)
 @simple_binary(Base.:>=)
 @simple_binary(Base.:<=)
+
+# Linear algebra
+
+@simple_binary(LinearAlgebra.dot)

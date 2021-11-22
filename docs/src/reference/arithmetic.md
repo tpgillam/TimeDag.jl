@@ -1,6 +1,8 @@
 # Arithmetic
 
 ```@docs
+Base.abs
+Base.exp
 Base.log
 Base.log10
 Base.log2

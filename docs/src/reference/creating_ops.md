@@ -13,7 +13,7 @@ wrap
 wrapb
 ```
 
-## Sources
+## Creating sources
 
 In order to create a source — i.e. an op with zero inputs — one should use the [Low-level API](@ref).
 
