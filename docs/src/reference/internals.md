@@ -86,7 +86,7 @@ We can perform the following steps:
 1. In real time, poll for new data with repeated calls to [`TimeDag.evaluate_until!`](@ref)
 
 The performance of this setup is naturally dependent upon the complexity of the model being evaluated.
-However, if models are appropriately designed to have efficient online updates, then the underlying overhead of `TimeDag` is sufficiently small for this to be usable with latencies of down to ``O(\mathrm(milliseconds))``.
+However, if models are appropriately designed to have efficient online updates, then the underlying overhead of `TimeDag` is sufficiently small for this to be usable with latencies of down to O(milliseconds).
 
 ```@example
 using Dates  # hide
