@@ -22,7 +22,7 @@ export INTERSECT, LEFT, UNION
 # Node creation.
 export wrap, wrapb
 # Source nodes.
-export block_node, constant, empty_node, iterdates, tea_file
+export block_node, constant, empty_node, iterdates, pulse, tea_file
 # Other nodes.
 export align, coalign, history, lag, right, left
 # Evaluation & other utilities.

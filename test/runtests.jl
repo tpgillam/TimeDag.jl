@@ -11,7 +11,7 @@ using TeaFiles
 using Test
 using TimeDag
 
-using TimeDag: Block, Node
+using TimeDag: Node
 using TimeDag: IntersectAlignment, LeftAlignment, UnionAlignment
 using TimeDag: duplicate, evaluate_until!, start_at
 
