@@ -154,13 +154,14 @@ If this returns true, it indicates that initial values for the `op`'s parents ar
 See the documentation on [Initial values](@ref) for further information.
 """
 has_initial_values(::BinaryNodeOp) = false
+has_initial_values(::NaryNodeOp) = false
 
 """
     initial_left(op::BinaryNodeOp) -> L
 
 Specify the initial value to use for the first parent of the given `op`.
 
-Needs to be defined if `has_initial_values(op)` returns true, and alignment is
+Needs to be defined if [`has_initial_values`](@ref) returns true, and alignment is
 [`UNION`](@ref). For other alignments it is not required.
 """
 function initial_left end
@@ -175,6 +176,15 @@ Needs to be defined if `has_initial_values(op)` returns true, and alignment is
 """
 function initial_right end
 
+"""
+    initial_values(op::NaryNodeOp) -> Tuple
+
+Specify the initial values to use for all parents of the given `op`.
+
+Needs to be defined for nary ops for which [`has_initial_values`](@ref) returns true.
+"""
+function initial_values end
+
 """Convenience method to dispatch to reduced-argument `operator!` calls."""
 function _operator!(op::NodeOp, state::NodeEvaluationState, time::DateTime, values...)
     return if stateless_operator(op) && time_agnostic(op)
@@ -188,19 +198,18 @@ function _operator!(op::NodeOp, state::NodeEvaluationState, time::DateTime, valu
     end
 end
 
-function _can_propagate_constant(op::UnaryNodeOp)
+function _can_propagate_constant(op::Union{UnaryNodeOp,BinaryNodeOp,NaryNodeOp})
     return always_ticks(op) && stateless_operator(op) && time_agnostic(op)
 end
 function _propagate_constant_value(op::UnaryNodeOp, parents::Tuple{Node})
     # NB, we know that time & state is ignored (due to _can_propagate_constant).
     return operator!(op, value(@inbounds(parents[1])))
 end
-
-function _can_propagate_constant(op::BinaryNodeOp)
-    return always_ticks(op) && stateless_operator(op) && time_agnostic(op)
-end
 function _propagate_constant_value(op::BinaryNodeOp, parents::Tuple{Node,Node})
     return operator!(op, value(@inbounds(parents[1])), value(@inbounds(parents[2])))
+end
+function _propagate_constant_value(op::NaryNodeOp{N}, parents::NTuple{N,Node}) where {N}
+    return operator!(op, map(value, parents)...)
 end
 
 # An unary node has no alignment state, so any state comes purely from the operator.
@@ -224,20 +233,20 @@ function run_node!(
     return if always_ticks(node_op)
         # We can ignore the validity of the return value of the operator, since we have been
         # promised that it will always tick. Hence we can use a for loop too.
-        for i in 1:n
-            time = @inbounds input.times[i]
-            @inbounds values[i] = _operator!(node_op, state, time, input.values[i])
+        @inbounds for i in 1:n
+            time = input.times[i]
+            values[i] = _operator!(node_op, state, time, input.values[i])
         end
         Block(unchecked, input.times, values)
     else
         times = _allocate_times(n)
         j = 1
-        for i in 1:n
-            time = @inbounds input.times[i]
-            out = _operator!(node_op, state, time, @inbounds(input.values[i]))
+        @inbounds for i in 1:n
+            time = input.times[i]
+            out = _operator!(node_op, state, time, input.values[i])
             if valid(out)
-                @inbounds values[j] = unsafe_value(out)
-                @inbounds times[j] = input.times[i]
+                values[j] = unsafe_value(out)
+                times[j] = input.times[i]
                 j += 1
             end
         end
@@ -256,9 +265,9 @@ function _apply_fast_align_binary!(
     return if always_ticks(op)
         # We shouldn't assume that it is valid to broadcast f over the inputs, so loop
         # manually.
-        for i in 1:n
-            time = @inbounds input_l.times[i]
-            @inbounds values[i] = _operator!(
+        @inbounds for i in 1:n
+            time = input_l.times[i]
+            values[i] = _operator!(
                 op, operator_state, time, input_l.values[i], input_r.values[i]
             )
         end
@@ -423,28 +432,28 @@ function run_node!(
     next_time_r = DateTime(0)
 
     # Loop until we exhaust inputs.
-    while (il <= nl || ir <= nr)
+    @inbounds while (il <= nl || ir <= nr)
         if (il <= nl)
-            next_time_l = @inbounds input_l.times[il]
+            next_time_l = input_l.times[il]
         end
         if (ir <= nr)
-            next_time_r = @inbounds input_r.times[ir]
+            next_time_r = input_r.times[ir]
         end
 
         new_time = if (il <= nl && next_time_l < next_time_r) || ir > nr
             # Left ticks next
-            _set_l!(state, @inbounds input_l.values[il])
+            _set_l!(state, input_l.values[il])
             il += 1
             next_time_l
         elseif (ir <= nr && next_time_r < next_time_l) || il > nl
             # Right ticks next
-            _set_r!(state, @inbounds input_r.values[ir])
+            _set_r!(state, input_r.values[ir])
             ir += 1
             next_time_r
         else
             # A shared time point where neither x1 nor x2 have been exhausted.
-            _set_l!(state, @inbounds input_l.values[il])
-            _set_r!(state, @inbounds input_r.values[ir])
+            _set_l!(state, input_l.values[il])
+            _set_r!(state, input_r.values[ir])
             il += 1
             ir += 1
             next_time_l
@@ -522,11 +531,11 @@ function run_node!(
 
     # If we get to the end of either series, we know that we cannot add any more elements to
     # the output.
-    while (il <= nl && ir <= nr)
+    @inbounds while (il <= nl && ir <= nr)
         # Obtain the *next available* times from each entity. We know that the current
         # state, and last emitted, time is strictly less than either of these.
-        time_l = @inbounds input_l.times[il]
-        time_r = @inbounds input_r.times[ir]
+        time_l = input_l.times[il]
+        time_r = input_r.times[ir]
 
         if time_l < time_r
             # Left ticks next; consider the next knot.
@@ -543,8 +552,8 @@ function run_node!(
                 values,
                 j,
                 time_l,
-                @inbounds(input_l.values[il]),
-                @inbounds(input_r.values[ir])
+                input_l.values[il],
+                input_r.values[ir],
             )
             il += 1
             ir += 1
@@ -650,15 +659,15 @@ function run_node!(
     # The index into the output.
     j = 1
 
-    for il in 1:nl
+    @inbounds for il in 1:nl
         # Consume r while it would leave us before the current time in l, or until we reach
         # the end of r.
-        while (ir < nr && @inbounds(input_r.times[ir + 1] <= input_l.times[il]))
+        while (ir < nr && input_r.times[ir + 1] <= input_l.times[il])
             ir += 1
         end
 
         if ir > 0
-            time = @inbounds input_l.times[il]
+            time = input_l.times[il]
 
             j = _maybe_add_knot!(
                 node_op,
@@ -667,13 +676,13 @@ function run_node!(
                 values,
                 j,
                 time,
-                @inbounds(input_l.values[il]),
-                @inbounds(input_r.values[ir])
+                input_l.values[il],
+                input_r.values[ir],
             )
 
         elseif have_initial_r
             # R hasn't ticked in this batch, but we have an initial value.
-            time = @inbounds input_l.times[il]
+            time = input_l.times[il]
 
             j = _maybe_add_knot!(
                 node_op,
@@ -682,7 +691,7 @@ function run_node!(
                 values,
                 j,
                 time,
-                @inbounds(input_l.values[il]),
+                input_l.values[il],
                 state.latest_r,
             )
         end
