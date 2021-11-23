@@ -118,10 +118,48 @@ Such a feature isn't currently planned.
 
 ## Alignment implementation
 
+If we want to define a new op that follows alignment semantics, it should derive from one of the following types.
+
 ```@docs
+TimeDag.UnaryNodeOp
+TimeDag.BinaryNodeOp
+TimeDag.NaryNodeOp
+```
+
+Instead of implementing [`TimeDag.run_node!`](@ref) directly, one instead implements some of the following functions.
+The exact alignment logic is then encapsulated, and doesn't need to be dealt with directly.
+
+```@docs
+TimeDag.operator!
+TimeDag.always_ticks
+TimeDag.stateless_operator
+TimeDag.time_agnostic
+TimeDag.value_agnostic
 TimeDag.has_initial_values
 TimeDag.initial_left
 TimeDag.initial_right
+TimeDag.create_operator_evaluation_state
+```
+
+For simple cases, the following node ops can be useful.
+
+!!! tip
+    Rather than using the structures below directly, you probably want to use [`TimeDag.apply`](@ref), [`wrap`](@ref), or [`wrapb`](@ref).
+
+```@docs
+TimeDag.SimpleUnary
+TimeDag.SimpleBinary
+TimeDag.SimpleBinaryUnionInitial
+TimeDag.SimpleBinaryLeftInitial
+```
+
+## Maybe
+
+```@docs
+TimeDag.Maybe
+TimeDag.valid
+TimeDag.value
+TimeDag.unsafe_value
 ```
 
 ## Other

@@ -28,8 +28,29 @@ const INTERSECT = IntersectAlignment()
 """The default alignment for operators when not specified."""
 const DEFAULT_ALIGNMENT = UNION
 
+"""
+    UnaryNodeOp{T} <: NodeOp{T}
+
+An abstract type representing a node op with a single parent.
+"""
 abstract type UnaryNodeOp{T} <: NodeOp{T} end
+
+"""
+    BinaryNodeOp{T,A<:Alignment} <: NodeOp{T}
+
+An abstract type representing a node op with two parents, and using alignment `A`.
+"""
 abstract type BinaryNodeOp{T,A<:Alignment} <: NodeOp{T} end
+
+"""
+    NaryNodeOp{N,T,A<:Alignment} <: NodeOp{T}
+
+An abstract type representing a node op with `N` parents, and using alignment `A`.
+
+This type should be avoided for `N < 3`, since in these cases it would be more appropriate
+to use either [`TimeDag.UnaryNodeOp`](@ref) or [`TimeDag.BinaryNodeOp`](@ref).
+"""
+abstract type NaryNodeOp{N,T,A<:Alignment} <: NodeOp{T} end
 
 # A note on the design choice here, which is motivated by performance reasons & profiling.
 #
@@ -49,16 +70,19 @@ abstract type BinaryNodeOp{T,A<:Alignment} <: NodeOp{T} end
 """
     operator!(op::UnaryNodeOp{T}, (state,), (time,) x) -> T / Maybe{T}
     operator!(op::BinaryNodeOp{T}, (state,), (time,) x, y) -> T / Maybe{T}
+    operator!(op::NaryNodeOp{N,T}, (state,), (time,) x, y, ...) -> T / Maybe{T}
 
 Perform the operation for this node.
 
-`state` should be omitted from the definition iff the node is stateless.
-`time` should be omitted from the definition iff the node is time_agnostic.
+When defining a method of this for a new op, follow these rules:
+- `state` should be omitted iff [`TimeDag.stateless_operator`](@ref).
+- `time` should be omitted iff [`TimeDag.time_agnostic`](@ref).
+- All values `x, y, ...` should be omittted iff [`TimeDag.value_agnostic`](@ref).
 
 For stateful operations, this operator should mutate `state` as required.
 
-The return value `out` should be of type `T` iff `always_ticks(op)` is true, otherwise
-it should be of type `Maybe{T}`.
+The return value `out` should be of type `T` iff [`TimeDag.always_ticks`](@ref) is true,
+otherwise it should be of type [`TimeDag.Maybe`](@ref).
 
 If `out <: Maybe{T}`, and has `!valid(out)`, this indicates that we do not wish to emit a
 knot at this time, and it will be skipped. Otherwise, `value(out)` will be used as the
