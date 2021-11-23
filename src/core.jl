@@ -99,7 +99,7 @@ Evaluate the given node from `time_start` until `time_end`, with the initial `st
 Zero or more blocks will be passed as an input; these correspond to the parents of a node,
 and are passed in the same order as that returned by `parents(node)`.
 
-We return a new `Block` of output knots from this node.
+We return a new [`Block`](@ref) of output knots from this node.
 
 !!! warning
     The implementer of `run_node!` must ensure:
@@ -120,28 +120,10 @@ function run_node! end
     stateless(op) -> Bool
 
 Returns true iff `op` can be assumed to be stateless; that is, if the node evaluation state
-is EMPTY_NODE_STATE.
+is [`TimeDag.EMPTY_NODE_STATE`](@ref).
 """
 stateless(node::Node) = stateless(node.op)
 stateless(::NodeOp) = false
-
-"""
-    time_agnostic(node) -> Bool
-    time_agnostic(op) -> Bool
-
-Returns true iff `op` does not care about the time of the input knot(s).
-"""
-time_agnostic(node::Node) = time_agnostic(node.op)
-time_agnostic(::NodeOp) = false
-
-"""
-    value_agnostic(node) -> Bool
-    value_agnostic(op) -> Bool
-
-Returns true iff `op` does not care about the value(s) of the input knot(s).
-"""
-value_agnostic(node::Node) = value_agnostic(node.op)
-value_agnostic(::NodeOp) = false
 
 """
     duplicate(x)

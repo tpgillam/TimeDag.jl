@@ -94,6 +94,24 @@ stateless_operator(node::Node) = stateless_operator(node.op)
 stateless_operator(op::NodeOp) = stateless(op)
 
 """
+    time_agnostic(node) -> Bool
+    time_agnostic(op) -> Bool
+
+Returns true iff `op` does not care about the time of the input knot(s).
+"""
+time_agnostic(node::Node) = time_agnostic(node.op)
+time_agnostic(::NodeOp) = false
+
+"""
+    value_agnostic(node) -> Bool
+    value_agnostic(op) -> Bool
+
+Returns true iff `op` does not care about the value(s) of the input knot(s).
+"""
+value_agnostic(node::Node) = value_agnostic(node.op)
+value_agnostic(::NodeOp) = false
+
+"""
     create_operator_evaluation_state(parents, op::NodeOp) -> NodeEvaluationState
 
 Create an empty evaluation state for the given node, when starting evaluation at the
