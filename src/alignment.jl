@@ -212,13 +212,23 @@ function _propagate_constant_value(op::NaryNodeOp{N}, parents::NTuple{N,Node}) w
     return operator!(op, map(value, parents)...)
 end
 
-# An unary node has no alignment state, so any state comes purely from the operator.
-function create_evaluation_state(parents::Tuple{Node}, op::UnaryNodeOp)
+"""
+    _create_operator_evaluation_state(parents, op) -> NodeEvaluationState
+
+Internal function that will look at `stateless_operator`, and iff it is false call
+`create_operator_evaluation_state`. Otherwise return an empty node state.
+"""
+function _create_operator_evaluation_state(parents, op)
     return if stateless_operator(op)
         EMPTY_NODE_STATE
     else
         create_operator_evaluation_state(parents, op)
     end
+end
+
+# An unary node has no alignment state, so any state comes purely from the operator.
+function create_evaluation_state(parents::Tuple{Node}, op::UnaryNodeOp)
+    return _create_operator_evaluation_state(parents, op)
 end
 
 function run_node!(
@@ -315,8 +325,8 @@ mutable struct UnionWithoutOpState{L,R} <: UnionAlignmentState{L,R}
     end
 end
 
-operator_state(::UnionWithoutOpState) = EMPTY_NODE_STATE
 operator_state(state::UnionWithOpState) = state.operator_state
+operator_state(::UnionWithoutOpState) = EMPTY_NODE_STATE
 
 function _set_l!(state::UnionAlignmentState{L}, x::L) where {L}
     state.latest_l = x
@@ -364,7 +374,7 @@ end
     # we can (at compile time) select the correct branch below based on `always_ticks(op)`.
     out = _operator!(node_op, operator_state, time, in_values...)
 
-    if always_ticks(node_op)
+    return if always_ticks(node_op)
         # Output value is raw, and should always be used.
         @inbounds out_times[j] = time
         @inbounds out_values[j] = out
@@ -383,24 +393,24 @@ end
 
 function run_node!(
     node_op::BinaryNodeOp{T,UnionAlignment},
-    state::UnionAlignmentState{L,R},
+    state::UnionAlignmentState,
     ::DateTime,  # time_start
     ::DateTime,  # time_end
-    input_l::Block{L},
-    input_r::Block{R},
-) where {T,L,R}
-    if isempty(input_l) && isempty(input_r)
+    input_l::Block,
+    input_r::Block,
+) where {T}
+    @inbounds if isempty(input_l) && isempty(input_r)
         # Nothing to do, since neither input has ticked.
         return Block{T}()
     elseif isempty(input_l) && !state.valid_l
         # Left is inactive and won't tick, so nothing gets emitted. But make sure we update
         # the state on the right.
-        _set_r!(state, @inbounds last(input_r.values))
+        _set_r!(state, last(input_r.values))
         return Block{T}()
     elseif isempty(input_r) && !state.valid_r
         # Right is inactive and won't tick, so nothing gets emitted. But make sure we update
         # the state on the left.
-        _set_l!(state, @inbounds last(input_l.values))
+        _set_l!(state, last(input_l.values))
         return Block{T}()
     end
 
@@ -427,18 +437,11 @@ function run_node!(
     # Index into the output.
     j = 1
 
-    # Store the next available time in the series, that is being pointed to by il & ir.
-    next_time_l = DateTime(0)
-    next_time_r = DateTime(0)
-
     # Loop until we exhaust inputs.
     @inbounds while (il <= nl || ir <= nr)
-        if (il <= nl)
-            next_time_l = input_l.times[il]
-        end
-        if (ir <= nr)
-            next_time_r = input_r.times[ir]
-        end
+        # Store the next available time in the series, that is being pointed to by il & ir.
+        next_time_l = il <= nl ? input_l.times[il] : DateTime(0)
+        next_time_r = ir <= nr ? input_r.times[ir] : DateTime(0)
 
         new_time = if (il <= nl && next_time_l < next_time_r) || ir > nr
             # Left ticks next
@@ -489,11 +492,7 @@ function create_evaluation_state(
 ) where {T}
     # Intersect alignment doesn't require remembering any previous state, so just return
     # the operator state.
-    return if stateless_operator(op)
-        EMPTY_NODE_STATE
-    else
-        create_operator_evaluation_state(parents, op)
-    end
+    return _create_operator_evaluation_state(parents, op)
 end
 
 function run_node!(
@@ -501,9 +500,9 @@ function run_node!(
     operator_state::NodeEvaluationState,
     ::DateTime,  # time_start
     ::DateTime,  # time_end
-    input_l::Block{L},
-    input_r::Block{R},
-) where {T,L,R}
+    input_l::Block,
+    input_r::Block,
+) where {T}
     if isempty(input_l) || isempty(input_r)
         # Output will be empty unless both inputs have ticked.
         return Block{T}()
@@ -534,16 +533,16 @@ function run_node!(
     @inbounds while (il <= nl && ir <= nr)
         # Obtain the *next available* times from each entity. We know that the current
         # state, and last emitted, time is strictly less than either of these.
-        time_l = input_l.times[il]
-        time_r = input_r.times[ir]
+        next_time_l = input_l.times[il]
+        next_time_r = input_r.times[ir]
 
-        if time_l < time_r
+        if next_time_l < next_time_r
             # Left ticks next; consider the next knot.
             il += 1
-        elseif time_r < time_l
+        elseif next_time_r < next_time_l
             # Right ticks next; consider the next knot.
             ir += 1
-        else  # time_l == time_r
+        else  # next_time_l == next_time_r
             # Shared time point, so emit a knot.
             j = _maybe_add_knot!(
                 node_op,
@@ -551,7 +550,7 @@ function run_node!(
                 times,
                 values,
                 j,
-                time_l,
+                next_time_l,
                 input_l.values[il],
                 input_r.values[ir],
             )
@@ -626,9 +625,9 @@ function run_node!(
     state::LeftAlignmentState,
     ::DateTime,  # time_start
     ::DateTime,  # time_end
-    input_l::Block{L},
-    input_r::Block{R},
-) where {T,L,R}
+    input_l::Block,
+    input_r::Block,
+) where {T}
     have_initial_r = state.valid_r
 
     if isempty(input_l)
@@ -662,35 +661,32 @@ function run_node!(
     @inbounds for il in 1:nl
         # Consume r while it would leave us before the current time in l, or until we reach
         # the end of r.
-        while (ir < nr && input_r.times[ir + 1] <= input_l.times[il])
+        next_time_l = input_l.times[il]
+        while (ir < nr && input_r.times[ir + 1] <= next_time_l)
             ir += 1
         end
 
         if ir > 0
-            time = input_l.times[il]
-
             j = _maybe_add_knot!(
                 node_op,
                 operator_state(state),
                 times,
                 values,
                 j,
-                time,
+                next_time_l,
                 input_l.values[il],
                 input_r.values[ir],
             )
 
         elseif have_initial_r
             # R hasn't ticked in this batch, but we have an initial value.
-            time = input_l.times[il]
-
             j = _maybe_add_knot!(
                 node_op,
                 operator_state(state),
                 times,
                 values,
                 j,
-                time,
+                next_time_l,
                 input_l.values[il],
                 state.latest_r,
             )
@@ -705,5 +701,180 @@ function run_node!(
     # Package the outputs into a block, resizing the outputs as necessary.
     _trim!(times, j - 1)
     _trim!(values, j - 1)
+    return Block(unchecked, times, values)
+end
+
+# TODO _apply_fast_align_nary!
+
+# Some thought went into how to store `latest` for the nary case.
+#
+# Ideally one would use a mutable heterogeneous collection (i.e. a "mutable tuple"), but
+# such a thing doesn't exist in Julia. There are tricks one can use if your elements are
+# isbits (see StaticArrays.MArray), but we want a solution that can work for *any* input
+# Julia type.
+#
+# Options considered:
+#   1. Nary alignment, with latest::Vector{Any} and accept that state *cannot* store latest
+#       values efficiently (will be a lot of runtime type checking). This WILL be slow, as
+#       it is in the inner loop of evaluation.
+#   2. Nary alignment, and use a Tuple for storage.
+#       But, because this isn't mutable, will have to use `Base.setindex` to update, which
+#       could theoretically do a lot of allocating.
+#   3. Use code generation to make Union2, Union3, Union4, ...
+#       This bloats the code somewhat, but would be guaranteed to be fast.
+#       However, there is then an arbitrary limit to the number of things that we can align.
+#
+# Benchmarking suggests that option 2 can actually be quite efficient in practice, since if
+# we immediately assign the tuple, LLVM has the ability to re-use memory. We hence take this
+# approach.
+#
+# In the future, we could generate a SMALL number of additional special-cases using option 3
+# (if, for example, we found ourselves doing a lot of ternary alignment).
+#
+# Also, to simplify matters, we use a single alignment state. It is slightly less memory
+# efficient, but should result in less code generation.
+
+# `Types` will look something like Tuple{In1,In2,...}
+mutable struct NaryAlignmentState{N,Types<:Tuple,OperatorState} <: NodeEvaluationState
+    # Since we may not have a latest value, we use the partial initialisation trick inside
+    # `Maybe` to avoid having to invent an unused placeholder.
+    latest::Tuple{Vararg{Maybe}}
+    operator_state::OperatorState
+
+    function NaryAlignmentState{N,Types}(
+        operator_state::OperatorState
+    ) where {N,Types,OperatorState}
+        return new{N,Types,OperatorState}(
+            Tuple(Maybe{T}() for T in Types.parameters), operator_state
+        )
+    end
+
+    function NaryAlignmentState{N,Types}(
+        operator_state::OperatorState, initial_values::Types
+    ) where {N,Types,OperatorState}
+        return new{N,Types,OperatorState}(
+            Tuple(Maybe(v) for v in initial_values), operator_state
+        )
+    end
+end
+
+operator_state(state::NaryAlignmentState) = state.operator_state
+
+Base.@propagate_inbounds function _set!(state::NaryAlignmentState, x, i::Integer)
+    # TODO Consider making a mutable Maybe type, to avoid possible reconstruction of the
+    #   tuple? It might just end up being slower though due to extra dereferencing.
+    # The state tuple is not mutable, so we need to use this trick.
+    state.latest = Base.setindex(state.latest, Maybe(x), i)
+    return state
+end
+
+function create_evaluation_state(parents::NTuple{N,Node}, op::NaryNodeOp{N}) where {N}
+    # Work out the tuple of input types necessary for constructing the alignment state.
+    Types = Tuple{map(value_type, parents)...}
+    operator_state = _create_operator_evaluation_state(parents, op)
+
+    return if has_initial_values(op)
+        NaryAlignmentState{N,Types}(operator_state, initial_values(op))
+    else
+        NaryAlignmentState{N,Types}(operator_state)
+    end
+end
+
+function create_evaluation_state(
+    parents::NTuple{N,Node}, op::NaryNodeOp{N,T,IntersectAlignment}
+) where {N,T}
+    # Intersect alignment doesn't require remembering any previous state, so just return
+    # the operator state.
+    return _create_operator_evaluation_state(parents, op)
+end
+
+function run_node!(
+    node_op::NaryNodeOp{N,T,UnionAlignment},
+    state::NaryAlignmentState{N},
+    ::DateTime,  # time_start
+    ::DateTime,  # time_end
+    inputs::Block...,
+) where {N,T}
+    @assert N == length(inputs)
+
+    inputs_empty = map(isempty, inputs)
+    @inbounds if all(inputs_empty)
+        # Nothing to do, as no inputs have ticked.
+        return Block{T}()
+    elseif any(inputs_empty .& map(!valid, state.latest))
+        # There is at least one input which has an empty input and does *not* have an
+        # initial value.
+
+        # We need to make sure we update any states which do have inputs.
+        for (i, input) in enumerate(inputs)
+            isempty(input) && continue
+            _set!(state, last(input.values), i)
+        end
+
+        # The output will, however, be empty.
+        return Block{T}()
+    end
+
+    # TODO fast alignment in case where all timestamps are equal
+
+    # TODO This could be a massive overestimate.
+    #   In practice it may be better to pick something smaller, and then increase the buffer
+    #   size where necessary.
+    #   One could also optimise this a bit more by using `_equal_times` as an
+    #   equivalence relation, and not double-counting those.
+    ns = map(length, inputs)
+    max_size = sum(ns)
+    times = _allocate_times(max_size)
+    values = _allocate_values(T, max_size)
+
+    # Indices into the inputs. The index represents the next time point for
+    # consideration for each series.
+    is = MVector{N,Int64}(ones(N))
+
+    # Index into the output.
+    j = 1
+
+    @inbounds while true
+        unfinisheds = (is .<= ns)
+        any(unfinisheds) || break  # Loop until we exhaust inputs.
+
+        # For each input, figure out the next time it would tick.
+        next_times = ntuple(Val(N)) do k
+            # If we're at the end of the series, just use a placeholder.
+            !unfinisheds[k] && return typemax(DateTime)
+            return inputs[k].times[is[k]]
+        end
+
+        # We need to figure out when we next tick.
+        new_time = minimum(next_times)
+
+        # For every input that ticks at exactly this time, update to use the new value.
+        for k in 1:N
+            unfinisheds[k] || continue
+            next_times[k] == new_time || continue
+            # If we are here, this input should advance.
+            _set!(state, inputs[k].values[is[k]], k)
+            is[k] += 1
+        end
+
+        # We must only output a knot if all inputs are active.
+        all(map(valid, state.latest)) || continue
+
+        # Compute and possibly output a knot.
+        j = _maybe_add_knot!(
+            node_op,
+            operator_state(state),
+            times,
+            values,
+            j,
+            new_time,
+            map(unsafe_value, state.latest)...,
+        )
+    end
+
+    # Package the outputs into a block, resizing the outputs as necessary.
+    _trim!(times, j - 1)
+    _trim!(values, j - 1)
+
     return Block(unchecked, times, values)
 end

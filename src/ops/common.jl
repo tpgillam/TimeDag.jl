@@ -63,15 +63,49 @@ has_initial_values(::SimpleBinaryLeftInitial) = true
 initial_right(op::SimpleBinaryLeftInitial) = op.initial_r
 
 """
+    SimpleNary{f,N,T,A}
+
+Represents a stateless, time-independent `N`ary operator that will always emit a value.
+"""
+struct SimpleNary{f,N,T,A} <: NaryNodeOp{N,T,A} end
+
+always_ticks(::SimpleNary) = true
+stateless_operator(::SimpleNary) = true
+time_agnostic(::SimpleNary) = true
+operator!(::SimpleNary{f}, values...) where {f} = f(values...)
+
+"""
+    SimpleNaryInitial{f,N,T,A,Types}
+
+Represents a stateless, time-independent binary operator that will always emit a value.
+
+Unlike [`SimpleNary`](@ref), this also contains initial values.
+See [Initial values](@ref) for more details.
+"""
+struct SimpleNaryInitial{f,N,T,A,Types} <: NaryNodeOp{N,T,A}
+    initial::Types
+end
+
+always_ticks(::SimpleNaryInitial) = true
+stateless_operator(::SimpleNaryInitial) = true
+time_agnostic(::SimpleNaryInitial) = true
+operator!(::SimpleNaryInitial{f}, values...) where {f} = f(values...)
+has_initial_values(::SimpleNaryInitial) = true
+initial_values(op::SimpleNaryInitial) = op.initial
+
+"""
     apply(f::Function, x; out_type=nothing)
     apply(
-        f::Function, x, y[, alignment=DEFAULT_ALIGNMENT];
+        f::Function, x, y[, z, ..., alignment=DEFAULT_ALIGNMENT];
         out_type=nothing, initial_values=nothing
     )
 
 Obtain a node with values constructed by applying the pure function `f` to the input values.
 
-With more than one argument an alignment can optionally be specified.
+With more than one nodal argument, alignment will be performed. In this case, the
+`alignment` argument can be specified as one of [`INTERSECT`](@ref), [`LEFT`](@ref) or
+[`UNION`](@ref). If unspecified, `DEFAULT_ALIGNMENT` will be used.
+
 
 Internally this will infer the output type of `f` applied to the arguments, and will also
 ensure that subgraph elimination occurs when possible.
@@ -98,12 +132,13 @@ function apply(
     f::Function,
     x,
     y,
-    alignment::A;
+    alignment::Alignment;
     out_type::Union{Nothing,Type}=nothing,
     initial_values::Union{Nothing,Tuple{<:Any,<:Any}}=nothing,
-) where {A<:Alignment}
+)
     x = _ensure_node(x)
     y = _ensure_node(y)
+    A = typeof(alignment)
     T = isnothing(out_type) ? output_type(f, value_type(x), value_type(y)) : out_type
     op = if isnothing(initial_values)
         SimpleBinary{f,T,A}()
@@ -124,6 +159,45 @@ end
 apply(f::Function, x::Node, y; kwargs...) = apply(f, x, y, DEFAULT_ALIGNMENT; kwargs...)
 apply(f::Function, x, y::Node; kwargs...) = apply(f, x, y, DEFAULT_ALIGNMENT; kwargs...)
 
+
+function apply(
+    f::Function,
+    x,
+    y,
+    z,
+    rest...;
+    out_type::Union{Nothing,Type}=nothing,
+    initial_values::Union{Nothing,Tuple{Vararg{Any}}}=nothing,
+)
+    # The last argument *might* be an alignment. If it isn't, we should use the default
+    # alignment.
+    args = (x, y, z, rest...)
+    head = args[1:end - 1]
+    tail = last(args)
+    args, alignment = if isa(tail, Alignment)
+        head, tail
+    else
+        args, DEFAULT_ALIGNMENT
+    end
+
+    inputs = map(_ensure_node, args)
+    A = typeof(alignment)
+    N = length(inputs)
+    input_types = map(value_type, inputs)
+    T = isnothing(out_type) ? output_type(f, input_types...) : out_type
+    op = if isnothing(initial_values)
+        SimpleNary{f,N,T,A}()
+    else
+        # Sanity check the initial values.
+        Types = Tuple{input_types...}
+        if !isa(initial_values, Types)
+            throw(ArgumentError("$initial_values should be of type $Types"))
+        end
+        SimpleNaryInitial{f,N,T,A,Types}(initial_values)
+    end
+    return obtain_node(inputs, op)
+end
+
 """
     BCast(f::Function)
 
@@ -142,8 +216,21 @@ end
 Represent a function that, when called, will expect its arguments to be nodes and try to
 convert them as such.
 """
-struct Wrapped{f} end
-@inline (::Wrapped{f})(args...; kwargs...) where {f} = apply(f, args...; kwargs...)
+struct Wrapped{f} <: Function end
+@inline function (::Wrapped{f})(x, rest...; kwargs...) where {f}
+    # args = (x, rest...)
+    # # In order to support nary functions, `apply` takes the alignment as the first argument.
+    # # Currently the rest of our API expects alignment as the last argument (as this makes
+    # # specifying a default easier in general).
+    # head = args[1:end - 1]
+    # tail = last(args)
+    # args, alignment = if isa(tail, Alignment)
+    #     head, tail
+    # else
+    #     args, DEFAULT_ALIGNMENT
+    # end
+    return apply(f, x, rest...; kwargs...)
+end
 
 # TODO Would we like an identity map? Not important right now, but could be in the future
 #   if we allow stateful things?
@@ -157,11 +244,11 @@ It is assumed that `f` is stateless and time-independent. We also assume that we
 always emit a knot when the alignment semantics say we should — thus `f` must always return
 a valid output value.
 
-If the object is called with more than one node, alignment will be performed. In this case,
-the final argument can be an `Alignment` instance, otherwise `DEFAULT_ALIGNMENT` will be
-used.
+If the object is called with more than one node, alignment will be performed.
+If an alignment other than the default should be used, provide it as the final argument.
 
-Internally this will call `TimeDag.apply(f, args...)`; see there for further details.
+Internally this will call `TimeDag.apply(f, args...; kwargs...)`; see there for further
+details.
 """
 wrap(f::Function) = Wrapped{f}()
 

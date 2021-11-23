@@ -138,6 +138,7 @@ TimeDag.value_agnostic
 TimeDag.has_initial_values
 TimeDag.initial_left
 TimeDag.initial_right
+TimeDag.initial_values
 TimeDag.create_operator_evaluation_state
 ```
 
@@ -151,6 +152,8 @@ TimeDag.SimpleUnary
 TimeDag.SimpleBinary
 TimeDag.SimpleBinaryUnionInitial
 TimeDag.SimpleBinaryLeftInitial
+TimeDag.SimpleNary
+TimeDag.SimpleNaryInitial
 ```
 
 ## Maybe

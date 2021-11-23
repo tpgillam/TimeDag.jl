@@ -260,4 +260,126 @@ function _test_binary_op(f_timedag, f=f_timedag)
     end
 end
 
+function _test_ternary_op(f_timedag, f=f_timedag)
+    @testset "Common (fast) alignment" begin
+        # Should apply for *any* user choice of alignment.
+        for alignment in (UNION, LEFT, INTERSECT)
+            n = f_timedag(n1, n1, n1, alignment)
+            block = _eval(n)
+            @test block == Block([
+                DateTime(2000, 1, 1) => f(1, 1, 1),
+                DateTime(2000, 1, 2) => f(2, 2, 2),
+                DateTime(2000, 1, 3) => f(3, 3, 3),
+                DateTime(2000, 1, 4) => f(4, 4, 4),
+            ])
+            # For fast alignment, we expect *identical* timestamps as on the input.
+            @test block.times === b1.times
+        end
+    end
+
+    @testset "union alignment" begin
+        n = f_timedag(n1, n2, n3)
+        @test n === f_timedag(n1, n2, n3, UNION)
+        block = _eval(n)
+        @test block == Block([
+            DateTime(2000, 1, 2) => f(2, 5, 15),
+            DateTime(2000, 1, 3) => f(3, 6, 15),
+            DateTime(2000, 1, 4) => f(4, 6, 15),
+            DateTime(2000, 1, 5) => f(4, 8, 15),
+        ])
+    end
+
+    @testset "intersect alignment" begin
+        n = f_timedag(n1, n2, n4, INTERSECT)
+
+        @test _eval(n) == Block([
+            DateTime(2000, 1, 2) => f(2, 5, 2),
+            DateTime(2000, 1, 3) => f(3, 6, 3),
+        ])
+    end
+
+    @testset "left alignment" begin
+        n = f_timedag(n1, n2, n3, LEFT)
+        @test _eval(n) == Block([
+            DateTime(2000, 1, 2) => f(2, 5, 15),
+            DateTime(2000, 1, 3) => f(3, 6, 15),
+            DateTime(2000, 1, 4) => f(4, 6, 15),
+        ])
+
+        # Catch edge-case in which there was a bug.
+        @test _eval(f_timedag(n2, n3, n1, LEFT)) == Block([
+            DateTime(2000, 1, 2) => f(5, 15, 2),
+            DateTime(2000, 1, 3) => f(6, 15, 3),
+            DateTime(2000, 1, 5) => f(8, 15, 4),
+        ])
+        @test _eval(f_timedag(n3, n2, n1, LEFT)) == Block{Int64}()
+    end
+
+    @testset "constant propagation" begin
+        value = 2.0  # valid for all ops we're currently testing.
+        cv = constant(value)
+        cf = constant(f(value, value, value))
+        @test f_timedag(cv, cv, cv) === cf
+        @test f_timedag(cv, value, value) === cf
+        @test f_timedag(value, cv, value) === cf
+        @test f_timedag(value, value, cv) === cf
+        @test f_timedag(cv, cv, value) === cf
+        @test f_timedag(cv, value, cv) === cf
+        @test f_timedag(value, cv, cv) === cf
+    end
+
+    # Two instances of the NodeOp instance should compare equal for equal
+    # type parameters.
+    T = Float64
+    for A in (UnionAlignment, IntersectAlignment, LeftAlignment)
+        @test TimeDag.SimpleNary{f,3,T,A}() == TimeDag.SimpleNary{f,3,T,A}()
+        @test T != Float32
+        @test TimeDag.SimpleNary{f,3,Float32,A}() != TimeDag.SimpleNary{f,3,T,A}()
+    end
+
+    @testset "initial values" begin
+        # Initial value of wrong type.
+        @test_throws ArgumentError f_timedag(n1, n2, n3; initial_values=(-1, -2.0, -3))
+
+        @testset "union alignment" begin
+            n = f_timedag(n1, n2, n3; initial_values=(-1, -2, -3))
+            @test n === f_timedag(n1, n2, n3, UNION; initial_values=(-1, -2, -3))
+
+            @test _eval(n) == Block([
+                DateTime(2000, 1, 1) => f(1, -2, 15),
+                DateTime(2000, 1, 2) => f(2, 5, 15),
+                DateTime(2000, 1, 3) => f(3, 6, 15),
+                DateTime(2000, 1, 4) => f(4, 6, 15),
+                DateTime(2000, 1, 5) => f(4, 8, 15),
+            ])
+
+            n = f_timedag(n2, n1, n3; initial_values=(-1, -2, -3))
+            @test _eval(n) == Block([
+                DateTime(2000, 1, 1) => f(-1, 1, 15),
+                DateTime(2000, 1, 2) => f(5, 2, 15),
+                DateTime(2000, 1, 3) => f(6, 3, 15),
+                DateTime(2000, 1, 4) => f(6, 4, 15),
+                DateTime(2000, 1, 5) => f(8, 4, 15),
+            ])
+        end
+
+        @testset "left alignment" begin
+            n = f_timedag(n1, n2, n3, LEFT; initial_values=(-1, -2, -3))
+            @test _eval(n) == Block([
+                DateTime(2000, 1, 1) => f(1, -2, 15),
+                DateTime(2000, 1, 2) => f(2, 5, 15),
+                DateTime(2000, 1, 3) => f(3, 6, 15),
+                DateTime(2000, 1, 4) => f(4, 6, 15),
+            ])
+        end
+
+        # Intersect alignment
+        @testset "intersect alignment" begin
+            n = f_timedag(n1, n2, n3, INTERSECT; initial_values=(-1, -2, -3))
+            # Initial values should always be ignored.
+            @test n === f_timedag(n1, n2, n3, INTERSECT)
+        end
+    end
+end
+
 #! format: on
