@@ -159,7 +159,6 @@ end
 apply(f::Function, x::Node, y; kwargs...) = apply(f, x, y, DEFAULT_ALIGNMENT; kwargs...)
 apply(f::Function, x, y::Node; kwargs...) = apply(f, x, y, DEFAULT_ALIGNMENT; kwargs...)
 
-
 function apply(
     f::Function,
     x,
@@ -172,7 +171,7 @@ function apply(
     # The last argument *might* be an alignment. If it isn't, we should use the default
     # alignment.
     args = (x, y, z, rest...)
-    head = args[1:end - 1]
+    head = args[1:(end - 1)]
     tail = last(args)
     args, alignment = if isa(tail, Alignment)
         head, tail
