@@ -365,6 +365,9 @@ function _test_ternary_op(f_timedag, f=f_timedag)
 
         @testset "left alignment" begin
             n = f_timedag(n1, n2, n3, LEFT; initial_values=(-1, -2, -3))
+            # TODO Support this.
+            # # Initial left value should be ignored.
+            # @test n === f_timedag(n1, n2, n3, LEFT; initial_values=(-42, -2, -3))
             @test _eval(n) == Block([
                 DateTime(2000, 1, 1) => f(1, -2, 15),
                 DateTime(2000, 1, 2) => f(2, 5, 15),

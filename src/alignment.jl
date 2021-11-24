@@ -765,11 +765,12 @@ Base.@propagate_inbounds function _set!(state::NaryAlignmentState, x, i::Integer
     return state
 end
 
-function create_evaluation_state(parents::NTuple{N,Node}, op::NaryNodeOp{N}) where {N}
+function create_evaluation_state(
+    parents::NTuple{N,Node}, op::NaryNodeOp{N,T,UnionAlignment}
+) where {N,T}
     # Work out the tuple of input types necessary for constructing the alignment state.
     Types = Tuple{map(value_type, parents)...}
     operator_state = _create_operator_evaluation_state(parents, op)
-
     return if has_initial_values(op)
         NaryAlignmentState{N,Types}(operator_state, initial_values(op))
     else
@@ -783,6 +784,23 @@ function create_evaluation_state(
     # Intersect alignment doesn't require remembering any previous state, so just return
     # the operator state.
     return _create_operator_evaluation_state(parents, op)
+end
+
+function create_evaluation_state(
+    parents::NTuple{N,Node}, op::NaryNodeOp{N,T,LeftAlignment}
+) where {N,T}
+    # Work out the tuple of input types necessary for constructing the alignment state.
+    # Note that we should ignore the left parent, so we only capture the rightmost M = N-1.
+    _, parents_r... = parents
+    M = N - 1
+    Types = Tuple{map(value_type, parents_r)...}
+    operator_state = _create_operator_evaluation_state(parents, op)
+    return if has_initial_values(op)
+        _, initial_values_r... = initial_values(op)
+        NaryAlignmentState{M,Types}(operator_state, initial_values_r)
+    else
+        NaryAlignmentState{M,Types}(operator_state)
+    end
 end
 
 """Apply, assuming all `inputs` have identical alignment."""
@@ -857,9 +875,9 @@ function run_node!(
         # initial value.
 
         # We need to make sure we update any states which do have inputs.
-        for (i, input) in enumerate(inputs)
+        for (k, input) in enumerate(inputs)
             isempty(input) && continue
-            _set!(state, last(input.values), i)
+            _set!(state, last(input.values), k)
         end
 
         # The output will, however, be empty.
@@ -890,7 +908,7 @@ function run_node!(
 
     # Indices into the inputs. The index represents the next time point for
     # consideration for each series.
-    is = MVector{N,Int64}(ones(N))
+    is = MVector{N,Int64}(ones(Int64, N))
 
     # Index into the output.
     j = 1
@@ -970,7 +988,7 @@ function run_node!(
 
     # Store indices into the inputs. The index represents the next time point for
     # consideration for each series.
-    is = MVector{N,Int64}(ones(N))
+    is = MVector{N,Int64}(ones(Int64, N))
 
     # Index into the output.
     j = 1
@@ -1005,6 +1023,120 @@ function run_node!(
                 is[k] += 1
             end
         end
+    end
+
+    # Package the outputs into a block, resizing the outputs as necessary.
+    _trim!(times, j - 1)
+    _trim!(values, j - 1)
+    return Block(unchecked, times, values)
+end
+
+function run_node!(
+    node_op::NaryNodeOp{N,T,LeftAlignment},
+    state::NaryAlignmentState{M},
+    ::DateTime,  # time_start
+    ::DateTime,  # time_end
+    input_l::Block,
+    inputs_r::Block...,
+) where {N,T,M}
+    @assert M == length(inputs_r)
+    @assert M == N - 1
+
+    # TODO can we delete all this special casing??
+    # TODO can we delete all this special casing??
+    # TODO can we delete all this special casing??
+    # TODO can we delete all this special casing??
+    wont_emit = @inbounds (
+        isempty(input_l) ||  # Left input empty
+        (
+            # at least one right input inactive
+            any(zip(inputs_r, state.latest)) do pair
+                input_r, latest = pair
+                return (isempty(input_r) && !valid(latest))
+            end
+        )
+    )
+
+    @inbounds if wont_emit
+        # We will not be emitting a knot, but we should go through and update the state
+        # where necessary
+        for (kr, input_r) in enumerate(inputs_r)
+            isempty(input_r) && continue
+            _set!(state, last(input_r.values), kr)
+        end
+        return Block{T}()
+    end
+
+    all_times_equal = all(input_r -> _equal_times(input_l, input_r), inputs_r)
+    if all_times_equal
+        # All times are indistinguishable.
+        # Update alignment state and use fast alignment.
+        @inbounds for (k, input) in enumerate(inputs_r)
+            _set!(state, last(input.values), k)
+        end
+        inputs = (input_l, inputs_r...)
+        return _apply_fast_align_nary!(node_op, operator_state(state), inputs)
+    end
+
+    # The most we can emit is one knot for every knot in input_l.
+    nl = length(input_l)
+    times = _allocate_times(nl)
+    values = _allocate_values(T, nl)
+
+    # Indices into the right inputs. The index represents the next time point for
+    # consideration for each series.
+    # Use zero as the intitial index to indicate that the corresponding input hasn't
+    # started ticking yet.
+    irs = MVector{M,Int64}(zeros(Int64, M))
+
+    # Index into the output.
+    j = 1
+
+    # Length of each 'right' input.
+    nrs = map(length, inputs_r)
+
+    # @inbounds for il in 1:nl
+    for il in 1:nl
+        new_time = input_l.times[il]
+
+        # Consume right inputs until we get to at or before `new_time`, or until we reach
+        # the end of the input.
+        for kr in 1:M
+            nr = nrs[kr]
+            nr < 1 && continue  # Nothing to do in this case.
+            input_r = inputs_r[kr]
+            advanced = false
+            while (irs[kr] < nr && input_r.times[irs[kr] + 1] <= new_time)
+                irs[kr] += 1
+                advanced = true
+            end
+
+            # If this input has advanced, we should update the state.
+            if advanced
+                _set!(state, input_r.values[irs[kr]], kr)
+            end
+        end
+
+        # Ascertain whether we can emit a knot. The answer is "yes" so long as all
+        # right-states are valid.
+        if all(valid, state.latest)
+            j = _maybe_add_knot!(
+                node_op,
+                operator_state(state),
+                times,
+                values,
+                j,
+                new_time,
+                input_l.values[il],
+                map(unsafe_value, state.latest)...,
+            )
+        end
+    end
+
+    # We now need to update the state for the right-inputs, as we may not have exhausted
+    # them all in the loop above.
+    @inbounds for (k, input) in enumerate(inputs_r)
+        _set!(state, last(input.values), k)
     end
 
     # Package the outputs into a block, resizing the outputs as necessary.
