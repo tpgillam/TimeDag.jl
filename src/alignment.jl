@@ -729,7 +729,7 @@ end
 # (if, for example, we found ourselves doing a lot of ternary alignment).
 #
 # Also, to simplify matters, we use a single alignment state. It is slightly less memory
-# efficient, but should result in less code generation.
+# efficient, because we store a pointer for operator state even if it is unnecessary.
 
 # `Types` will look something like Tuple{In1,In2,...}
 mutable struct NaryAlignmentState{N,Types<:Tuple,OperatorState} <: NodeEvaluationState
