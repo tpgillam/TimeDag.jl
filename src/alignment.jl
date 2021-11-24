@@ -1042,10 +1042,6 @@ function run_node!(
     @assert M == length(inputs_r)
     @assert M == N - 1
 
-    # TODO can we delete all this special casing??
-    # TODO can we delete all this special casing??
-    # TODO can we delete all this special casing??
-    # TODO can we delete all this special casing??
     wont_emit = @inbounds (
         isempty(input_l) ||  # Left input empty
         (
@@ -1095,8 +1091,7 @@ function run_node!(
     # Length of each 'right' input.
     nrs = map(length, inputs_r)
 
-    # @inbounds for il in 1:nl
-    for il in 1:nl
+    @inbounds for il in 1:nl
         new_time = input_l.times[il]
 
         # Consume right inputs until we get to at or before `new_time`, or until we reach
