@@ -185,7 +185,9 @@ function apply(
     N = length(inputs)
     input_types = map(value_type, inputs)
     T = isnothing(out_type) ? output_type(f, input_types...) : out_type
-    op = if isnothing(initial_values)
+    # Note that initial values should always be ignored for intersect alignment, since by
+    # definition they will never be used.
+    op = if A <: IntersectAlignment || isnothing(initial_values)
         SimpleNary{f,N,T,A}()
     else
         # Sanity check the initial values.

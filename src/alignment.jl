@@ -483,7 +483,6 @@ function run_node!(
     # Package the outputs into a block, resizing the outputs as necessary.
     _trim!(times, j - 1)
     _trim!(values, j - 1)
-
     return Block(unchecked, times, values)
 end
 
@@ -516,7 +515,7 @@ function run_node!(
     # Create our outputs as the maximum possible size.
     nl = length(input_l)
     nr = length(input_r)
-    max_size = nl
+    max_size = min(nl, nr)
     times = _allocate_times(max_size)
     values = _allocate_values(T, max_size)
 
@@ -878,7 +877,7 @@ function run_node!(
         return _apply_fast_align_nary!(node_op, operator_state(state), inputs)
     end
 
-    # TODO This could be a massive overestimate.
+    # TODO `max_size` could be a massive overestimate.
     #   In practice it may be better to pick something smaller, and then increase the buffer
     #   size where necessary.
 
@@ -908,7 +907,7 @@ function run_node!(
             return inputs[k].times[is[k]]
         end
 
-        # We need to figure out when we next tick.
+        # This is when we will next tick.
         new_time = minimum(next_times)
 
         # For every input that ticks at exactly this time, update to use the new value.
@@ -939,5 +938,77 @@ function run_node!(
     _trim!(times, j - 1)
     _trim!(values, j - 1)
 
+    return Block(unchecked, times, values)
+end
+
+function run_node!(
+    node_op::NaryNodeOp{N,T,IntersectAlignment},
+    operator_state::NodeEvaluationState,
+    ::DateTime,  # time_start
+    ::DateTime,  # time_end
+    inputs::Block...,
+) where {N,T}
+    @assert N == length(inputs)
+
+    if any(isempty, inputs)
+        # Nothing to do, as no inputs have ticked.
+        return Block{T}()
+    end
+
+    input_classes = equivalence_classes(_equal_times, inputs)
+
+    if length(input_classes) == 1
+        # All times are indistinguishable, so use fast alignment.
+        return _apply_fast_align_nary!(node_op, operator_state, inputs)
+    end
+
+    # Create our output as the maximum possible size.
+    ns = map(length, inputs)
+    max_size = minimum(ns)
+    times = _allocate_times(max_size)
+    values = _allocate_values(T, max_size)
+
+    # Store indices into the inputs. The index represents the next time point for
+    # consideration for each series.
+    is = MVector{N,Int64}(ones(N))
+
+    # Index into the output.
+    j = 1
+
+    # If we get to the end of any series, we know that we cannot add any more elements to
+    # the output.
+    @inbounds while all(is .<= ns)
+        # For each input, figure out the next time it would tick.
+        next_times = ntuple(k -> inputs[k].times[is[k]], Val(N))
+
+        # This is when we *might* next tick, if all inputs tick at this time.
+        new_time = minimum(next_times)
+
+        tick_mask = next_times .== new_time
+        if all(tick_mask)
+            # All inputs tick simultaneously, this means we should compute and possibly
+            # output a knot.
+            input_values = map(zip(is, inputs)) do pair
+                i, input = pair
+                return input.values[i]
+            end
+            j = _maybe_add_knot!(
+                node_op, operator_state, times, values, j, new_time, input_values...
+            )
+            # Advance all pointers.
+            is .+= 1
+        else
+            # We aren't going to emit a knot, so advance all inputs that tick next.
+            for k in 1:N
+                next_times[k] == new_time || continue
+                # If we are here, this input should advance.
+                is[k] += 1
+            end
+        end
+    end
+
+    # Package the outputs into a block, resizing the outputs as necessary.
+    _trim!(times, j - 1)
+    _trim!(values, j - 1)
     return Block(unchecked, times, values)
 end
