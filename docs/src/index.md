@@ -6,7 +6,7 @@ CurrentModule = TimeDag
 
 Welcome to the documentation for [TimeDag.jl](https://github.com/invenia/TimeDag.jl)!
 
-`TimeDag.jl` enables you to build and run time-series models efficiently.
+`TimeDag` enables you to build and run time-series models efficiently.
 
 You might want to use this package if some of the following apply:
 * You are processing data with a natural time ordering.
