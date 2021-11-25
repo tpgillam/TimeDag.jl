@@ -6,13 +6,13 @@ Other parts shouldn't need to be regularly interacted with, but can be useful to
 
 ## Identity map
 
-One of the key features of `TimeDag.jl` is avoiding duplicating work.
+One of the key features of `TimeDag` is avoiding duplicating work.
 
 This is primarily achieved by ensuring that we never construct the 'same' node twice.
 By 'same', here we mean two nodes that we can prove will always give the same output.
 
 One easy-to-handle case is that of a node that has identical parents & op to another.
-To avoid this, `TimeDag.jl` maintains a global [identity map](https://en.wikipedia.org/wiki/Identity_map_pattern), of type [`TimeDag.IdentityMap`](@ref).
+To avoid this, `TimeDag` maintains a global [identity map](https://en.wikipedia.org/wiki/Identity_map_pattern), of type [`TimeDag.IdentityMap`](@ref).
 
 Currently the only implementation of the identity map is [`TimeDag.WeakIdentityMap`](@ref).
 This contains weak references to nodes, to ensure that we know about all nodes that currently exist, but don't unnecessarily prevent nodes from being garbage collected when we no longer want them.

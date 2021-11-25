@@ -18,7 +18,7 @@ A node knows the type of its values, which can be queries with [`TimeDag.value_t
 Note that nodes should never be constructed directly by the user.
 Typically one will call a function like [`block_node`](@ref) or [`lag`](@ref), which will construct a node.
 
-`TimeDag.jl` includes functions to construct many useful nodes, but often you will need to create a custom node.
+`TimeDag` includes functions to construct many useful nodes, but often you will need to create a custom node.
 See `Creating nodes` for instructions on how to do this.
 
 !!! info

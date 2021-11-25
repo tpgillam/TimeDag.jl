@@ -113,6 +113,8 @@ If this returns true, `create_operator_evaluation_state` will not be used.
 Note that if an `op` has `stateless(op)` returning true, then it necessarily should also
 return true here. The default implementation is to return `stateless(op)`, meaning that if
 one is creating a node that is fully stateless, one need only define `stateless`.
+
+For optimal performance, this should be knowable from the type of `op` alone.
 """
 stateless_operator(node::Node) = stateless_operator(node.op)
 stateless_operator(op::NodeOp) = stateless(op)
@@ -122,6 +124,8 @@ stateless_operator(op::NodeOp) = stateless(op)
     time_agnostic(op) -> Bool
 
 Returns true iff `op` does not care about the time of the input knot(s).
+
+For optimal performance, this should be knowable from the type of `op` alone.
 """
 time_agnostic(node::Node) = time_agnostic(node.op)
 time_agnostic(::NodeOp) = false
@@ -131,6 +135,8 @@ time_agnostic(::NodeOp) = false
     value_agnostic(op) -> Bool
 
 Returns true iff `op` does not care about the value(s) of the input knot(s).
+
+For optimal performance, this should be knowable from the type of `op` alone.
 """
 value_agnostic(node::Node) = value_agnostic(node.op)
 value_agnostic(::NodeOp) = false

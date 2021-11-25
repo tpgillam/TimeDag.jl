@@ -32,7 +32,7 @@ struct MySource <: TimeDag.NodeOp{Int64} end
 # Indicate that our source doesn't have any evaluation state.
 TimeDag.stateless(::MySource) = true
 
-TimeDag.run_node!(
+function TimeDag.run_node!(
     ::MySource, 
     ::TimeDag.EmptyNodeEvaluationState, 
     time_start::DateTime, 
