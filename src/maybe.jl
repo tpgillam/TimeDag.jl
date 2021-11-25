@@ -8,6 +8,10 @@ The API is optimised for speed over memory usage, by allowing a function that ma
 return `Union{T, Nothing}` to instead always return `Maybe{T}`, and hence be type-stable.
 """
 struct Maybe{T}
+    # TODO see the changes in this merge request:
+    #   https://github.com/iamed2/ResultTypes.jl/commit/24e0aa779a29376ce3320cd8f106c5416aaff4c1
+    # It may be possible to improve performance by using Union{Some{T},Nothing} instead of
+    # this partial initialisation approach.
     valid::Bool
     value::T
 
