@@ -1,7 +1,6 @@
 # TimeDag
 
-<!-- TODO enable this when package is registered -->
-<!-- [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://invenia.github.io/TimeDag.jl/stable) -->
+[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://invenia.github.io/TimeDag.jl/stable)
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://invenia.github.io/TimeDag.jl/dev)
 [![Build Status](https://github.com/invenia/TimeDag.jl/workflows/CI/badge.svg)](https://github.com/invenia/TimeDag.jl/actions)
 [![Coverage](https://codecov.io/gh/invenia/TimeDag.jl/branch/main/graph/badge.svg?token=NpXA7RCBxc)](https://codecov.io/gh/invenia/TimeDag.jl)

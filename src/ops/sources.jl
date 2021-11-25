@@ -72,8 +72,8 @@ iterdates(time_of_day::Time=Time(0)) = obtain_node((), Iterdates(time_of_day))
 """
 A node op which ticks every `delta`, such that a knot would appear on `epoch`.
 """
-struct Pulse{P<:TimePeriod} <: NodeOp{DateTime}
-    delta::P
+struct Pulse <: NodeOp{DateTime}
+    delta::Millisecond
     epoch::DateTime
 end
 
@@ -82,10 +82,10 @@ stateless(::Pulse) = true
 function run_node!(
     op::Pulse, ::EmptyNodeEvaluationState, time_start::DateTime, time_end::DateTime
 )
-    rem_ = (time_start - op.epoch) % Millisecond(op.delta)
+    rem_ = (time_start - op.epoch) % op.delta
     pulse_start = rem_ == Millisecond(0) ? time_start : time_start + (op.delta - rem_)
 
-    rem_ = (time_end - op.epoch) % Millisecond(op.delta)
+    rem_ = (time_end - op.epoch) % op.delta
     pulse_end = rem_ == Millisecond(0) ? time_end - op.delta : time_end - rem_
 
     times = collect(pulse_start:(op.delta):pulse_end)
@@ -106,7 +106,7 @@ is `DateTime(0, 12, 31)`.
 """
 function pulse(delta::TimePeriod; epoch::DateTime=_JULIA_EPOCH)
     delta > Millisecond(0) || throw(ArgumentError("delta must be positive, got $delta"))
-    return obtain_node((), Pulse{typeof(delta)}(delta, epoch))
+    return obtain_node((), Pulse(Millisecond(delta), epoch))
 end
 
 # TODO We may want to generalise or otherwise refactor to allow reading multiple value

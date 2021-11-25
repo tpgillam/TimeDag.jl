@@ -197,7 +197,7 @@ Each diagram is shown for the case of two inputs; the docstrings describe the ge
 Functions in `TimeDag` that accept multiple nodes typically default to using [`UNION`](@ref) alignment.
 
 ##### Union
-Similar to an "outer join", with the key difference that we only emit knots once _both_ inputs have started ticking.
+Similar to an "outer join", with the key difference that we only emit knots once _all_ inputs have started ticking.
 
 ```@docs
 UNION
@@ -214,7 +214,7 @@ INTERSECT
 ![Intersect alignment](assets/intersect_align.png)
 
 ##### Left
-Similar to a "left join", with the key difference that we only emit knots once _both_ inputs have started ticking.
+Similar to a "left join", with the key difference that we only emit knots once _all_ inputs have started ticking.
 
 ```@docs
 LEFT
@@ -223,9 +223,9 @@ LEFT
 
 #### Initial values
 
-For the alignments above, it was noted that we have to wait for both inputs to start ticking before the output ticks.
+For the alignments above, it was noted that we have to wait for all inputs to start ticking before the output ticks.
 
-It is possible to tell `TimeDag` that a given operation should consider its inputs to have some _initial value_.
+It is possible to tell `TimeDag` that a given operation should consider its inputs to have some _initial values_.
 This behaves a little like a knot at the start of the evaluation window, however does *not* result in the creation of an output knot at that time.
 In the notation above, it is the definition of a value for ``x(t_{-})`` which isn't ``\oslash``.
 
@@ -240,7 +240,7 @@ Some more implementation details on the lower-level functionality that controls 
 
 So far we have introduced the notion of time-series operations.
 By working purely with [`TimeDag.NodeOp`](@ref)s, we build up an abstract representation of the computation we want to do.
-A [`TimeDag.Node`](@ref) contains both some inputs, as well as a [`TimeDag.NodeOp`](@ref) defining how they should be combined.
+A [`TimeDag.Node`](@ref) contains zero or more input nodes, as well as a [`TimeDag.NodeOp`](@ref) defining how they should be combined.
 
 ### Evaluation
 When we wish to evaluate a node over some interval ``\delta``, we first evaluate all input nodes over the same interval, recursively.

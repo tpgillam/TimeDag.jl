@@ -43,7 +43,7 @@ include("plotting.jl")
 
 include("alignment.jl")
 
-include("ops/core.jl")  # This defines macros useful for definition of other nodes.
+include("ops/common.jl")  # This defines macros useful for definition of other nodes.
 
 include("ops/align.jl")
 include("ops/array.jl")

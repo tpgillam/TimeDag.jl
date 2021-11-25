@@ -92,6 +92,18 @@ end
             end
         end
     end
+
+    @testset "equivalents" begin
+        @test pulse(Hour(1)) === pulse(Hour(1))
+        @test pulse(Hour(1)) === pulse(Minute(60))
+        @test pulse(Hour(1)) === pulse(Second(60 * 60))
+        @test pulse(Hour(1)) === pulse(Millisecond(60 * 60 * 1000))
+        @test pulse(Hour(1); epoch=DateTime(2020)) !=
+            pulse(Hour(1); epoch=DateTime(2020, 1, 1, 1, 30))
+        # Optimising this in the general case is too hard, even though these two nodes
+        # ought to be equivalent
+        @test pulse(Hour(1); epoch=DateTime(2020)) != pulse(Hour(1); epoch=DateTime(2021))
+    end
 end
 
 @testset "tea_file" begin
