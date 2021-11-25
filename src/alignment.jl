@@ -70,19 +70,19 @@ abstract type NaryNodeOp{N,T,A<:Alignment} <: NodeOp{T} end
 """
     operator!(op::UnaryNodeOp{T}, (state,), (time,) x) -> T / Maybe{T}
     operator!(op::BinaryNodeOp{T}, (state,), (time,) x, y) -> T / Maybe{T}
-    operator!(op::NaryNodeOp{N,T}, (state,), (time,) x, y, ...) -> T / Maybe{T}
+    operator!(op::NaryNodeOp{N,T}, (state,), (time,) x, y, z...) -> T / Maybe{T}
 
 Perform the operation for this node.
 
 When defining a method of this for a new op, follow these rules:
 - `state` should be omitted iff [`TimeDag.stateless_operator`](@ref).
 - `time` should be omitted iff [`TimeDag.time_agnostic`](@ref).
-- All values `x, y, ...` should be omittted iff [`TimeDag.value_agnostic`](@ref).
+- All values `x, y, z...` should be omittted iff [`TimeDag.value_agnostic`](@ref).
 
 For stateful operations, this operator should mutate `state` as required.
 
 The return value `out` should be of type `T` iff [`TimeDag.always_ticks`](@ref) is true,
-otherwise it should be of type [`TimeDag.Maybe`](@ref).
+otherwise it should be of type [`TimeDag.Maybe`](@ref)`{T}`.
 
 If `out <: Maybe{T}`, and has `!valid(out)`, this indicates that we do not wish to emit a
 knot at this time, and it will be skipped. Otherwise, `value(out)` will be used as the
@@ -734,7 +734,7 @@ end
 # `Types` will look something like Tuple{In1,In2,...}
 mutable struct NaryAlignmentState{N,Types<:Tuple,OperatorState} <: NodeEvaluationState
     # Since we may not have a latest value, we use the partial initialisation trick inside
-    # `Maybe` to avoid having to invent an unused placeholder.
+    # `Maybe` to avoid having to invent an unused placeholder for arbitrary types.
     latest::Tuple{Vararg{Maybe}}
     operator_state::OperatorState
 
