@@ -297,7 +297,7 @@ details.
 wrap(f::Function; time_agnostic::Bool=true) = Wrapped{f}(time_agnostic)
 
 """
-    wrapb(f::Function)
+    wrapb(f::Function; time_agnostic=true)
 
 `wrapb` is like [`wrap`](@ref), however `f` will be broadcasted over all input values.
 """
