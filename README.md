@@ -10,6 +10,10 @@
 A computational graph for time-series processing.
 
 ```julia
+using Dates
+using Statistics
+using TimeDag
+
 # Create nodes — lazy generators of time-series data.
 x = rand(pulse(Hour(2)))
 y = rand(pulse(Hour(3)))
