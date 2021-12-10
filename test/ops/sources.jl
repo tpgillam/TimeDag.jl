@@ -34,6 +34,27 @@ end
         expected_times = collect(first:Day(1):last)
         @test _eval(n) == Block(expected_times, expected_times)
     end
+
+    @testset "non-UTC" begin
+        timezone = tz"America/Chicago"
+
+        n = iterdates(Time(0), timezone)
+        @test n === iterdates(Time(0), timezone)
+        @test value_type(n) == DateTime
+
+        # Evaluate over a sufficient range to get some DST changes.
+        block = _evaluate(n, DateTime(2020), DateTime(2021))
+        @test block.times === block.values
+        zdts = ZonedDateTime.(block.times, tz"UTC")
+        local_time_of_day = Time.(astimezone.(zdts, timezone))
+        @test all(local_time_of_day .== Time(0))
+    end
+
+    @testset "non-existent time" begin
+        timezone = tz"America/Chicago"
+        n = iterdates(Time(2), timezone)
+        @test_throws NonExistentTimeError _evaluate(n, DateTime(2020), DateTime(2021))
+    end
 end
 
 @testset "pulse" begin

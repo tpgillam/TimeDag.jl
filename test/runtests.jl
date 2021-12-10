@@ -10,6 +10,7 @@ using Statistics
 using TeaFiles
 using Test
 using TimeDag
+using TimeZones
 
 using TimeDag: Node
 using TimeDag: IntersectAlignment, LeftAlignment, UnionAlignment
