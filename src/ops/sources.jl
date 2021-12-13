@@ -34,40 +34,66 @@ Construct a node with value type `T` which, if evaluated, will never tick.
 empty_node(T) = block_node(Block{T}())
 
 """
-A node op which ticks once a day at the specified time.
+A node op which ticks once a day at the specified local time of day.
 """
 struct Iterdates <: NodeOp{DateTime}
     time_of_day::Time
+    tz::TimeZone
 end
 
 stateless(::Iterdates) = true
 
+"""
+    _to_utc(dt::DateTime, tz::TimeZone) -> DateTime
+
+Interpret naive `dt` to be in timezone `tz`. Return a naive `DateTime`, but in UTC.
+"""
+function _to_utc(dt::DateTime, tz::TimeZone)
+    # If we are already in UTC, there's nothing to do.
+    tz == tz"UTC" && return dt
+    return ZonedDateTime(dt, tz).utc_datetime
+end
+
 function run_node!(
     op::Iterdates, ::EmptyNodeEvaluationState, time_start::DateTime, time_end::DateTime
 )
-    # Figure out the first time at the appropriate time of day.
-    t1 = Date(time_start) + op.time_of_day
-    t1 = t1 < time_start ? t1 + Day(1) : t1
+    times = DateTime[]
 
-    # Figure out the last time to emit.
-    t2 = Date(time_end) + op.time_of_day
-    t2 = t2 >= time_end ? t2 - Day(1) : t2
+    # Add some padding for safety — we will only emit those times that are in the correct
+    # time range.
+    d1 = Date(time_start) - Day(2)
+    d2 = Date(time_end) + Day(2)
+    for d in d1:Day(1):d2
+        # Get the appropriate time of day in this timezone.
+        t = _to_utc(d + op.time_of_day, op.tz)
+        t < time_start && continue
+        t >= time_end && break
+        push!(times, t)
+    end
 
-    times = collect(t1:Day(1):t2)
     return Block(unchecked, times, times)
 end
 
 # TODO add the equivalent of an RDate step & offset, for valid steps. Not sure what the
 #   equivalent of these in Julia would be...
-# TODO deal with timezones. Semantics here would be that the `time_of_day` would apply in
-#   a particular timezone.
 """
-    iterdates(time_of_day::Time=Time(0))
+    iterdates(time_of_day::Time=Time(0), tz::TimeZone=tz"UTC", occurrence=1)
 
-Create a node which ticks exactly once a day at `time_of_day`, which defaults to midnight.
+Create a node which ticks exactly once a day at `time_of_day` in timezone `tz`.
+
+This defaults to midnight in UTC. If `tz` is set otherwise, then each knot will appear at
+`time_of_day` in that timezone.
+
+Note that:
+    * All knot times in `TimeDag` are considered to be in UTC.
+    * It is possible to select a `time_of_day` that does not exist for every day. This will
+        lead to an exception being raised during evaluation.
+
 In a given knot, each value will be of type `DateTime`, and equal the time of the knot.
 """
-iterdates(time_of_day::Time=Time(0)) = obtain_node((), Iterdates(time_of_day))
+function iterdates(time_of_day::Time=Time(0), tz::TimeZone=tz"UTC")
+    return obtain_node((), Iterdates(time_of_day, tz))
+end
 
 """
 A node op which ticks every `delta`, such that a knot would appear on `epoch`.
