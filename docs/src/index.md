@@ -33,7 +33,7 @@ This section indicates various core functionality that is either possible, or in
 - [ ] Lagging by fixed time interval
 - [x] Alignment of arbitrary numbers of node arguments to a node op
 
-### Sources
+### Source node ops
 - [x] In-memory, from an existing `Block`
 - [x] From a Tea file
 - [ ] From a generic `Table`, with some schema constraints
@@ -42,7 +42,6 @@ This section indicates various core functionality that is either possible, or in
 - [ ] Nodes should be aware of the `size` of each value, when it is provably constant.
 
 ### Statistics
-
 - [x] Fixed-window sum, mean, std, cov, etc.
 - [ ] Time-windowed sum, mean, standard-deviation, covariance, etc.
 - [ ] Exponentially-weighted mean, std, cov, correlation
