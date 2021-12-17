@@ -47,4 +47,16 @@ function run_node!(
     end
 end
 
+"""
+    constant(value) -> Node
+
+Explicitly wrap `value` into a `TimeDag` constant node, regardless of its type.
+
+In many cases this isn't required, since many `TimeDag` functions which expect nodes will
+automatically wrap non-node arguments into a constant node.
+
+!!! warning
+    If `value` is already a node, this will wrap it up in an additional node. This is very
+    likely not what you want to do.
+"""
 constant(value::T) where {T} = obtain_node((), Constant(value))
