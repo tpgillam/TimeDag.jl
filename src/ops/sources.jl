@@ -9,6 +9,7 @@ end
 
 Base.hash(x::BlockNode, h::UInt64) = hash(x.block, hash(:BlockNode, h))
 Base.:(==)(x::BlockNode{T}, y::BlockNode{T}) where {T} = x.block == y.block
+Base.isequal(x::BlockNode{T}, y::BlockNode{T}) where {T} = isequal(x.block, y.block)
 
 stateless(::BlockNode) = true
 
