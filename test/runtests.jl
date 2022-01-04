@@ -25,9 +25,10 @@ using TimeDag: duplicate, evaluate_until!, start_at
 
     include("common.jl")
 
-    @testset "maybe" begin include("maybe.jl") end
     @testset "block" begin include("block.jl") end
     @testset "constants" begin include("constants.jl") end
+    @testset "maybe" begin include("maybe.jl") end
+    @testset "output_type" begin include("output_type.jl") end
 
     @testset "ops" begin
         @testset "align" begin include("ops/align.jl") end

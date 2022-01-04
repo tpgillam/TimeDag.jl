@@ -3,13 +3,7 @@
 
 Return the output type of the specified function. Tries to be fast where possible.
 """
-function output_type(f, arg_types...)
-    candidates = Base.return_types(f, arg_types)
-    if length(candidates) > 1
-        throw(ArgumentError("Got multiple return types for $(f)$(arg_types): $candidates"))
-    end
-    return only(candidates)
-end
+output_type(f, arg_types...) = Union{Base.return_types(f, arg_types)...}
 
 output_type(::typeof(-), x) = x
 # TODO more efficient versions for common exp & log cases

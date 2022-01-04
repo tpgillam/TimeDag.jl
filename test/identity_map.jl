@@ -78,3 +78,17 @@ end
     @test isempty(TimeDag.global_identity_map())
     @test isempty(TimeDag.global_identity_map().weak_to_ref)
 end
+
+@testset "block with missing" begin
+    _reset_global_identity_map()
+
+    block1 = Block([DateTime(2021) => 1, DateTime(2022) => missing])
+    block2 = Block([DateTime(2021) => 1, DateTime(2022) => missing])
+
+    @test isequal(block1, block2)
+    @test ismissing(block1 != block2)
+
+    @test block_node(block1) === block_node(block1)
+    @test block_node(block2) === block_node(block2)
+    @test block_node(block1) === block_node(block2)
+end
