@@ -728,10 +728,7 @@ struct Ema{T} <: UnaryInceptionOp{T,EmaData{T}}
 end
 _unfiltered(::Ema) = true
 function _update(op::Ema{T}, a::EmaData{T}, x) where {T}
-    return EmaData(
-        x + (1 - op.α) * a.weighted_sum,
-        1 + (1 - op.α) * a.weighted_count,
-    )
+    return EmaData(x + (1 - op.α) * a.weighted_sum, 1 + (1 - op.α) * a.weighted_count)
 end
 _extract(::Ema, data::EmaData) = data.weighted_sum / data.weighted_count
 Base.show(io::IO, ::Ema{T}) where {T} = print(io, "Ema{$T}")
