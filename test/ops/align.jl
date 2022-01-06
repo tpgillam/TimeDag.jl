@@ -67,3 +67,22 @@ end
         end
     end
 end
+
+@testset "first_knot" begin
+    @test _eval(first_knot(n4)) == b4[1:1]
+    @test _eval(first_knot(n_boolean)) == b_boolean[1:1]
+    @test _eval(empty_node(Float64)) == Block{Float64}()
+end
+
+@testset "active_count" begin
+    @test _eval(active_count(n1)) == Block([b1.times[1]], [1])
+    @test _eval(active_count(n1, n2)) == Block([b1.times[1], b2.times[1]], [1, 2])
+    @test _eval(active_count(n1, n2, n3)) == Block([b1.times[1], b2.times[1]], [2, 3])
+    @test _eval(active_count(n1, n2, n3, n4)) == Block([b1.times[1], b2.times[1]], [3, 4])
+
+    # Testing for optimisations.
+    @test active_count(n1, n2) === active_count(n2, n1)
+    @test active_count(n1, n2, n3) === active_count(n2, n1, n3)
+    @test active_count(n1, n2, n3) === active_count(n3, n1, n2)
+    @test active_count(n1, n2, n3) === active_count(n3, n2, n1)
+end
