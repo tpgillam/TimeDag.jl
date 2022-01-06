@@ -29,12 +29,30 @@ them into a new data object.
 function _combine end
 
 """
+    _update(op, data_1, x...) -> Data
+
+Given a data object, and a new observation (of potentially multiple arguments), generate a
+new data field.
+
+If only creating an `InceptionOp`, it is sufficient to define this instead of `_combine`.
+By default this will use `_wrap` and `_combine`.
+"""
+_update(op, data_1, x...) = _combine(op, data_1, _wrap(_data_type(op), x...))
+
+"""
     _extract(op, data) -> value
 
 This should be defined for all inception and windowed ops. Given some data object, it should
 compute the appropriate output value for the node.
 """
 function _extract end
+
+"""
+    _data_type(op)
+
+Return the type of data used for the given op.
+"""
+function _data_type end
 
 """Unary operator accumulated from inception."""
 abstract type UnaryInceptionOp{T,Data} <: UnaryNodeOp{T} end
@@ -43,6 +61,7 @@ abstract type UnaryInceptionOp{T,Data} <: UnaryNodeOp{T} end
 abstract type BinaryInceptionOp{T,Data,A} <: BinaryNodeOp{T,A} end
 
 const InceptionOp{T,Data} = Union{UnaryInceptionOp{T,Data},BinaryInceptionOp{T,Data}}
+_data_type(::InceptionOp{T,Data}) where {T,Data} = Data
 
 always_ticks(op::InceptionOp) = _unfiltered(op)
 time_agnostic(::InceptionOp) = true
@@ -73,7 +92,7 @@ function operator!(
         state.data = _wrap(Data, x...)
         state.initialised = true
     else
-        state.data = _combine(op, state.data, _wrap(Data, x...))
+        state.data = _update(op, state.data, x...)
     end
     return if always_ticks(op)
         # Deal with the case where we always emit.
@@ -95,6 +114,7 @@ abstract type BinaryWindowOp{T,Data,EmitEarly,A} <: BinaryNodeOp{T,A} end
 const WindowOp{T,Data,EmitEarly} = Union{
     UnaryWindowOp{T,Data,EmitEarly},BinaryWindowOp{T,Data,EmitEarly}
 }
+_data_type(::WindowOp{T,Data}) where {T,Data} = Data
 
 """
     _window(window_op) -> Int64
@@ -692,3 +712,48 @@ end
 #   In the future, if we want to support more general types of time, we could introduce a
 #   TimeDelta wrapper, that could server to distinguish between an Int64 "time" and an Int64
 #   "number of knots".
+
+struct EmaData{T}
+    weighted_sum::T
+    weighted_count::Float64
+end
+
+_wrap(::Type{EmaData{T}}, x) where {T} = EmaData{T}(x, 1.0)
+struct Ema{T} <: UnaryInceptionOp{T,EmaData{T}}
+    α::Float64
+    function Ema{T}(α::Float64) where {T}
+        0 < α < 1 || throw(ArgumentError("α = $α is outside of the valid range."))
+        return new{T}(α)
+    end
+end
+_unfiltered(::Ema) = true
+function _update(op::Ema{T}, a::EmaData{T}, x) where {T}
+    return EmaData(
+        x + (1 - op.α) * a.weighted_sum,
+        1 + (1 - op.α) * a.weighted_count,
+    )
+end
+_extract(::Ema, data::EmaData) = data.weighted_sum / data.weighted_count
+Base.show(io::IO, ::Ema{T}) where {T} = print(io, "Ema{$T}")
+
+"""
+    ema(x::Node, α::AbstractFloat) -> Node
+    ema(x::Node, w_eff::Int) -> Node
+
+Create a node which computes the exponential moving average of `x`.
+
+The decay is specified either by `α`, which should satisfy `0 < α < 1`, or by `w_eff`, which
+should be an integer greater than 1. If the latter is specified, then we compute
+`α = 2 / (w_eff + 1)`.
+
+See e.g. the conventions here:
+https://en.wikipedia.org/wiki/Moving_average#Exponential_moving_average
+"""
+function ema(x::Node, α::AbstractFloat)
+    T = output_type(*, value_type(x), Float64)
+    return obtain_node((x,), Ema{T}(α))
+end
+function ema(x::Node, w_eff::Integer)
+    w_eff > 1 || throw(ArgumentError("w_eff = $w_eff is out of range"))
+    return ema(x, 2 / (w_eff + 1))
+end

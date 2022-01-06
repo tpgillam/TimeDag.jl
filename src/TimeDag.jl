@@ -25,7 +25,7 @@ export wrap, wrapb
 # Source nodes.
 export block_node, constant, empty_node, iterdates, pulse, tea_file
 # Other nodes.
-export align, coalign, history, lag, right, left
+export align, coalign, ema, history, lag, right, left
 # Evaluation & other utilities.
 export evaluate, value_type
 

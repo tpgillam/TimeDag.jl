@@ -124,6 +124,17 @@ function _get_rand_vec_block(rng::AbstractRNG, dim::Int, n_obs::Int)
     return Block(times, values)
 end
 
+"""
+    _get_rand_block(rng::AbstractRNG, n_obs::Int) -> Block
+
+Get a block of value type `Float64`, of length `n_obs`, with random values.
+"""
+function _get_rand_block(rng::AbstractRNG, n_obs::Int)
+    times = _T_START:Day(1):(_T_START + Day(n_obs - 1))
+    values = rand(rng, n_obs)
+    return Block(times, values)
+end
+
 function _test_unary_op(f_timedag, block::Block, f=f_timedag; time_agnostic::Bool=true)
     ft = time_agnostic ? (_, x) -> f(x) : f
 
