@@ -7,8 +7,9 @@ const _UNARY_STUFF = [
     (log2, b1),
     (sqrt, b1),
     (cbrt, b1),
-    (inv, b1),
+    (sign, b1),
     (!, b_boolean),
+    (inv, b1),
 ]
 
 @testset "unary" begin
