@@ -351,3 +351,30 @@ end
         _test_binary_window_op(Float64, cor; min_window=2)
     end
 end
+
+@testset "ema" begin
+    n_obs = 20
+    block = _get_rand_block(MersenneTwister(42), n_obs)
+    n = block_node(block)
+
+    @test_throws ArgumentError ema(n, 0.0)
+    @test_throws ArgumentError ema(n, 0)
+    @test_throws ArgumentError ema(n, 1.0)
+    @test_throws ArgumentError ema(n, 1)
+
+    for alpha in [0.1, 0.5, 0.9]
+        # Naive computation.
+        weighted_sum = 0.0
+        weighted_count = 0.0
+        expected_values = Float64[]
+        for x in block.values
+            weighted_sum = x + (1 - alpha) * weighted_sum
+            weighted_count = 1 + (1 - alpha) * weighted_count
+            push!(expected_values, weighted_sum / weighted_count)
+        end
+
+        @test _eval(ema(n, alpha)) == Block(block.times, expected_values)
+    end
+
+    @test ema(n, 0.5) === ema(n, 3)
+end

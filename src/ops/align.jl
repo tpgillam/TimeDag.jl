@@ -75,3 +75,55 @@ function coalign(x, x_rest...; alignment::Alignment=DEFAULT_ALIGNMENT)
     # Convert nodes back to original order.
     return new_nodes[invperm(index)]
 end
+
+struct FirstKnot{T} <: NodeOp{T} end
+
+mutable struct FirstKnotState <: NodeEvaluationState
+    ticked::Bool
+    FirstKnotState() = new(false)
+end
+
+create_evaluation_state(::Tuple{Node}, ::FirstKnot) = FirstKnotState()
+
+function run_node!(
+    ::FirstKnot{T},
+    state::FirstKnotState,
+    time_start::DateTime,
+    time_end::DateTime,
+    block::Block{T},
+) where {T}
+    # If we have already ticked, or the input is empty, we should not emit any knots.
+    (state.ticked || isempty(block)) && return Block{T}()
+
+    # We should tick, and record the fact that we have done so.
+    state.ticked = true
+    time = @inbounds first(block.times)
+    value = @inbounds first(block.values)
+    return Block(unchecked, [time], T[value])
+end
+
+"""
+    first_knot(x::Node{T}) -> Node{T}
+
+Get a node which ticks with only the first knot of `x`, and then never ticks again.
+"""
+function first_knot(node::Node{T}) where {T}
+    # TODO There are various optimisations here
+    #   * idempotent for constant nodes
+    #   * ? eagerly filter block node
+    return obtain_node((node,), FirstKnot{T}())
+end
+
+"""
+    active_count(nodes...) -> Node{Int64}
+
+Get a node of the number of the given `nodes` (at least one) which are active.
+"""
+function active_count(x, x_rest...)
+    nodes = map(_ensure_node, [x, x_rest...])
+
+    # Perform the same ordering optimisation that we use in coalign. This aims to give the
+    # same node regardless of the order in which `nodes` were passed in.
+    sort!(nodes; by=objectid)
+    return reduce((x, y) -> +(x, y; initial_values=(0, 0)), align.(1, first_knot.(nodes)))
+end

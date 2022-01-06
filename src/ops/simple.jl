@@ -7,6 +7,7 @@
 @simple_unary(Base.log2)
 @simple_unary(Base.sqrt)
 @simple_unary(Base.cbrt)
+@simple_unary(Base.sign)
 @simple_unary_self_inverse(Base.:-)
 @simple_unary_self_inverse(Base.inv)
 
