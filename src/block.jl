@@ -187,7 +187,7 @@ Base.isempty(block::Block)::Bool = length(block) == 0
 Base.firstindex(block::Block) = 1
 Base.lastindex(block::Block) = length(block)
 Base.getindex(block::Block, i::Int) = (block.times[i], block.values[i])
-Base.getindex(block::Block, i::UnitRange{Int}) = Block(block.times[i], block.values[i])
+Base.getindex(block::Block, i::OrdinalRange{Int}) = Block(block.times[i], block.values[i])
 
 Base.eltype(::Block{T}) where {T} = Tuple{DateTime,T}
 function Base.iterate(block::Block, state::Int=1)
