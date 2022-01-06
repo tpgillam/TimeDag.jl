@@ -375,4 +375,6 @@ end
 
         @test _eval(ema(n, alpha)) == Block(block.times, expected_values)
     end
+
+    @test ema(n, 0.5) === ema(n, 3)
 end

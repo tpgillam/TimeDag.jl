@@ -735,7 +735,7 @@ Base.show(io::IO, ::Ema{T}) where {T} = print(io, "Ema{$T}")
 
 """
     ema(x::Node, α::AbstractFloat) -> Node
-    ema(x::Node, w_eff::Int) -> Node
+    ema(x::Node, w_eff::Integer) -> Node
 
 Create a node which computes the exponential moving average of `x`.
 
