@@ -754,7 +754,7 @@ m_t &= \\frac{\\alpha s_t}{1 - (1 - \\alpha)^t}.
 ```
 
 For further information, see the notational conventions and discussion on
-(Wikipedia)[https://en.wikipedia.org/wiki/Moving_average#Exponential_moving_average]. Note
+[Wikipedia](https://en.wikipedia.org/wiki/Moving_average#Exponential_moving_average). Note
 that this function implements the variant including the correction for the initial
 convergence problem.
 """
