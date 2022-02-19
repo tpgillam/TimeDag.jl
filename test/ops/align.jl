@@ -86,3 +86,10 @@ end
     @test active_count(n1, n2, n3) === active_count(n3, n1, n2)
     @test active_count(n1, n2, n3) === active_count(n3, n2, n1)
 end
+
+@testset "throttle" begin
+    @test throttle(n4, 1) === n4
+    @test _eval(throttle(n4, 2)) == b4[1:2:end]
+    @test _eval(throttle(n4, 3)) == b4[1:3:end]
+    @test _eval(throttle(n4, 4)) == b4[1:4:end]
+end
