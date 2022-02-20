@@ -102,13 +102,14 @@ end
 _unfiltered(::TWindowProd) = true
 _combine(::TWindowProd, x, y) = Base.mul_prod(x, y)
 _extract(::TWindowProd, data) = data
-Base.show(io::IO, op::TWindowProd{T}) where {T} = print(io, "TWindowProd{$T}($(_window(op)))")
+function Base.show(io::IO, op::TWindowProd{T}) where {T}
+    return print(io, "TWindowProd{$T}($(_window(op)))")
+end
 function Base.prod(x::Node, window::TimePeriod; emit_early::Bool=false)
     T_in = value_type(x)
     T = output_type(Base.mul_prod, T_in, T_in)
     return obtain_node((x,), TWindowProd{T,emit_early}(Millisecond(window)))
 end
-
 
 # Mean, cumulative over time.
 # In order to be numerically stable, use a generalisation of Welford's algorithm.
@@ -168,7 +169,9 @@ end
 _unfiltered(::TWindowMean) = true
 _combine(::TWindowMean, x::MeanData, y::MeanData) = _combine(x, y)
 _extract(::TWindowMean, data::MeanData) = data.mean
-Base.show(io::IO, op::TWindowMean{T}) where {T} = print(io, "TWindowMean{$T}($(_window(op)))")
+function Base.show(io::IO, op::TWindowMean{T}) where {T}
+    return print(io, "TWindowMean{$T}($(_window(op)))")
+end
 function Statistics.mean(x::Node, window::TimePeriod; emit_early::Bool=false)
     T = output_type(/, value_type(x), Int)
     return obtain_node((x,), TWindowMean{T,emit_early}(Millisecond(window)))

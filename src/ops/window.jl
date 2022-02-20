@@ -215,9 +215,7 @@ end
 
 function create_operator_evaluation_state(op::TWindowOp{T,Data}) where {T,Data}
     f(x, y) = _combine(op, x, y)
-    return TWindowOpState{Data,f}(
-        TimeWindowAssociativeOp{Data,f,f,DateTime}(_window(op))
-    )
+    return TWindowOpState{Data,f}(TimeWindowAssociativeOp{Data,f,f,DateTime}(_window(op)))
 end
 
 function operator!(

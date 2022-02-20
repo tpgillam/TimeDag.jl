@@ -13,7 +13,6 @@ Return the output type of the specified function. Tries to be fast where possibl
 """
 output_type(f, arg_types...) = Base.promote_op(f, arg_types...)
 
-
 output_type(::typeof(-), x) = x
 # TODO more efficient versions for common exp & log cases
 
