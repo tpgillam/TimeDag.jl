@@ -2,8 +2,13 @@
     _wrap(::Type{T}, x...)
 
 Wrap value(s) into a data object of the given type, for use with associative combinations.
+
+The default implementation handles the identity case, and also common conversions where
+possible (calling single-argument constructor). A custom method should be added when
+needed for user-defined types.
 """
 _wrap(::Type{T}, x::T) where {T} = x
+_wrap(::Type{T}, x::S) where {S,T} = T(x)
 
 """
     _unfiltered(op) -> Bool
@@ -176,7 +181,7 @@ end
 # Sum, cumulative over time.
 struct Sum{T} <: UnaryInceptionOp{T,T} end
 _unfiltered(::Sum) = true
-_combine(::Sum, x, y) = x + y
+_combine(::Sum, x, y) = Base.add_sum(x, y)
 _extract(::Sum, data) = data
 Base.show(io::IO, ::Sum{T}) where {T} = print(io, "Sum{$T}")
 """
@@ -186,7 +191,9 @@ Create a node which ticks when `x` ticks, with values of the cumulative sum of `
 """
 function Base.sum(x::Node)
     _is_constant(x) && return x
-    return obtain_node((x,), Sum{value_type(x)}())
+    T_in = value_type(x)
+    T = output_type(Base.add_sum, T_in, T_in)
+    return obtain_node((x,), Sum{T}())
 end
 
 # Sum over fixed window.
@@ -194,7 +201,7 @@ struct WindowSum{T,EmitEarly} <: UnaryWindowOp{T,T,EmitEarly}
     window::Int64
 end
 _unfiltered(::WindowSum) = true
-_combine(::WindowSum, x, y) = x + y
+_combine(::WindowSum, x, y) = Base.add_sum(x, y)
 _extract(::WindowSum, data) = data
 Base.show(io::IO, op::WindowSum{T}) where {T} = print(io, "WindowSum{$T}($(_window(op)))")
 
@@ -207,13 +214,15 @@ If `emit_early` is false, then the node returned will only start ticking once th
 full. Otherwise, it will tick immediately with a partially-filled window.
 """
 function Base.sum(x::Node, window::Int; emit_early::Bool=false)
-    return obtain_node((x,), WindowSum{value_type(x),emit_early}(window))
+    T_in = value_type(x)
+    T = output_type(Base.add_sum, T_in, T_in)
+    return obtain_node((x,), WindowSum{T,emit_early}(window))
 end
 
 # Product, cumulative over time.
 struct Prod{T} <: UnaryInceptionOp{T,T} end
 _unfiltered(::Prod) = true
-_combine(::Prod, x, y) = x * y
+_combine(::Prod, x, y) = Base.mul_prod(x, y)
 _extract(::Prod, data) = data
 Base.show(io::IO, ::Prod{T}) where {T} = print(io, "Prod{$T}")
 """
@@ -223,7 +232,9 @@ Create a node which ticks when `x` ticks, with values of the cumulative product 
 """
 function Base.prod(x::Node)
     _is_constant(x) && return x
-    return obtain_node((x,), Prod{value_type(x)}())
+    T_in = value_type(x)
+    T = output_type(Base.mul_prod, T_in, T_in)
+    return obtain_node((x,), Prod{T}())
 end
 
 # Product over fixed window.
@@ -231,7 +242,7 @@ struct WindowProd{T,EmitEarly} <: UnaryWindowOp{T,T,EmitEarly}
     window::Int64
 end
 _unfiltered(::WindowProd) = true
-_combine(::WindowProd, x, y) = x * y
+_combine(::WindowProd, x, y) = Base.mul_prod(x, y)
 _extract(::WindowProd, data) = data
 Base.show(io::IO, op::WindowProd{T}) where {T} = print(io, "WindowProd{$T}($(_window(op)))")
 """
@@ -243,7 +254,9 @@ If `emit_early` is false, then the node returned will only start ticking once th
 full. Otherwise, it will tick immediately with a partially-filled window.
 """
 function Base.prod(x::Node, window::Int; emit_early::Bool=false)
-    return obtain_node((x,), WindowProd{value_type(x),emit_early}(window))
+    T_in = value_type(x)
+    T = output_type(Base.mul_prod, T_in, T_in)
+    return obtain_node((x,), WindowProd{T,emit_early}(window))
 end
 
 # Mean, cumulative over time.

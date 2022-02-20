@@ -190,11 +190,21 @@ end
 @testset "sum" begin
     @testset "inception" begin
         @test sum(constant(42)) == constant(42)
-        _test_inception_op(Int64, sum)
+        _test_inception_op(Int, sum)
+
+        # Check types for which the sum should have a different type.
+        _test_inception_op(Int, sum; block=b_boolean)
+        _test_inception_op(Int, sum; block=Block(b1.times, Int8[1, 2, 3, 4]))
+        _test_inception_op(Int, sum; block=Block(b1.times, Int16[1, 2, 3, 4]))
     end
 
     @testset "window" begin
         _test_window_op(Int64, sum)
+
+        # Check types for which the sum should have a different type.
+        _test_window_op(Int, sum; block=b_boolean)
+        _test_window_op(Int, sum; block=Block(b1.times, Int8[1, 2, 3, 4]))
+        _test_window_op(Int, sum; block=Block(b1.times, Int16[1, 2, 3, 4]))
     end
 end
 
