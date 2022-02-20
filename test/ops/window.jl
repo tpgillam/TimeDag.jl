@@ -112,6 +112,40 @@ function _naive_window_reduce(
     return Block(times, values)
 end
 
+function _naive_twindow_reduce(
+    T, f::Function, block::Block, window::Millisecond, emit_early::Bool, min_knot_count::Int
+)
+    @assert window > Millisecond(0)
+    @assert min_knot_count > 0
+
+    # We build a state which is effectively implemeting a time-window of values by using
+    # the associative `vcat` operator (not the most efficient way of doing this, but good
+    # for testing).
+    state = TimeWindowAssociativeOp{Vector{T},vcat,vcat,DateTime}(window)
+
+    times = DateTime[]
+    values = T[]
+    for (i, (time, value)) in enumerate(block)
+        update_state!(state, time, [value])
+
+        if !emit_early && !window_full(state)
+            # The state is not full, and we require that it be full for us to emit a knot.
+            continue
+        end
+        if i < min_knot_count
+            # We need to wait longer before emitting.
+            continue
+        end
+
+        buffer = window_value(state)
+
+        push!(times, time)
+        push!(values, f(buffer))
+    end
+
+    return Block(times, values)
+end
+
 function _test_inception_op(
     T, f_normal::Function, f_timedag::Function=f_normal; min_window=1, block::Block=b4
 )
@@ -136,6 +170,8 @@ end
 function _test_window_op(
     T, f_normal::Function, f_timedag::Function=f_normal; min_window=1, block::Block=b4
 )
+    # FIXME test throwing for windows that are too small.
+
     n_in = block_node(block)
     for window in min_window:(length(block) + 2)
         n = f_timedag(n_in, window)
@@ -187,14 +223,73 @@ function _test_binary_window_op(
     return nothing
 end
 
+function _test_twindow_op(
+    T,
+    f_normal::Function,
+    f_timedag::Function=f_normal;
+    min_knot_count=1,
+    block::Block=b4,
+    num_windows_in_block_duration=7,
+)
+    # FIXME test throwing for windows that are too small.
+
+    n_in = block_node(block)
+
+    # Pick some windows with lengths determined relative to the duration of the block.
+    min_window = Millisecond(1)
+    block_duration = Millisecond(last(block.times) - first(block.times))
+    increment = div(block_duration, num_windows_in_block_duration)
+    max_window = block_duration + 2 * increment
+
+    for window in min_window:increment:max_window
+        n = f_timedag(n_in, window)
+
+        block_default = _eval(n)
+        block_ee_false = _eval(f_timedag(n_in, window; emit_early=false))
+        block_ee_true = _eval(f_timedag(n_in, window; emit_early=true))
+
+        @test isequal(block_default, block_ee_false)
+        @test isapprox(
+            block_ee_false,
+            _naive_twindow_reduce(T, f_normal, block, window, false, min_knot_count);
+            nans=true,
+        )
+        @test isapprox(
+            block_ee_true,
+            _naive_twindow_reduce(T, f_normal, block, window, true, min_knot_count);
+            nans=true,
+        )
+    end
+    return nothing
+end
+
 @testset "sum" begin
     @testset "inception" begin
         @test sum(constant(42)) == constant(42)
-        _test_inception_op(Int64, sum)
+        _test_inception_op(Int, sum)
+
+        # Check types for which the sum should have a different type.
+        _test_inception_op(Int, sum; block=b_boolean)
+        _test_inception_op(Int, sum; block=Block(b1.times, Int8[1, 2, 3, 4]))
+        _test_inception_op(Int, sum; block=Block(b1.times, Int16[1, 2, 3, 4]))
     end
 
     @testset "window" begin
         _test_window_op(Int64, sum)
+
+        # Check types for which the sum should have a different type.
+        _test_window_op(Int, sum; block=b_boolean)
+        _test_window_op(Int, sum; block=Block(b1.times, Int8[1, 2, 3, 4]))
+        _test_window_op(Int, sum; block=Block(b1.times, Int16[1, 2, 3, 4]))
+    end
+
+    @testset "twindow" begin
+        _test_twindow_op(Int64, sum)
+
+        # Check types for which the sum should have a different type.
+        _test_twindow_op(Int, sum; block=b_boolean)
+        _test_twindow_op(Int, sum; block=Block(b1.times, Int8[1, 2, 3, 4]))
+        _test_twindow_op(Int, sum; block=Block(b1.times, Int16[1, 2, 3, 4]))
     end
 end
 
@@ -207,6 +302,10 @@ end
     @testset "window" begin
         _test_window_op(Int64, prod)
     end
+
+    @testset "twindow" begin
+        _test_twindow_op(Int64, prod)
+    end
 end
 
 @testset "mean" begin
@@ -217,6 +316,10 @@ end
 
     @testset "window" begin
         _test_window_op(Float64, mean)
+    end
+
+    @testset "twindow" begin
+        _test_twindow_op(Float64, mean)
     end
 end
 

@@ -127,3 +127,47 @@ function active_count(x, x_rest...)
     sort!(nodes; by=objectid)
     return reduce((x, y) -> +(x, y; initial_values=(0, 0)), align.(1, first_knot.(nodes)))
 end
+
+struct ThrottleKnots{T} <: UnaryNodeOp{T}
+    n::Int64
+end
+
+time_agnostic(::ThrottleKnots) = true
+
+"""
+State to keep track of the number of knots that we have seen on the input since the last
+output.
+"""
+mutable struct ThrottleKnotsState <: NodeEvaluationState
+    count::Int64
+    ThrottleKnotsState() = new(0)
+end
+
+create_operator_evaluation_state(::Tuple{Node}, ::ThrottleKnots) = ThrottleKnotsState()
+
+function operator!(op::ThrottleKnots{T}, state::ThrottleKnotsState, x::T) where {T}
+    result = if state.count == 0
+        state.count = op.n
+        Maybe(x)
+    else
+        Maybe{T}()
+    end
+    state.count -= 1
+    return result
+end
+
+"""
+    throttle(x::Node, n::Integer) -> Node
+
+Return a node that only ticks every `n` knots.
+
+The first knot encountered on the input will always be emitted.
+
+!!! info
+    The throttled node is stateful and depends on the starting point of the evaluation.
+"""
+function throttle(x::Node, n::Integer)
+    n > 0 || throw(ArgumentError("n should be positive, got $n"))
+    n == 1 && return x
+    return obtain_node((x,), ThrottleKnots{value_type(x)}(n))
+end

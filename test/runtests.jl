@@ -1,3 +1,4 @@
+using AssociativeWindowAggregation
 using Combinatorics
 using DataFrames
 using DataStructures

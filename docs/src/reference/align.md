@@ -7,6 +7,7 @@ align
 coalign
 first_knot
 active_count
+throttle
 lag
 Base.diff
 ```
