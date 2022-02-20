@@ -47,6 +47,7 @@ include("plotting.jl")
 include("alignment.jl")
 
 include("ops/common.jl")  # This defines macros useful for definition of other nodes.
+include("ops/window.jl")  # Common stuff for windowed ops.
 
 include("ops/align.jl")
 include("ops/array.jl")
@@ -56,6 +57,6 @@ include("ops/lagging.jl")
 include("ops/random.jl")
 include("ops/simple.jl")
 include("ops/sources.jl")
-include("ops/window.jl")
+include("ops/stats.jl")
 
 end

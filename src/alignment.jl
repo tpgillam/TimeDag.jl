@@ -192,13 +192,15 @@ Needs to be defined for nary ops for which [`has_initial_values`](@ref) returns 
 function initial_values end
 
 """Convenience method to dispatch to reduced-argument `operator!` calls."""
-function _operator!(op::NodeOp, state::NodeEvaluationState, time::DateTime, values...)
+function _operator!(op::NodeOp, state::NodeEvaluationState, t::DateTime, values...)
     return if stateless_operator(op) && time_agnostic(op)
         value_agnostic(op) ? operator!(op) : operator!(op, values...)
     elseif stateless_operator(op) && !time_agnostic(op)
-        value_agnostic(op) ? operator!(op, time) : operator!(op, time, values...)
+        value_agnostic(op) ? operator!(op, t) : operator!(op, t, values...)
     elseif !stateless_operator(op) && time_agnostic(op)
         value_agnostic(op) ? operator!(op, state) : operator!(op, state, values...)
+    elseif !stateless_operator(op) && !time_agnostic(op)
+        value_agnostic(op) ? operator!(op, state, t) : operator!(op, state, t, values...)
     else
         error("Error! We should have dispatched to a more specialised method.")
     end
