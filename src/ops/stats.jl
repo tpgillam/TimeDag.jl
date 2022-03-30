@@ -317,7 +317,6 @@ function _combine(state_a::CovData{T}, state_b::CovData{T}) where {T}
 
     ca = state_a.c
     cb = state_b.c
-    # FIXME This is speculation - do the algebra to check this!
     cc = (ca + cb) + nb * (μxb - μxa) * (μyb - μyc)
 
     return CovData{T}((n=nc, mean_x=μxc, mean_y=μyc, c=cc))
@@ -366,8 +365,10 @@ Base.show(io::IO, op::WindowCov{T}) where {T} = print(io, "WindowCov{$T}($(_wind
 
 """
     cov(x, y, window::Int[, alignment]; emit_early=false, corrected=true) -> Node
+    cov(x, y, window::TimePeriod[, alignment]; emit_early=false, corrected=true) -> Node
 
-Create a node of the rolling covariance of `x` and `y` over the last `window` knots.
+Create a node of the rolling covariance of `x` and `y` over the last `window` knots, or time
+interval.
 
 The specified `alignment` controls the behaviour when `x` and `y` tick at different times,
 as per the documentation in [Alignment](@ref). When not specified, it defaults to
@@ -392,18 +393,45 @@ function Statistics.cov(
     T = output_type(/, output_type(*, value_type(x), value_type(y)), Int)
     return obtain_node((x, y), WindowCov{T,corrected,emit_early,A}(window))
 end
+
+# Time-window covariance.
+struct TWindowCov{T,Corrected,EmitEarly,A} <: BinaryTWindowOp{T,CovData{T},EmitEarly,A}
+    window::Millisecond
+end
+_should_tick(::TWindowCov, data::CovData) = data.n > 1
+_combine(::TWindowCov, x::CovData, y::CovData) = _combine(x, y)
+_extract(::TWindowCov{T,true}, data::CovData) where {T} = data.c / (data.n - 1)
+_extract(::TWindowCov{T,false}, data::CovData) where {T} = data.c / data.n
+Base.show(io::IO, op::TWindowCov{T}) where {T} = print(io, "TWindowCov{$T}($(_window(op)))")
 function Statistics.cov(
-    x::Node, y::Node, window::Int; emit_early::Bool=false, corrected::Bool=true
+    x, y, window::TimePeriod, ::A; emit_early::Bool=false, corrected::Bool=true
+) where {A<:Alignment}
+    x = _ensure_node(x)
+    y = _ensure_node(y)
+    if _is_constant(x) && _is_constant(y)
+        throw(ArgumentError("Cannot compute covariance of constants $x and $y"))
+    end
+    T = output_type(/, output_type(*, value_type(x), value_type(y)), Int)
+    return obtain_node((x, y), TWindowCov{T,corrected,emit_early,A}(Millisecond(window)))
+end
+
+# Shorthand covariance calls where alignment isn't specified.
+function Statistics.cov(
+    x::Node,
+    y::Node,
+    window::Union{Int,TimePeriod};
+    emit_early::Bool=false,
+    corrected::Bool=true,
 )
     return cov(x, y, window, DEFAULT_ALIGNMENT; emit_early, corrected)
 end
 function Statistics.cov(
-    x::Node, y, window::Int; emit_early::Bool=false, corrected::Bool=true
+    x::Node, y, window::Union{Int,TimePeriod}; emit_early::Bool=false, corrected::Bool=true
 )
     return cov(x, y, window, DEFAULT_ALIGNMENT; emit_early, corrected)
 end
 function Statistics.cov(
-    x, y::Node, window::Int; emit_early::Bool=false, corrected::Bool=true
+    x, y::Node, window::Union{Int,TimePeriod}; emit_early::Bool=false, corrected::Bool=true
 )
     return cov(x, y, window, DEFAULT_ALIGNMENT; emit_early, corrected)
 end
@@ -583,8 +611,10 @@ Statistics.cor(x, y::Node) = cov(x, y, DEFAULT_ALIGNMENT)
 
 """
     cor(x, y, window::Int[, alignment]; emit_early=false) -> Node
+    cor(x, y, window::TimePeriod[, alignment]; emit_early=false) -> Node
 
-Create a node of the rolling covariance of `x` and `y` over the last `window` knots.
+Create a node of the rolling covariance of `x` and `y` over the last `window` knots, or time
+interval.
 
 The specified `alignment` controls the behaviour when `x` and `y` tick at different times,
 as per the documentation in [Alignment](@ref). When not specified, it defaults to
@@ -596,18 +626,22 @@ full. Otherwise, it will tick immediately with a partially-filled window.
 This is equivalent to a sample correlation over the `n` values of `(x, y)` pairs observed at
 and before a given time, with `n` capped at `window`.
 """
-function Statistics.cor(x, y, window::Int, alignment::Alignment; emit_early::Bool=false)
+function Statistics.cor(
+    x, y, window::Union{Int,TimePeriod}, alignment::Alignment; emit_early::Bool=false
+)
     x, y = coalign(x, y, alignment)
     return cov(x, y, window; emit_early) /
            (std(x, window; emit_early) * std(y, window; emit_early))
 end
-function Statistics.cor(x::Node, y::Node, window::Int; emit_early::Bool=false)
+function Statistics.cor(
+    x::Node, y::Node, window::Union{Int,TimePeriod}; emit_early::Bool=false
+)
     return cor(x, y, window, DEFAULT_ALIGNMENT; emit_early)
 end
-function Statistics.cor(x::Node, y, window::Int; emit_early::Bool=false)
+function Statistics.cor(x::Node, y, window::Union{Int,TimePeriod}; emit_early::Bool=false)
     return cor(x, y, window, DEFAULT_ALIGNMENT; emit_early)
 end
-function Statistics.cor(x, y::Node, window::Int; emit_early::Bool=false)
+function Statistics.cor(x, y::Node, window::Union{Int,TimePeriod}; emit_early::Bool=false)
     return cor(x, y, window, DEFAULT_ALIGNMENT; emit_early)
 end
 
