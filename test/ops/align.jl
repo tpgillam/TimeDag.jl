@@ -72,6 +72,7 @@ end
     @test _eval(first_knot(n4)) == b4[1:1]
     @test _eval(first_knot(n_boolean)) == b_boolean[1:1]
     @test _eval(empty_node(Float64)) == Block{Float64}()
+    @test first_knot(constant(42.0)) === constant(42.0)
 end
 
 @testset "active_count" begin
