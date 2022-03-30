@@ -110,9 +110,12 @@ function operator!(
 end
 
 """
-Windowed associative binary operator, potentially emitting early before the window is full.
+Windowed associative unary operator, potentially emitting early before the window is full.
 """
 abstract type UnaryWindowOp{T,Data,EmitEarly} <: UnaryNodeOp{T} end
+"""
+Windowed associative binary operator, potentially emitting early before the window is full.
+"""
 abstract type BinaryWindowOp{T,Data,EmitEarly,A} <: BinaryNodeOp{T,A} end
 
 const WindowOp{T,Data,EmitEarly} = Union{
@@ -175,10 +178,14 @@ function operator!(op::WindowOp{T,Data}, state::WindowOpState{Data}, x...) where
 end
 
 """
-Time-windowed associative binary operator, potentially emitting early before the window is
+Time-windowed associative unary operator, potentially emitting early before the window is
 full.
 """
 abstract type UnaryTWindowOp{T,Data,EmitEarly} <: UnaryNodeOp{T} end
+"""
+Time-windowed associative binary operator, potentially emitting early before the window is
+full.
+"""
 abstract type BinaryTWindowOp{T,Data,EmitEarly,A} <: BinaryNodeOp{T,A} end
 
 const TWindowOp{T,Data,EmitEarly} = Union{
