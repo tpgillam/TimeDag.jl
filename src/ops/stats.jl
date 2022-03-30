@@ -230,8 +230,9 @@ _extract(::WindowVar{T,false}, data::VarData) where {T} = data.s / data.n
 Base.show(io::IO, op::WindowVar{T}) where {T} = print(io, "WindowVar{$T}($(_window(op)))")
 """
     var(x::Node, window::Int; emit_early::Bool=false, corrected::Bool=true) -> Node
+    var(x::Node, window::TimePeriod; emit_early::Bool=false, corrected::Bool=true) -> Node
 
-Create a node of the rolling variance of `x` over the last `window` knots.
+Create a node of the rolling variance of `x` over the last `window` knots, or time interval.
 
 If `emit_early` is false, then the node returned will only start ticking once the window is
 full. Otherwise, it will tick immediately with a partially-filled window.
@@ -247,6 +248,23 @@ function Statistics.var(x::Node, window::Int; emit_early::Bool=false, corrected:
     return obtain_node((x,), WindowVar{T,corrected,emit_early}(window))
 end
 
+# Variance over time window
+struct TWindowVar{T,Corrected,EmitEarly} <: UnaryTWindowOp{T,VarData{T},EmitEarly}
+    window::Millisecond
+end
+_should_tick(::TWindowVar, data::VarData) = data.n > 1
+_combine(::TWindowVar, x::VarData, y::VarData) = _combine(x, y)
+_extract(::TWindowVar{T,true}, data::VarData) where {T} = data.s / (data.n - 1)
+_extract(::TWindowVar{T,false}, data::VarData) where {T} = data.s / data.n
+Base.show(io::IO, op::TWindowVar{T}) where {T} = print(io, "TWindowVar{$T}($(_window(op)))")
+function Statistics.var(
+    x::Node, window::TimePeriod; emit_early::Bool=false, corrected::Bool=true
+)
+    _is_constant(x) && throw(ArgumentError("Cannot compute variance of constant $x"))
+    T = output_type(/, value_type(x), Int)
+    return obtain_node((x,), TWindowVar{T,corrected,emit_early}(Millisecond(window)))
+end
+
 # Standard deviation.
 """
     std(x::Node; corrected::Bool=true) -> Node
@@ -260,15 +278,19 @@ Statistics.std(x::Node; corrected::Bool=true) = sqrt(var(x; corrected))
 
 """
     std(x::Node, window::Int; emit_early::Bool=false, corrected::Bool=true) -> Node
+    std(x::Node, window::TimePeriod; emit_early::Bool=false, corrected::Bool=true) -> Node
 
-Create a node of the rolling standard deviation of `x` over the last `window` knots.
+Create a node of the rolling standard deviation of `x` over the last `window` knots, or time
+interval.
 
 If `emit_early` is false, then the node returned will only start ticking once the window is
 full. Otherwise, it will tick immediately with a partially-filled window.
 
 This is equivalent to `sqrt(var(x; emit_early, corrected))`.
 """
-function Statistics.std(x::Node, window::Int; emit_early::Bool=false, corrected::Bool=true)
+function Statistics.std(
+    x::Node, window::Union{Int,TimePeriod}; emit_early::Bool=false, corrected::Bool=true
+)
     return sqrt(var(x, window; emit_early, corrected))
 end
 
