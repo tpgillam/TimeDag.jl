@@ -19,11 +19,9 @@ function run_node!(
     ::DateTime,  # time_end
     input::Block{T},
 ) where {T}
-    if isempty(input)
-        # The input is empty, so regardless of the state we cannot lag onto anything.
-        # The state is unmodified, and return the empty block.
-        return input
-    end
+    # The input is empty, so regardless of the state we cannot lag onto anything.
+    # The state is unmodified, and return the empty block.
+    isempty(input) && return input
 
     w = op.n  # The window length.
     ni = length(input)  # The input length.
@@ -78,6 +76,65 @@ function lag(x::Node, n::Integer)
         x
     else
         obtain_node((x,), Lag{value_type(x)}(n))
+    end
+end
+
+"""A node which lags its input by a fixed time duration."""
+struct TLag{T} <: NodeOp{T}
+    w::Millisecond
+end
+
+mutable struct TLagState{T} <: NodeEvaluationState
+    # We don't know how many knots history we will have to keep.
+    buffer::Block{T}
+end
+
+create_evaluation_state(::Tuple{Node}, ::TLag{T}) where {T} = TLagState(Block{T}())
+
+function run_node!(
+    op::TLag{T},
+    state::TLagState{T},
+    time_start::DateTime,  # time_start
+    time_end::DateTime,  # time_end
+    input::Block{T},
+) where {T}
+    # This is all history available to us, including the current block.
+    # NB That `vcat` is optimimsed to avoid allocation if the existing buffer or `input`
+    # is empty.
+    history = vcat(state.buffer, input)
+
+    # Select the period of history that we should be returning.
+    view_start = time_start - op.w
+    view_end = time_end - op.w
+    view_history = _slice(history, view_start, view_end)
+
+    # Store the rest in the state.
+    # TODO This is slightly inefficient because we are repeating a binary search to locate
+    # `view_end`, and we know that `time_end` is at the end of `history`.
+    state.buffer = _slice(history, view_end, time_end)
+
+    # Now we modify the times of the knots that we're outputting in the new block.
+    return Block(unchecked, view_history.times .+ op.w, view_history.values)
+end
+
+"""
+    lag(x::Node, w::TimePeriod)
+
+Construct a node which takes values from `x`, but lags them by period `w`.
+"""
+function lag(x::Node, w::TimePeriod)
+    w = Millisecond(w)
+
+    return if w == Millisecond(0)
+        # Optimisation.
+        x
+    elseif w < Millisecond(0)
+        throw(ArgumentError("Cannot lag by $w."))
+    elseif _is_constant(x)
+        # Constant nodes shouldn't be affected by lagging.
+        x
+    else
+        obtain_node((x,), TLag{value_type(x)}(w))
     end
 end
 
