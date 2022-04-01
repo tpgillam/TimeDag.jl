@@ -286,7 +286,7 @@ interval.
 If `emit_early` is false, then the node returned will only start ticking once the window is
 full. Otherwise, it will tick immediately with a partially-filled window.
 
-This is equivalent to `sqrt(var(x; emit_early, corrected))`.
+This is equivalent to `sqrt(var(x, window; emit_early, corrected))`.
 """
 function Statistics.std(
     x::Node, window::Union{Int,TimePeriod}; emit_early::Bool=false, corrected::Bool=true
@@ -586,7 +586,6 @@ end
 
 """
     cor(x, y[, alignment]; corrected::Bool=true) -> Node
-
 
 Create a node which ticks with values of the running correlation of `x` and `y`.
 
