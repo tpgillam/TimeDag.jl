@@ -35,6 +35,12 @@ end
         end
     end
 
+    @testset "constant" begin
+        n = constant(42.0)
+        @test lag(n, 1) === n
+        @test lag(n, Hour(1)) === n
+    end
+
     @testset "general" begin
         for n_lag in 0:10
             n = lag(n4, n_lag)
