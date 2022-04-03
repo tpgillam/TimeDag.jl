@@ -150,13 +150,13 @@ function _slice(block::Block{T}, time_start::DateTime, time_end::DateTime) where
     i_first = searchsortedfirst(block.times, time_start)
     i_last = searchsortedfirst(block.times, time_end) - 1
 
-    if (i_first > length(block) || i_last < 1)
-        return Block{T}()
+    return if (i_first > length(block) || i_last < 1)
+        Block{T}()
     elseif (i_first == 1 && i_last == length(block))
         # Avoid constructing views if we want the whole block.
-        return block
+        block
     else
-        return Block(
+        Block(
             unchecked,
             @inbounds(@view(block.times[i_first:i_last])),
             @inbounds(@view(block.values[i_first:i_last])),
@@ -164,19 +164,40 @@ function _slice(block::Block{T}, time_start::DateTime, time_end::DateTime) where
     end
 end
 
-function Base.vcat(blocks::Block{T}...) where {T}
-    return if length(blocks) == 1
-        # Fast path for a single block.
-        only(blocks)
+"""
+Internal implementation of `vcat`.
+
+Expects `blocks` to be non-empty, and all blocks therein to also be non-empty.
+"""
+_vcat(block::Block) = block
+function _vcat(b1::Block{T}, blocks::Block{T}...) where {T}
+    # TODO Rather than using vcat here, we could use a function that more intelligently
+    # merges views and ranges etc.
+    # TODO we could use unchecked here, if we were to check that all the adjacent
+    #   elements between blocks were correct.
+    return Block(
+        vcat(b1.times, (block.times for block in blocks)...),
+        vcat(b1.values, (block.values for block in blocks)...),
+    )
+end
+
+# Fast path for a single block.
+Base.vcat(block::Block) = block
+
+function Base.vcat(b1::Block{T}, blocks::Block{T}...) where {T}
+    # Do not include empty blocks in concatenation
+    blocks = filter(!isempty, blocks)
+
+    return if isempty(b1)
+        if isempty(blocks)
+            # If `blocks` is also empty, then we should just return a single empty block of
+            # the correct type. Blocks are considered immutable, so use `b1`.
+            b1
+        else
+            _vcat(blocks...)
+        end
     else
-        # TODO Rather than using vcat here, we could use a function that more intelligently
-        # merges views and ranges etc.
-        # TODO we could use unchecked here, if we were to check that all the adjacent
-        #   elements between blocks were correct.
-        Block(
-            vcat((block.times for block in blocks)...),
-            vcat((block.values for block in blocks)...),
-        )
+        _vcat(b1, blocks...)
     end
 end
 

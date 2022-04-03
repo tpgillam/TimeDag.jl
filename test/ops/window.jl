@@ -1,14 +1,14 @@
 # Gloriously inefficient ways of computing running & rolled quantities.
 
-function _naive_inception_reduce(T, f::Function, block::Block, min_window::Int)
-    @assert min_window > 0
+function _naive_inception_reduce(T, f::Function, block::Block, min_knot_count::Int)
+    @assert min_knot_count > 0
     times = DateTime[]
     values = T[]
     buffer = value_type(block)[]
     for (i, (time, value)) in enumerate(block)
         # Push a new value onto the buffer.
         push!(buffer, value)
-        if i < min_window
+        if i < min_knot_count
             # We need to wait longer before emitting.
             continue
         end
@@ -20,9 +20,9 @@ function _naive_inception_reduce(T, f::Function, block::Block, min_window::Int)
 end
 
 function _naive_inception_reduce(
-    T, f::Function, block_a::Block, block_b::Block, min_window::Int
+    T, f::Function, block_a::Block, block_b::Block, min_knot_count::Int
 )
-    @assert min_window > 0
+    @assert min_knot_count > 0
     @assert block_a.times == block_b.times  # Don't attempt to perform alignment
     times = DateTime[]
     values = T[]
@@ -34,7 +34,7 @@ function _naive_inception_reduce(
         # Push new values onto the buffer.
         push!(buffer_a, a)
         push!(buffer_b, b)
-        if i < min_window
+        if i < min_knot_count
             # We need to wait longer before emitting.
             continue
         end
@@ -46,10 +46,10 @@ function _naive_inception_reduce(
 end
 
 function _naive_window_reduce(
-    T, f::Function, block::Block, window::Int, emit_early::Bool, min_window::Int
+    T, f::Function, block::Block, window::Int, emit_early::Bool, min_knot_count::Int
 )
     @assert window > 0
-    @assert min_window > 0
+    @assert min_knot_count > 0
     times = DateTime[]
     values = T[]
     buffer = CircularBuffer{value_type(block)}(window)
@@ -61,7 +61,7 @@ function _naive_window_reduce(
             # The buffer is not full, and we require that it be full for us to emit a knot.
             continue
         end
-        if i < min_window
+        if i < min_knot_count
             # We need to wait longer before emitting.
             continue
         end
@@ -79,10 +79,10 @@ function _naive_window_reduce(
     block_b::Block,
     window::Int,
     emit_early::Bool,
-    min_window::Int,
+    min_knot_count::Int,
 )
     @assert window > 0
-    @assert min_window > 0
+    @assert min_knot_count > 0
     @assert block_a.times == block_b.times  # Don't attempt to perform alignment
 
     times = DateTime[]
@@ -101,7 +101,7 @@ function _naive_window_reduce(
             # The buffer is not full, and we require that it be full for us to emit a knot.
             continue
         end
-        if i < min_window
+        if i < min_knot_count
             # We need to wait longer before emitting.
             continue
         end
@@ -118,10 +118,10 @@ function _naive_twindow_reduce(
     @assert window > Millisecond(0)
     @assert min_knot_count > 0
 
-    # We build a state which is effectively implemeting a time-window of values by using
+    # We build a state which is effectively implementing a time-window of values by using
     # the associative `vcat` operator (not the most efficient way of doing this, but good
     # for testing).
-    state = TimeWindowAssociativeOp{Vector{T},vcat,vcat,DateTime}(window)
+    state = TimeWindowAssociativeOp{Vector{T},vcat,DateTime}(window)
 
     times = DateTime[]
     values = T[]
@@ -132,7 +132,7 @@ function _naive_twindow_reduce(
             # The state is not full, and we require that it be full for us to emit a knot.
             continue
         end
-        if i < min_knot_count
+        if window_size(state) < min_knot_count
             # We need to wait longer before emitting.
             continue
         end
@@ -146,15 +146,64 @@ function _naive_twindow_reduce(
     return Block(times, values)
 end
 
+function _naive_twindow_reduce(
+    T,
+    f::Function,
+    block_a::Block,
+    block_b::Block,
+    window::Millisecond,
+    emit_early::Bool,
+    min_knot_count::Int,
+)
+    @assert window > Millisecond(0)
+    @assert min_knot_count > 0
+    @assert block_a.times == block_b.times  # Don't attempt to perform alignment
+
+    # We build a state which is effectively implementing a time-window of values by using
+    # the associative `vcat` operator (not the most efficient way of doing this, but good
+    # for testing).
+    state_a = TimeWindowAssociativeOp{Vector{value_type(block_a)},vcat,DateTime}(window)
+    state_b = TimeWindowAssociativeOp{Vector{value_type(block_b)},vcat,DateTime}(window)
+
+    times = DateTime[]
+    values = T[]
+    for i in 1:length(block_a)
+        time, value_a = block_a[i]
+        _, value_b = block_b[i]
+
+        update_state!(state_a, time, [value_a])
+        update_state!(state_b, time, [value_b])
+
+        if !emit_early && !window_full(state_a)
+            @assert !window_full(state_b)
+            # The state is not full, and we require that it be full for us to emit a knot.
+            continue
+        end
+        if window_size(state_a) < min_knot_count
+            # We need to wait longer before emitting.
+            continue
+        end
+
+        buffer_a = window_value(state_a)
+        buffer_b = window_value(state_b)
+
+        push!(times, time)
+        push!(values, f(buffer_a, buffer_b))
+    end
+
+    return Block(times, values)
+end
+
 function _test_inception_op(
-    T, f_normal::Function, f_timedag::Function=f_normal; min_window=1, block::Block=b4
+    T, f_normal::Function, f_timedag::Function=f_normal; min_knot_count=1, block::Block=b4
 )
     n_in = block_node(block)
-    @test _eval(f_timedag(n_in)) ≈ _naive_inception_reduce(T, f_normal, block, min_window)
+    @test _eval(f_timedag(n_in)) ≈
+        _naive_inception_reduce(T, f_normal, block, min_knot_count)
 end
 
 function _test_binary_inception_op(
-    T, f_normal::Function, f_timedag::Function=f_normal; min_window=1
+    T, f_normal::Function, f_timedag::Function=f_normal; min_knot_count=1
 )
     # TODO test other alignments
     # pre-align outputs so the reduction operation is simpler
@@ -162,7 +211,7 @@ function _test_binary_inception_op(
     block_a, block_b = _eval_fast([na, nb])
     @test isapprox(
         _eval(f_timedag(n1, n4)),
-        _naive_inception_reduce(T, f_normal, block_a, block_b, min_window);
+        _naive_inception_reduce(T, f_normal, block_a, block_b, min_knot_count);
         nans=true,
     )
 end
@@ -223,6 +272,20 @@ function _test_binary_window_op(
     return nothing
 end
 
+"""
+    _time_windows(block, num_windows_in_block_duration) -> AbstractVector{<:TimePeriod}
+
+For testing time-window functions, generate a vector of time-windows covering.
+"""
+function _time_windows(block::Block, num_windows_in_block_duration::Integer)
+    # Pick some windows with lengths determined relative to the duration of the block.
+    min_window = Millisecond(1)
+    block_duration = Millisecond(last(block.times) - first(block.times))
+    increment = div(block_duration, num_windows_in_block_duration)
+    max_window = block_duration + 2 * increment
+    return min_window:increment:max_window
+end
+
 function _test_twindow_op(
     T,
     f_normal::Function,
@@ -231,17 +294,9 @@ function _test_twindow_op(
     block::Block=b4,
     num_windows_in_block_duration=7,
 )
-    # FIXME test throwing for windows that are too small.
-
     n_in = block_node(block)
 
-    # Pick some windows with lengths determined relative to the duration of the block.
-    min_window = Millisecond(1)
-    block_duration = Millisecond(last(block.times) - first(block.times))
-    increment = div(block_duration, num_windows_in_block_duration)
-    max_window = block_duration + 2 * increment
-
-    for window in min_window:increment:max_window
+    for window in _time_windows(block, num_windows_in_block_duration)
         n = f_timedag(n_in, window)
 
         block_default = _eval(n)
@@ -257,6 +312,42 @@ function _test_twindow_op(
         @test isapprox(
             block_ee_true,
             _naive_twindow_reduce(T, f_normal, block, window, true, min_knot_count);
+            nans=true,
+        )
+    end
+    return nothing
+end
+
+function _test_binary_twindow_op(
+    T,
+    f_normal::Function,
+    f_timedag::Function=f_normal;
+    min_knot_count=1,
+    num_windows_in_block_duration=7,
+)
+    na = n4
+    nb = TimeDag.align(n1, n4)
+    block_a, block_b = _eval_fast([na, nb])
+    for window in _time_windows(block_a, num_windows_in_block_duration)
+        n = f_timedag(n1, n4, window)
+
+        block = _eval(n)
+        block_ee_false = _eval(f_timedag(n1, n4, window; emit_early=false))
+        block_ee_true = _eval(f_timedag(n1, n4, window; emit_early=true))
+
+        @test isequal(block, block_ee_false)
+        @test isapprox(
+            block_ee_false,
+            _naive_twindow_reduce(
+                T, f_normal, block_a, block_b, window, false, min_knot_count
+            );
+            nans=true,
+        )
+        @test isapprox(
+            block_ee_true,
+            _naive_twindow_reduce(
+                T, f_normal, block_a, block_b, window, true, min_knot_count
+            );
             nans=true,
         )
     end
@@ -326,9 +417,9 @@ end
 @testset "var" begin
     @testset "inception" begin
         @test_throws ArgumentError var(constant(42.0))
-        _test_inception_op(Float64, var; min_window=2)
-        _test_inception_op(Float64, partial(var; corrected=false); min_window=2)
-        _test_inception_op(Float64, partial(var; corrected=true); min_window=2)
+        _test_inception_op(Float64, var; min_knot_count=2)
+        _test_inception_op(Float64, partial(var; corrected=false); min_knot_count=2)
+        _test_inception_op(Float64, partial(var; corrected=true); min_knot_count=2)
     end
 
     @testset "window" begin
@@ -342,14 +433,21 @@ end
         _test_window_op(Float64, partial(var; corrected=false); min_window=2)
         _test_window_op(Float64, partial(var; corrected=true); min_window=2)
     end
+
+    @testset "twindow" begin
+        @test_throws ArgumentError var(constant(42.0), Hour(1))
+        _test_twindow_op(Float64, var; min_knot_count=2)
+        _test_twindow_op(Float64, partial(var; corrected=false); min_knot_count=2)
+        _test_twindow_op(Float64, partial(var; corrected=true); min_knot_count=2)
+    end
 end
 
 @testset "std" begin
     @testset "inception" begin
         @test_throws ArgumentError std(constant(42.0))
-        _test_inception_op(Float64, std; min_window=2)
-        _test_inception_op(Float64, partial(std; corrected=false); min_window=2)
-        _test_inception_op(Float64, partial(std; corrected=true); min_window=2)
+        _test_inception_op(Float64, std; min_knot_count=2)
+        _test_inception_op(Float64, partial(std; corrected=false); min_knot_count=2)
+        _test_inception_op(Float64, partial(std; corrected=true); min_knot_count=2)
     end
 
     @testset "window" begin
@@ -363,14 +461,21 @@ end
         _test_window_op(Float64, partial(std; corrected=false); min_window=2)
         _test_window_op(Float64, partial(std; corrected=true); min_window=2)
     end
+
+    @testset "twindow" begin
+        @test_throws ArgumentError std(constant(42.0), Hour(1))
+        _test_twindow_op(Float64, std; min_knot_count=2)
+        _test_twindow_op(Float64, partial(std; corrected=false); min_knot_count=2)
+        _test_twindow_op(Float64, partial(std; corrected=true); min_knot_count=2)
+    end
 end
 
 @testset "cov" begin
     @testset "inception" begin
         @test_throws ArgumentError cov(constant(42.0), constant(24.0))
-        _test_binary_inception_op(Float64, cov; min_window=2)
-        _test_binary_inception_op(Float64, partial(cov; corrected=false); min_window=2)
-        _test_binary_inception_op(Float64, partial(cov; corrected=true); min_window=2)
+        _test_binary_inception_op(Float64, cov; min_knot_count=2)
+        _test_binary_inception_op(Float64, partial(cov; corrected=false); min_knot_count=2)
+        _test_binary_inception_op(Float64, partial(cov; corrected=true); min_knot_count=2)
     end
 
     @testset "window" begin
@@ -384,6 +489,14 @@ end
         _test_binary_window_op(Float64, partial(cov; corrected=false); min_window=2)
         _test_binary_window_op(Float64, partial(cov; corrected=true); min_window=2)
     end
+
+    @testset "twindow" begin
+        @test_throws ArgumentError cov(constant(42.0), constant(24.0), Hour(2))
+
+        _test_binary_twindow_op(Float64, cov; min_knot_count=2)
+        _test_binary_twindow_op(Float64, partial(cov; corrected=false); min_knot_count=2)
+        _test_binary_twindow_op(Float64, partial(cov; corrected=true); min_knot_count=2)
+    end
 end
 
 @testset "cov matrix static" begin
@@ -394,9 +507,9 @@ end
 
     @testset "inception" begin
         @test_throws ArgumentError cov(constant(SVector((1.0, 2.0, 3.0))))
-        _test_inception_op(T, cov; min_window=2, block)
-        _test_inception_op(T, partial(cov; corrected=false); min_window=2, block)
-        _test_inception_op(T, partial(cov; corrected=true); min_window=2, block)
+        _test_inception_op(T, cov; min_knot_count=2, block)
+        _test_inception_op(T, partial(cov; corrected=false); min_knot_count=2, block)
+        _test_inception_op(T, partial(cov; corrected=true); min_knot_count=2, block)
     end
 
     @testset "window" begin
@@ -420,9 +533,9 @@ end
 
     @testset "inception" begin
         @test_throws ArgumentError cov(constant([1.0, 2.0, 3.0]))
-        _test_inception_op(T, cov; min_window=2, block)
-        _test_inception_op(T, partial(cov; corrected=false); min_window=2, block)
-        _test_inception_op(T, partial(cov; corrected=true); min_window=2, block)
+        _test_inception_op(T, cov; min_knot_count=2, block)
+        _test_inception_op(T, partial(cov; corrected=false); min_knot_count=2, block)
+        _test_inception_op(T, partial(cov; corrected=true); min_knot_count=2, block)
     end
 
     @testset "window" begin
@@ -441,7 +554,7 @@ end
 @testset "cor" begin
     @testset "inception" begin
         @test_throws ArgumentError cor(constant(42.0), constant(24.0))
-        _test_binary_inception_op(Float64, cor; min_window=2)
+        _test_binary_inception_op(Float64, cor; min_knot_count=2)
     end
 
     @testset "window" begin
@@ -452,6 +565,12 @@ end
         @test_throws ArgumentError cor(constant(42.0), constant(24.0), 2)
 
         _test_binary_window_op(Float64, cor; min_window=2)
+    end
+
+    @testset "twindow" begin
+        @test_throws ArgumentError cor(constant(42.0), constant(24.0), Hour(2))
+
+        _test_binary_twindow_op(Float64, cor; min_knot_count=2)
     end
 end
 

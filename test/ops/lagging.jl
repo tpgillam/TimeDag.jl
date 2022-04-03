@@ -2,6 +2,8 @@ function _naive_lag(block::Block, lag::Int64)
     return Block(block.times[(1 + lag):end], block.values[1:(end - lag)])
 end
 
+_naive_lag(block::Block, lag::TimePeriod) = Block(block.times .+ lag, block.values)
+
 function _naive_diff(block::Block, lag::Int64)
     lagged_block = _naive_lag(block, lag)
     return Block(lagged_block.times, block.values[(1 + lag):end] - lagged_block.values)
@@ -10,12 +12,16 @@ end
 @testset "lag" begin
     @testset "negative" begin
         @test_throws ArgumentError lag(n1, -1)
+        @test_throws ArgumentError lag(n1, -Hour(1))
     end
 
     @testset "zero" begin
         # Lagging by zero knots should return identically the same node.
         @test lag(n1, 0) === n1
         @test lag(n2, 0) === n2
+
+        @test lag(n1, Hour(0)) === n1
+        @test lag(n2, Second(0)) === n2
     end
 
     @testset "lag with one input knot" begin
@@ -29,11 +35,26 @@ end
         end
     end
 
+    @testset "constant" begin
+        n = constant(42.0)
+        @test lag(n, 1) === n
+        @test lag(n, Hour(1)) === n
+    end
+
     @testset "general" begin
         for n_lag in 0:10
             n = lag(n4, n_lag)
             @test value_type(n) == value_type(n4)
             @test _eval(n) == _naive_lag(b4, n_lag)
+        end
+    end
+
+    @testset "time period" begin
+        for w in [Millisecond(1), Second(1), Hour(1), Hour(48)]
+            n = lag(n4, w)
+
+            @test value_type(n) == value_type(n4)
+            @test _eval(n) == _naive_lag(b4, w)
         end
     end
 end

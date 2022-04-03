@@ -108,9 +108,8 @@ end
 Get a node which ticks with only the first knot of `x`, and then never ticks again.
 """
 function first_knot(node::Node{T}) where {T}
-    # TODO There are various optimisations here
-    #   * idempotent for constant nodes
-    #   * ? eagerly filter block node
+    # This function should be idempotent for constant nodes.
+    _is_constant(node) && return node
     return obtain_node((node,), FirstKnot{T}())
 end
 

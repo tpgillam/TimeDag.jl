@@ -30,7 +30,7 @@ This section indicates various core functionality that is either possible, or in
 
 ### Basic operations
 - [x] Lagging by fixed number of knots
-- [ ] Lagging by fixed time interval
+- [x] Lagging by fixed time interval
 - [x] Alignment of arbitrary numbers of node arguments to a node op
 
 ### Source node ops
