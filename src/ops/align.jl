@@ -5,7 +5,7 @@ _right(_, y) = y
 #   same alignment as a particular node. This can allow for extra pruning of the graph.
 
 """
-    left(x, y[, alignment::Alignment; initial_values=nothing])
+    left(x, y[, alignment::Alignment; initial_values=nothing]) -> Node
 
 Construct a node that ticks according to `alignment` with the latest value of `x`.
 
@@ -16,7 +16,7 @@ function left(x, y, alignment::Alignment=DEFAULT_ALIGNMENT; initial_values=nothi
 end
 
 """
-    right(x, y[, alignment::Alignment; initial_values=nothing])
+    right(x, y[, alignment::Alignment; initial_values=nothing]) -> Node
 
 Construct a node that ticks according to `alignment` with the latest value of `y`.
 
@@ -27,7 +27,7 @@ function right(x, y, alignment::Alignment=DEFAULT_ALIGNMENT; initial_values=noth
 end
 
 """
-    align(x, y)
+    align(x, y) -> Node
 
 Form a node that ticks with the values of `x` whenever `y` ticks.
 """
@@ -169,4 +169,32 @@ function throttle(x::Node, n::Integer)
     n > 0 || throw(ArgumentError("n should be positive, got $n"))
     n == 1 && return x
     return obtain_node((x,), ThrottleKnots{value_type(x)}(n))
+end
+
+struct CountKnots <: UnaryNodeOp{Int64} end
+time_agnostic(::CountKnots) = true
+always_ticks(::CountKnots) = true
+
+"""State to keep track of the number of knots that we have seen on the input."""
+mutable struct CountKnotsState <: NodeEvaluationState
+    count::Int64
+    CountKnotsState() = new(0)
+end
+
+create_operator_evaluation_state(::Tuple{Node}, ::CountKnots) = CountKnotsState()
+
+function operator!(::CountKnots, state::CountKnotsState, x::T) where {T}
+    state.count += 1
+    return state.count
+end
+
+"""
+    count_knots(x) -> Node{Int64}
+
+Return a node that ticks with the number of knots seen in `x` since evaluation began.
+"""
+function count_knots(x)
+    x = _ensure_node(x)
+    _is_constant(x) && return constant(1)  # A constant will always have one knot.
+    return obtain_node((x,), CountKnots())
 end

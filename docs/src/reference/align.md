@@ -10,4 +10,5 @@ active_count
 throttle
 lag
 Base.diff
+count_knots
 ```

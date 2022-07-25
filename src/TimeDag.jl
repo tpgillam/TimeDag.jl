@@ -25,7 +25,7 @@ export wrap, wrapb
 # Source nodes.
 export block_node, constant, empty_node, iterdates, pulse, tea_file
 # Alignment nodes.
-export active_count, align, coalign, first_knot, lag, right, left, throttle
+export active_count, align, coalign, count_knots, first_knot, lag, right, left, throttle
 # Other nodes
 export history, ema
 # Evaluation & other utilities.
