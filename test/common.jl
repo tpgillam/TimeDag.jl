@@ -93,7 +93,7 @@ const n1 = block_node(b1)
 const n2 = block_node(b2)
 const n3 = block_node(b3)
 const n4 = block_node(b4)
-const n_boolean = TimeDag.block_node(b_boolean)
+const n_boolean = block_node(b_boolean)
 
 const _T_START = DateTime(2000, 1, 1)
 const _T_END = DateTime(2001, 1, 1)

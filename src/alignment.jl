@@ -94,7 +94,10 @@ function operator! end
     always_ticks(node) -> Bool
     always_ticks(op) -> Bool
 
-Returns true iff the return value from `operator` can be assumed to always be valid.
+Returns true iff the return value from `operator!` can be assumed to always be valid.
+
+If `true`, `operator!(::Node{T}, ...)` should return a `T`.
+If `false`, `operator!(::Node{T}, ...)` should return a `Maybe{T}`.
 
 Note, that for sensible performance characteristics, this should be knowable from
 `typeof(op)`
