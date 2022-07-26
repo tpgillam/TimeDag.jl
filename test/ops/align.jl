@@ -7,8 +7,8 @@ end
 end
 
 @testset "align" begin
-    @test _eval(TimeDag.align(n4, n1)) == b1
-    @test _eval(TimeDag.align(n1, n4)) == Block([
+    @test _eval(align(n4, n1)) == b1
+    @test _eval(align(n1, n4)) == Block([
         DateTime(2000, 1, 1) => 1,
         DateTime(2000, 1, 2) => 2,
         DateTime(2000, 1, 3) => 3,
@@ -17,6 +17,25 @@ end
         DateTime(2000, 1, 6) => 4,
         DateTime(2000, 1, 7) => 4,
     ])
+end
+
+@testset "align_once" begin
+    @test _eval(align_once(n4, n1)) == b1
+    #! format:off
+    @test _eval(align_once(n1, n2)) == Block([
+        DateTime(2000, 1, 2) => 2,
+        DateTime(2000, 1, 3) => 3,
+        DateTime(2000, 1, 5) => 4
+    ])
+    @test _eval(align_once(n3, n2)) == Block([
+        DateTime(2000, 1, 2) => 15
+    ])
+    @test _eval(align_once(n2, n4)) == Block([
+        DateTime(2000, 1, 2) => 5,
+        DateTime(2000, 1, 3) => 6,
+        DateTime(2000, 1, 5) => 8
+    ])
+    #! format:on
 end
 
 @testset "coalign" begin
@@ -86,6 +105,43 @@ end
     @test active_count(n1, n2, n3) === active_count(n2, n1, n3)
     @test active_count(n1, n2, n3) === active_count(n3, n1, n2)
     @test active_count(n1, n2, n3) === active_count(n3, n2, n1)
+end
+
+@testset "prepend" begin
+    # The second argument should take over as soon as it is available. In the case that both
+    # arguments are constants, that is immediately.
+    @test prepend(1, 2) === constant(2)
+    @test prepend(1, "s") === constant("s")
+
+    # We should promote or widen types where applicable.
+    @test value_type(prepend(1, n1)) == Int64
+    @test value_type(prepend(1.0, n1)) == Float64
+    @test value_type(prepend("s", n1)) == Any
+    @test prepend(1, n2) === prepend(constant(1), n2)
+    @test prepend(n1, n2) === prepend(n1, n2)
+
+    @test _eval(prepend(42, n1)) == b1
+    @test _eval(prepend(42, n2)) == Block([
+        DateTime(2000, 1, 1) => 42,
+        DateTime(2000, 1, 2) => 5,
+        DateTime(2000, 1, 3) => 6,
+        DateTime(2000, 1, 5) => 8,
+    ])
+
+    @test _eval(prepend(n4, n2)) == Block([
+        DateTime(2000, 1, 1) => 1,
+        DateTime(2000, 1, 2) => 5,
+        DateTime(2000, 1, 3) => 6,
+        DateTime(2000, 1, 5) => 8,
+    ])
+
+    @test _eval(prepend(n_boolean, lag(n2, 2))) == Block([
+        DateTime(2000, 1, 1) => 1,
+        DateTime(2000, 1, 2) => 0,
+        DateTime(2000, 1, 3) => 1,
+        DateTime(2000, 1, 4) => 1,
+        DateTime(2000, 1, 5) => 5,
+    ])
 end
 
 @testset "throttle" begin

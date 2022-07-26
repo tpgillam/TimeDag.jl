@@ -33,6 +33,34 @@ Form a node that ticks with the values of `x` whenever `y` ticks.
 """
 align(x, y) = right(y, x, LEFT)
 
+"""
+    align_once(x, y) -> Node
+
+Similar to `align(x, y)`, except knots from `x` will be emitted at most once.
+
+This means that the resulting node will tick at a subset of the times that `y` ticks.
+"""
+function align_once(x, y)
+    x = _ensure_node(x)
+    y = _ensure_node(y)
+
+    # Imagine the following scenario.
+    #
+    # x: 1  2  3     4  5
+    # y: x     x  x     x
+    #
+    # In this situation, we want the result to be
+    # z: 1     3        5
+    #
+    # We can directly implement this by working with the 'knot count', and filtering out
+    # those knots where the count increases. We can then align to this.
+    aligned_count = align(count_knots(x), y)
+
+    # We should remove any knot where the change in count is non-positive.
+    alignment = filter(>(0), prepend(aligned_count, diff(aligned_count)))
+    return align(x, alignment)
+end
+
 # TODO support initial_values in coalign.
 """
     coalign(node_1, [node_2...; alignment::Alignment]) -> Node...
@@ -125,6 +153,88 @@ function active_count(x, x_rest...)
     # same node regardless of the order in which `nodes` were passed in.
     sort!(nodes; by=objectid)
     return reduce((x, y) -> +(x, y; initial_values=(0, 0)), align.(1, first_knot.(nodes)))
+end
+
+struct Prepend{T} <: NodeOp{T} end
+mutable struct PrependState <: NodeEvaluationState
+    switched::Bool
+    PrependState() = new(false)
+end
+create_evaluation_state(::Tuple{Node,Node}, op::Prepend) = PrependState()
+function run_node!(
+    ::Prepend{T},
+    state::PrependState,
+    ::DateTime,  # time_start
+    ::DateTime,  # time_end
+    input_x::Block,
+    input_y::Block,
+) where {T}
+    # prepend is implemented in terms of the raw API, since conceptually there will only be
+    # one batch where we have to find switch-over between nodes. This can be found with
+    # binary search or similar. In prior & subsequent batches we can immediately use the
+    # block from either x or y as appropriate.
+
+    # If we've already switched, we just take input from y.
+    state.switched && return input_y
+
+    # We haven't already switched.
+    # If y has not ticked, take input from x.
+    isempty(input_y) && return input_x
+
+    # We are in the block where y has some values.
+    state.switched = true
+
+    # Allocate a block of the maximum possible length. We'll trim it later.
+    n = length(input_x) + length(input_y)
+    times = _allocate_times(n)
+    values = _allocate_values(T, n)
+
+    # Index into the output.
+    j = 1
+
+    # Copy from x into the output buffer, until we want to take from y instead.
+    switch_time = first(input_y.times)
+    @inbounds for ix in 1:length(input_x)
+        time = input_x.times[ix]
+        # Stop copying values when we hit the first time in y.
+        time >= switch_time && break
+
+        times[j] = time
+        values[j] = input_x.values[ix]
+        j += 1
+    end
+
+    # Copy the remaining values from y into the output buffer.
+    @inbounds for (time, value) in input_y
+        times[j] = time
+        values[j] = value
+        j += 1
+    end
+
+    # Package the outputs into a block, resizing the outputs as necessary.
+    _trim!(times, j - 1)
+    _trim!(values, j - 1)
+
+    return Block(unchecked, times, values)
+end
+
+"""
+    prepend(x, y) -> Node
+
+Create a node that ticks with knots from `x` until `y` is active, and thereafter from `y`.
+
+Note that the [`value_type`](@ref) of the returned node will be that of the promoted value
+types of `x` and `y`.
+"""
+function prepend(x, y)
+    x = _ensure_node(x)
+    y = _ensure_node(y)
+
+    # Constant propagation.
+    _is_constant(x) && _is_constant(y) && return y
+
+    T = promote_type(value_type(x), value_type(y))
+    return obtain_node((x, y), Prepend{T}())
 end
 
 struct ThrottleKnots{T} <: UnaryNodeOp{T}
