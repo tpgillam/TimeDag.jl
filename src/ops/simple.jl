@@ -8,8 +8,12 @@
 @simple_unary(Base.sqrt)
 @simple_unary(Base.cbrt)
 @simple_unary(Base.sign)
+@simple_unary(Base.tan)
+@simple_unary(Base.sin)
+@simple_unary(Base.cos)
 @simple_unary_self_inverse(Base.:-)
 @simple_unary_self_inverse(Base.inv)
+
 
 @simple_binary(Base.:+)
 @simple_binary(Base.:-)

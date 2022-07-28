@@ -8,6 +8,10 @@ Base.log10
 Base.log2
 Base.sqrt
 Base.cbrt
+Base.sign
+Base.tan
+Base.sin
+Base.cos
 Base.inv
 
 Base.:+

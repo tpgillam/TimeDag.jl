@@ -1,5 +1,4 @@
 const _UNARY_STUFF = [
-    (-, b1),
     (abs, b1),
     (exp, b1),
     (log, b1),
@@ -8,7 +7,11 @@ const _UNARY_STUFF = [
     (sqrt, b1),
     (cbrt, b1),
     (sign, b1),
+    (tan, b1),
+    (sin, b1),
+    (cos, b1),
     (!, b_boolean),
+    (-, b1),
     (inv, b1),
 ]
 
