@@ -12,6 +12,15 @@ Base.sign
 Base.tan
 Base.sin
 Base.cos
+Base.atan
+Base.asin
+Base.acos
+Base.tanh
+Base.sinh
+Base.cosh
+Base.atanh
+Base.asinh
+Base.acosh
 Base.inv
 
 Base.:+
