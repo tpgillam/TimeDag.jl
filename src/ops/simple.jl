@@ -14,7 +14,6 @@
 @simple_unary_self_inverse(Base.:-)
 @simple_unary_self_inverse(Base.inv)
 
-
 @simple_binary(Base.:+)
 @simple_binary(Base.:-)
 @simple_binary(Base.:*)
