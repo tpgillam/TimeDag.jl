@@ -1,4 +1,4 @@
-_constrained_input_data = Block([
+_b_constrained = Block([
     DateTime(2000, 1, 1) => -0.9,
     DateTime(2000, 1, 2) => -0.1,
     DateTime(2000, 1, 3) => 0.0,
@@ -18,12 +18,12 @@ const _UNARY_STUFF = [
     (sin, b1),
     (cos, b1),
     (atan, b1),
-    (asin, _constrained_input_data),
-    (acos, _constrained_input_data),
+    (asin, _b_constrained),
+    (acos, _b_constrained),
     (tanh, b1),
     (sinh, b1),
     (cosh, b1),
-    (atanh, _constrained_input_data),
+    (atanh, _b_constrained),
     (asinh, b1),
     (acosh, b1),
     (!, b_boolean),
