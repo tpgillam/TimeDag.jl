@@ -4,7 +4,7 @@ CurrentModule = TimeDag
 
 # TimeDag
 
-Welcome to the documentation for [TimeDag.jl](https://github.com/invenia/TimeDag.jl)!
+Welcome to the documentation for [TimeDag.jl](https://github.com/tpgillam/TimeDag.jl)!
 
 `TimeDag` enables you to build and run time-series models efficiently.
 
@@ -50,6 +50,6 @@ This section indicates various core functionality that is either possible, or in
 ### Evaluation & scheduling
 - [x] Single-threaded evaluation of a graph
 - [ ] Optimise value-independent ops by using `alignment_base` concept.
-- [ ] Graph compilation / [transformations](https://github.com/invenia/TimeDag.jl/issues/5)
+- [ ] Graph compilation / [transformations](https://github.com/tpgillam/TimeDag.jl/issues/5)
 - [ ] Parallel evaluation of a batch within time-independent nodes
 - [ ] Parallelising scheduler
