@@ -1,6 +1,6 @@
 name = "TimeDag"
 uuid = "91963e24-6e66-4132-aeb8-436d9f37dbc7"
-authors = ["Invenia Technical Computing Corporation"]
+authors = ["Invenia Technical Computing Corporation", "Tom Gillam"]
 version = "0.1.10"
 
 [deps]
