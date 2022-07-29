@@ -1,5 +1,11 @@
+_b_constrained = Block([
+    DateTime(2000, 1, 1) => -0.9,
+    DateTime(2000, 1, 2) => -0.1,
+    DateTime(2000, 1, 3) => 0.0,
+    DateTime(2000, 1, 4) => 0.5,
+])
+
 const _UNARY_STUFF = [
-    (-, b1),
     (abs, b1),
     (exp, b1),
     (log, b1),
@@ -8,7 +14,20 @@ const _UNARY_STUFF = [
     (sqrt, b1),
     (cbrt, b1),
     (sign, b1),
+    (tan, b1),
+    (sin, b1),
+    (cos, b1),
+    (atan, b1),
+    (asin, _b_constrained),
+    (acos, _b_constrained),
+    (tanh, b1),
+    (sinh, b1),
+    (cosh, b1),
+    (atanh, _b_constrained),
+    (asinh, b1),
+    (acosh, b1),
     (!, b_boolean),
+    (-, b1),
     (inv, b1),
 ]
 
