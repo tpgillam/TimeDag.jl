@@ -161,3 +161,10 @@ end
     @test _eval(count_knots(n4)) == _expected_count_knots(b4)
     @test _eval(count_knots(n_boolean)) == _expected_count_knots(b_boolean)
 end
+
+@testset "skip" begin
+    @test _eval(skip(n1, 1)) == b1[2:end]
+    @test _eval(skip(n1, 3)) == b1[4:end]
+    @test skip(n1, 0) === n1
+    @test_throws ArgumentError skip(n1, -4)
+end

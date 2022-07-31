@@ -308,3 +308,41 @@ function count_knots(x)
     _is_constant(x) && return constant(1)  # A constant will always have one knot.
     return obtain_node((x,), CountKnots())
 end
+
+# Skip
+struct Skip{T} <: UnaryNodeOp{T}
+    n::Int
+end
+
+mutable struct SkipState <: NodeEvaluationState
+    n::Int
+    SkipState() = new(1)
+end
+
+create_operator_evaluation_state(::Tuple{Node}, ::Skip) = SkipState()
+
+time_agnostic(::Skip) = true
+
+function operator!(op::Skip{T}, state::SkipState, x::T)::Maybe{T} where {T}
+    if state.n <= op.n
+        state.n += 1
+        return Maybe{T}()
+    else
+        return Maybe(x)
+    end
+end
+
+"""
+    skip(node::Node, n::Int)
+
+Prouces a `Node` which is equal to `node` less the first `n` knots.
+"""
+function Base.skip(node::Node{T}, n::Int) where {T}
+    if n == 0
+        return node
+    elseif n < 0
+        throw(ArgumentError("n < 0"))
+    else
+        return obtain_node((node, ), Skip{T}(n))
+    end
+end
