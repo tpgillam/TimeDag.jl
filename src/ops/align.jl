@@ -342,6 +342,6 @@ function Base.skip(node::Node{T}, n::Int) where {T}
     elseif n < 0
         throw(ArgumentError("n < 0"))
     else
-        return obtain_node((node, ), Skip{T}(n))
+        return obtain_node((node,), Skip{T}(n))
     end
 end
