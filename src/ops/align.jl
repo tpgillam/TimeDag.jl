@@ -309,7 +309,6 @@ function count_knots(x)
     return obtain_node((x,), CountKnots())
 end
 
-# Skip
 struct Skip{T} <: UnaryNodeOp{T}
     n::Int
 end
