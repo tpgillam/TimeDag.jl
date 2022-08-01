@@ -30,7 +30,7 @@ Base.:(==)(x::RandArray{T}, y::RandArray{T}) where {T} = x.rng == y.rng && x.dim
 operator!(op::RandArray{T}, state::RandState) where {T} = rand(state.rng, T, op.dims)
 
 """
-    rand([rng=MersenneTwister(),] alignment::Node[, S, dims...])
+    rand([rng=Xoshiro(),] alignment::Node[, S, dims...])
 
 Generate random numbers aligned to `alignment`, with the given `rng` if provided.
 
@@ -45,16 +45,16 @@ Semantics are otherwise very similar to the usual `Base.rand`:
     If provided, `rng` will be copied before it is used. This is to ensure reproducability
     when evaluating a node multiple times.
 """
-Base.rand(alignment::Node) = rand(MersenneTwister(), alignment)
+Base.rand(alignment::Node) = rand(Xoshiro(), alignment)
 Base.rand(rng::Random.AbstractRNG, alignment::Node) = rand(rng, alignment, Float64)
 function Base.rand(rng::Random.AbstractRNG, alignment::Node, ::Type{X}) where {X}
     return obtain_node((alignment,), Rand{X}(copy(rng)))
 end
 
 function Base.rand(alignment::Node, dims::Integer...)
-    return rand(MersenneTwister(), alignment, Dims(dims))
+    return rand(Xoshiro(), alignment, Dims(dims))
 end
-Base.rand(alignment::Node, dims::Dims) = rand(MersenneTwister(), alignment, dims)
+Base.rand(alignment::Node, dims::Dims) = rand(Xoshiro(), alignment, dims)
 function Base.rand(rng::Random.AbstractRNG, alignment::Node, dims::Dims)
     return rand(rng, alignment, Float64, dims)
 end
