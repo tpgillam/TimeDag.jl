@@ -65,7 +65,7 @@ end
 
 # TODO support initial_values in coalign.
 """
-    coalign(node_1, [node_2...; alignment::Alignment]) -> Node...
+    coalign(x, [...; alignment::Alignment]) -> Node...
 
 Given at least one node(s) `x`, or values that are convertible to nodes, align all of them.
 
@@ -309,4 +309,102 @@ function count_knots(x)
     x = _ensure_node(x)
     _is_constant(x) && return constant(1)  # A constant will always have one knot.
     return obtain_node((x,), CountKnots())
+end
+
+struct Merge2{T} <: NodeOp{T} end
+create_evaluation_state(::Tuple{Node,Node}, ::Merge2) = EMPTY_NODE_STATE
+function run_node!(
+    ::Merge2{T},
+    ::EmptyNodeEvaluationState,
+    ::DateTime,  # time_start
+    ::DateTime,  # time_end
+    input_l::Block,
+    input_r::Block,
+) where {T}
+    # This is a very simplified version of Union alignment, since we do not need to keep
+    # track of any previous values.
+
+    # Fast-paths — any emptiness of inputs means that no merging is required.
+    isempty(input_l) && return input_r
+    isempty(input_r) && return input_l
+
+    # Allocate a block of the maximum possible length. We'll trim it later.
+    nl = length(input_l)
+    nr = length(input_r)
+    max_size = nl + nr
+    times = _allocate_times(max_size)
+    values = _allocate_values(T, max_size)
+
+    # Store indices into the inputs. The index represents the next time point for
+    # consideration for each series.
+    il = 1
+    ir = 1
+
+    # Index into the output.
+    j = 1
+
+    # Loop until we exhaust inputs.
+    # @inbounds while (il <= nl || ir <= nr)
+    while (il <= nl || ir <= nr)
+        # Store the next available time in the series, that is being pointed to by il & ir.
+        next_time_l = il <= nl ? input_l.times[il] : DateTime(0)
+        next_time_r = ir <= nr ? input_r.times[ir] : DateTime(0)
+
+        time, value = if (il <= nl && next_time_l < next_time_r) || ir > nr
+            # Left ticks next
+            val = input_l.values[il]
+            il += 1
+            next_time_l, val
+        elseif (ir <= nr && next_time_r < next_time_l) || il > nl
+            # Right ticks next
+            val = input_r.values[ir]
+            ir += 1
+            next_time_r, val
+        else
+            # A shared time point where neither left nor right have been exhausted.
+            # Emit a value from the right-hand input in this case.
+            val = input_r.values[ir]
+            il += 1
+            ir += 1
+            next_time_r, val
+        end
+
+        # We always add a value
+        times[j] = time
+        values[j] = value
+        j += 1
+    end
+
+    # Package the outputs into a block, resizing the outputs as necessary.
+    _trim!(times, j - 1)
+    _trim!(values, j - 1)
+    return Block(unchecked, times, values)
+end
+
+"""
+    merge(x::Node...) -> Node
+
+Given at least one node `x`, create a node that emits the union of knots from all `x`.
+
+If one or more of the inputs contain knots at the same time, then only one will be emitted.
+The _last_ input in which a knot occurs at a particular time will take precedence.
+
+If the inputs `x` have different value types, then the resultant value type will be
+promoted as necessary to accommodate all inputs.
+"""
+function Base.merge(x::Node, others::Node...)
+    # This is an optimisation to ensure that if nodes are repeated in `others`, we only
+    # keep the last instance of them.
+    xs_backwards = unique(Iterators.reverse((x, others...)))
+    x = last(xs_backwards)
+    others = xs_backwards[(end - 1):-1:1]
+
+    # Apply merging pairwise.
+    return foldl(merge, others; init=x)
+end
+Base.merge(x::Node) = x
+function Base.merge(x::Node, y::Node)
+    x === y && return x
+    T = promote_type(value_type(x), value_type(y))
+    return obtain_node((x, y), Merge2{T}())
 end
