@@ -29,8 +29,11 @@ Base.:(==)(x::RandArray{T}, y::RandArray{T}) where {T} = x.rng == y.rng && x.dim
 
 operator!(op::RandArray{T}, state::RandState) where {T} = rand(state.rng, T, op.dims)
 
+# See docstring below — Xoshiro only exists (and is the default) in Julia 1.7 and later.
+_make_rng() = VERSION < v"1.7.0" ? MersenneTwister() : Xoshiro()
+
 """
-    rand([rng=Xoshiro(),] alignment::Node[, S, dims...])
+    rand([rng=...,] alignment::Node[, S, dims...])
 
 Generate random numbers aligned to `alignment`, with the given `rng` if provided.
 
@@ -39,22 +42,26 @@ Semantics are otherwise very similar to the usual `Base.rand`:
 * If specified, `dims` should be a tuple or vararg of integers representing the dimensions
     of an array.
 
-**NB** The values of `alignment` will be ignored.
+!!! note
+    The values of the knots from `alignment` will be ignored.
+
+!!! note
+    The default value of `rng` on Julia 1.6 is `MersenneTwister()`. On Julia 1.7 and later
+    it is `Xoshiro()`. This matches the default random number generator used in the
+    language.
 
 !!! tip
     If provided, `rng` will be copied before it is used. This is to ensure reproducability
     when evaluating a node multiple times.
 """
-Base.rand(alignment::Node) = rand(Xoshiro(), alignment)
+Base.rand(alignment::Node) = rand(_make_rng(), alignment)
 Base.rand(rng::Random.AbstractRNG, alignment::Node) = rand(rng, alignment, Float64)
 function Base.rand(rng::Random.AbstractRNG, alignment::Node, ::Type{X}) where {X}
     return obtain_node((alignment,), Rand{X}(copy(rng)))
 end
 
-function Base.rand(alignment::Node, dims::Integer...)
-    return rand(Xoshiro(), alignment, Dims(dims))
-end
-Base.rand(alignment::Node, dims::Dims) = rand(Xoshiro(), alignment, dims)
+Base.rand(alignment::Node, dims::Integer...) = rand(_make_rng(), alignment, Dims(dims))
+Base.rand(alignment::Node, dims::Dims) = rand(_make_rng(), alignment, dims)
 function Base.rand(rng::Random.AbstractRNG, alignment::Node, dims::Dims)
     return rand(rng, alignment, Float64, dims)
 end
