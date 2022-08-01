@@ -1,9 +1,11 @@
 @testset "right" begin
-    _test_binary_op(TimeDag.right, (x, y) -> y)
+    _test_binary_op(right, (x, y) -> y)
+    @test right(n1, n1) === n1
 end
 
 @testset "left" begin
-    _test_binary_op(TimeDag.left, (x, y) -> x)
+    _test_binary_op(left, (x, y) -> x)
+    @test left(n1, n1) === n1
 end
 
 @testset "align" begin
@@ -51,6 +53,7 @@ end
             na, nb = coalign(n1, n2; alignment)
             @test _eval(na) == _eval(left(n1, n2, alignment))
             @test _eval(nb) == _eval(right(n1, n2, alignment))
+            @test coalign(n1, n1; alignment) === (n1, n1)
         end
     end
 
@@ -64,6 +67,8 @@ end
             @test _eval(na) == _eval(l(n1, l(n2, n3)))
             @test _eval(nb) == _eval(r(n1, l(n2, n3)))
             @test _eval(nc) == _eval(r(n1, r(n2, n3)))
+
+            @test coalign(n1, n1, n1; alignment) === (n1, n1, n1)
         end
     end
 
