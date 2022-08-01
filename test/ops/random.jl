@@ -48,5 +48,13 @@
         block = _eval(n)
         @test block.times == expected_times
         @test all(map(value -> all(0 .<= value .< 1), block.values))
+
+        # Test value types when we don't have an explicit rng
+        @test value_type(rand(x, 2)) == Vector{Float64}
+        @test value_type(rand(x, (2,))) == Vector{Float64}
+        @test value_type(rand(x, 2, 3)) == Matrix{Float64}
+        @test value_type(rand(x, (2, 3))) == Matrix{Float64}
+        @test value_type(rand(x, 2, 3, 4)) == Array{Float64,3}
+        @test value_type(rand(x, (2, 3, 4))) == Array{Float64,3}
     end
 end
