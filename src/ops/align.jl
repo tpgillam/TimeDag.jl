@@ -336,14 +336,10 @@ end
 """
     skip(node::Node, n::Int)
 
-Prouces a `Node` which is equal to `node` less the first `n` knots.
+Produces a [`TimeDag.Node`](@ref) which is equal to `x` less the first `n` knots.
 """
-function Base.skip(node::Node{T}, n::Int) where {T}
-    if n == 0
-        return node
-    elseif n < 0
-        throw(ArgumentError("n < 0"))
-    else
-        return obtain_node((node,), Skip{T}(n))
-    end
+function Base.skip(x::Node{T}, n::Int) where {T}
+    n >=0 || throw(ArgumentError("n = $n, but should be non-negative"))
+    n == 0 && return x
+    return obtain_node((x,), Skip{T}(n))
 end
