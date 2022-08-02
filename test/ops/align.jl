@@ -186,6 +186,12 @@ end
     merge(constant(1), constant(2)) === constant(2)
     merge(constant(1), constant(2), constant(3)) === constant(3)
 
+    # If the times of the inputs are identically equal, we expect to not
+    # allocate a new block in evaluation.
+    b_new = Block(b1.times, 2 .* (1:length(b1.times)))
+    @test _eval(merge(block_node(b_new), n1)) === b1
+    @test _eval(merge(n1, block_node(b_new))) === b_new
+
     # Some hand-crafted examples:
     @test _eval(merge(n1, n2)) == Block([
         DateTime(2000, 1, 1) => 1,

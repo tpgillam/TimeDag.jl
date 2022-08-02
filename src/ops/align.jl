@@ -328,6 +328,9 @@ function run_node!(
     isempty(input_l) && return input_r
     isempty(input_r) && return input_l
 
+    # If times are identical, we can return the right-hand block.
+    _equal_times(input_l, input_r) && return input_r
+
     # Allocate a block of the maximum possible length. We'll trim it later.
     nl = length(input_l)
     nr = length(input_r)
@@ -344,8 +347,7 @@ function run_node!(
     j = 1
 
     # Loop until we exhaust inputs.
-    # @inbounds while (il <= nl || ir <= nr)
-    while (il <= nl || ir <= nr)
+    @inbounds while (il <= nl || ir <= nr)
         # Store the next available time in the series, that is being pointed to by il & ir.
         next_time_l = il <= nl ? input_l.times[il] : DateTime(0)
         next_time_r = ir <= nr ? input_r.times[ir] : DateTime(0)
