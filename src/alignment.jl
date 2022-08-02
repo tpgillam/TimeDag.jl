@@ -465,7 +465,7 @@ function run_node!(
             ir += 1
             next_time_r
         else
-            # A shared time point where neither x1 nor x2 have been exhausted.
+            # A shared time point where neither input has been exhausted.
             _set_l!(state, input_l.values[il])
             _set_r!(state, input_r.values[ir])
             il += 1

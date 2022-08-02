@@ -140,6 +140,7 @@ end
         DateTime(2000, 1, 5) => 8,
     ])
 
+    # Checking type-promotion.
     @test _eval(prepend(n_boolean, lag(n2, 2))) == Block([
         DateTime(2000, 1, 1) => 1,
         DateTime(2000, 1, 2) => 0,
@@ -165,4 +166,59 @@ end
     @test _eval(count_knots(n1)) == _expected_count_knots(b1)
     @test _eval(count_knots(n4)) == _expected_count_knots(b4)
     @test _eval(count_knots(n_boolean)) == _expected_count_knots(b_boolean)
+end
+
+@testset "merge" begin
+    # Merging a node with itself any number of times should be a no-op.
+    @test merge(n1) === n1
+    @test merge(n1, n1) === n1
+    @test merge(n1, n1, n1) === n1
+    @test merge(n1, n1, n1, n1) === n1
+
+    # More generally, if a node appears multiple times, we only need to keep the _last_
+    # occurrence.
+    @test merge(n2, n1, n2) === merge(n1, n2)
+    @test merge(n1, n2, n1, n2) === merge(n1, n2)
+    @test merge(n1, n2, n3, n2, n1, n1, n2, n1, n2) === merge(n3, n1, n2)
+
+    # Merging constants should give a constant.
+    @test merge(constant(1), constant(2)) === constant(2)
+    @test merge(constant(1), constant(2), constant(3)) === constant(3)
+
+    # If the times of the inputs are identically equal, we expect to not
+    # allocate a new block in evaluation.
+    b_new = Block(b1.times, 2 .* (1:length(b1.times)))
+    @test _eval(merge(block_node(b_new), n1)) === b1
+    @test _eval(merge(n1, block_node(b_new))) === b_new
+
+    # Some hand-crafted examples:
+    @test _eval(merge(n1, n2)) == Block([
+        DateTime(2000, 1, 1) => 1,
+        DateTime(2000, 1, 2) => 5,
+        DateTime(2000, 1, 3) => 6,
+        DateTime(2000, 1, 4) => 4,
+        DateTime(2000, 1, 5) => 8,
+    ])
+    @test _eval(merge(n1, n2, n3)) == Block([
+        DateTime(2000, 1, 1) => 15,
+        DateTime(2000, 1, 2) => 5,
+        DateTime(2000, 1, 3) => 6,
+        DateTime(2000, 1, 4) => 4,
+        DateTime(2000, 1, 5) => 8,
+    ])
+    @test _eval(merge(n4, n1, n2, n3)) == Block([
+        DateTime(2000, 1, 1) => 15,
+        DateTime(2000, 1, 2) => 5,
+        DateTime(2000, 1, 3) => 6,
+        DateTime(2000, 1, 4) => 4,
+        DateTime(2000, 1, 5) => 8,
+        DateTime(2000, 1, 6) => 6,
+        DateTime(2000, 1, 7) => 7,
+    ])
+
+    # Type promotion.
+    @test value_type(merge(n1, n_boolean)) == Int64
+    rng = MersenneTwister()
+    @test value_type(merge(n1, block_node(_get_rand_block(rng, 3)))) == Float64
+    @test value_type(merge(n1, block_node(_get_rand_vec_block(rng, 3, 3)))) == Any
 end
