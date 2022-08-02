@@ -182,7 +182,6 @@ end
     @test merge(n1, n2, n3, n2, n1, n1, n2, n1, n2) === merge(n3, n1, n2)
 
     # Merging constants should give a constant.
-    # NB: the first argument has to be a node, so as to
     merge(constant(1), constant(2)) === constant(2)
     merge(constant(1), constant(2), constant(3)) === constant(3)
 
