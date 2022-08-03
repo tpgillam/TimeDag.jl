@@ -330,7 +330,6 @@ function run_node!(
     ::DateTime,
     input::Block{T},
 ) where {T}
-
     # If enough knots have already been skipped, just return the block.
     state.num_knots_left_to_skip == 0 && return input
 
@@ -342,15 +341,6 @@ function run_node!(
     return input[num_knots_to_skip+1:end]
 end
 
-function operator!(op::Skip{T}, state::SkipState, x::T)::Maybe{T} where {T}
-    if state.n <= op.n
-        state.n += 1
-        return Maybe{T}()
-    else
-        return Maybe(x)
-    end
-end
-
 """
     skip(node::Node, n::Int)
 
@@ -359,7 +349,7 @@ Produces a [`TimeDag.Node`](@ref) which is equal to `x` less the first `n` knots
 function Base.skip(x::Node{T}, n::Int) where {T}
     n >= 0 || throw(ArgumentError("n = $n, but should be non-negative"))
     n == 0 && return x
-    _is_constant(x) && n >= 1 && return empty_node(T)
+    _is_constant(x) && return empty_node(T)
     return obtain_node((x,), Skip{T}(n))
 end
 
