@@ -139,6 +139,9 @@ ensure that subgraph elimination occurs when possible.
 If `out_type` is not specified, we attempt to infer the value type of the resulting node
 automatically, using [`output_type`](@ref). Alternatively, if `out_type` is given as
 anything other than `nothing`, it will be used instead.
+
+If `initial_values` is specified, it should be a tuple of the same length as the number of
+node-like arguments passed in. See [Initial values](@ref) for more details.
 """
 function apply(
     f::Function, x; out_type::Union{Nothing,Type}=nothing, time_agnostic::Bool=true
