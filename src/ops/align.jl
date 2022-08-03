@@ -331,10 +331,10 @@ function run_node!(
     input::Block{T},
 ) where {T}
 
-    # If state has already been skipped, just return the block.
+    # If enough knots have already been skipped, just return the block.
     state.num_knots_left_to_skip == 0 && return input
 
-    # Compute the number of knots we need to skip in this block and update state.
+    # Compute the number of knots to skip in this block and update state.
     num_knots_to_skip = min(state.num_knots_left_to_skip, length(input))
     state.num_knots_left_to_skip -= num_knots_to_skip
 
