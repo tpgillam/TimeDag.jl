@@ -321,8 +321,6 @@ end
 
 create_evaluation_state(::Tuple{Node}, node_op::Skip) = SkipState(node_op.n)
 
-time_agnostic(::Skip) = true
-
 function run_node!(
     ::Skip{T},
     state::SkipState,
