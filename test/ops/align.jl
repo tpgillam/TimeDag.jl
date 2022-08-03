@@ -172,7 +172,9 @@ end
     @test _eval(skip(n1, 3)) == b1[4:end]
     @test _eval(skip(n1, 10)) == _eval(empty_node(Float64))
     @test skip(constant(5), 1) === empty_node(Int)
+    @test skip(constant(5), 0) === constant(5)
     @test skip(n1, 1) === skip(n1, 1)
     @test skip(n1, 0) === n1
+    @test_broken empty_node(Float64) === skip(empty_node(Float64), 3)
     @test_throws ArgumentError skip(n1, -4)
 end
