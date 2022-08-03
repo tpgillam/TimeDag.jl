@@ -324,11 +324,7 @@ create_evaluation_state(::Tuple{Node}, node_op::Skip) = SkipState(node_op.n)
 time_agnostic(::Skip) = true
 
 function run_node!(
-    ::Skip{T},
-    state::SkipState,
-    ::DateTime,
-    ::DateTime,
-    input::Block{T},
+    ::Skip{T}, state::SkipState, ::DateTime, ::DateTime, input::Block{T}
 ) where {T}
 
     # If enough knots have already been skipped, just return the block.
@@ -339,7 +335,7 @@ function run_node!(
     state.num_knots_left_to_skip -= num_knots_to_skip
 
     # Pull out required number of knots from input.
-    return input[num_knots_to_skip+1:end]
+    return input[(num_knots_to_skip + 1):end]
 end
 
 function operator!(op::Skip{T}, state::SkipState, x::T)::Maybe{T} where {T}
