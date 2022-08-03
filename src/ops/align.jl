@@ -311,6 +311,42 @@ function count_knots(x)
     return obtain_node((x,), CountKnots())
 end
 
+struct Skip{T} <: NodeOp{T}
+    n::Int
+end
+
+mutable struct SkipState <: NodeEvaluationState
+    num_knots_left_to_skip::Int
+end
+
+create_evaluation_state(::Tuple{Node}, node_op::Skip) = SkipState(node_op.n)
+
+function run_node!(
+    ::Skip{T}, state::SkipState, ::DateTime, ::DateTime, input::Block{T}
+) where {T}
+    # If enough knots have already been skipped, just return the block.
+    state.num_knots_left_to_skip == 0 && return input
+
+    # Compute the number of knots to skip in this block and update state.
+    num_knots_to_skip = min(state.num_knots_left_to_skip, length(input))
+    state.num_knots_left_to_skip -= num_knots_to_skip
+
+    # Pull out required number of knots from input.
+    return input[(num_knots_to_skip + 1):end]
+end
+
+"""
+    skip(node::Node, n::Int)
+
+Produces a [`TimeDag.Node`](@ref) which is equal to `x` less the first `n` knots.
+"""
+function Base.skip(x::Node{T}, n::Int) where {T}
+    n >= 0 || throw(ArgumentError("n = $n, but should be non-negative"))
+    n == 0 && return x
+    _is_constant(x) && return empty_node(T)
+    return obtain_node((x,), Skip{T}(n))
+end
+
 struct Merge2{T} <: NodeOp{T} end
 create_evaluation_state(::Tuple{Node,Node}, ::Merge2) = EMPTY_NODE_STATE
 function run_node!(

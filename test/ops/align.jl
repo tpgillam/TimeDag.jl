@@ -168,6 +168,18 @@ end
     @test _eval(count_knots(n_boolean)) == _expected_count_knots(b_boolean)
 end
 
+@testset "skip" begin
+    @test _eval(skip(n1, 1)) == b1[2:end]
+    @test _eval(skip(n1, 3)) == b1[4:end]
+    @test _eval(skip(n1, 10)) == _eval(empty_node(Float64))
+    @test skip(constant(5), 1) === empty_node(Int)
+    @test skip(constant(5), 0) === constant(5)
+    @test skip(n1, 1) === skip(n1, 1)
+    @test skip(n1, 0) === n1
+    @test_broken skip(empty_node(Float64), 3) === empty_node(Float64)
+    @test_throws ArgumentError skip(n1, -4)
+end
+
 @testset "merge" begin
     # Merging a node with itself any number of times should be a no-op.
     @test merge(n1) === n1
