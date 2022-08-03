@@ -36,7 +36,9 @@ include("maybe.jl")
 
 include("core.jl")
 include("identity_map.jl")
-include("constant.jl")  # Constant nodes are special, so we need to know about them first.
+# Constant and Empty nodes are special, so we need to know about them first.
+include("constant.jl")
+include("empty.jl")
 
 include("output_type.jl")
 

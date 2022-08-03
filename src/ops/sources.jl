@@ -26,14 +26,6 @@ Construct a node whose values are read directly from the given `block`.
 """
 block_node(block::Block) = obtain_node((), BlockNode(block))
 
-# TODO Identity mapping... probably just want a cache of empty blocks by T somewhere?
-"""
-    empty_node(T)
-
-Construct a node with value type `T` which, if evaluated, will never tick.
-"""
-empty_node(T) = block_node(Block{T}())
-
 """
 A node op which ticks once a day at the specified local time of day.
 """

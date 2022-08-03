@@ -1,6 +1,7 @@
 @testset "equality" begin
     @test TimeDag.Constant(1) == TimeDag.Constant(1)
     @test isequal(TimeDag.Constant(1), TimeDag.Constant(1))
+    @test hash(TimeDag.Constant(1)) == hash(TimeDag.Constant(1))
 
     @test TimeDag.Constant(1.0) != TimeDag.Constant(1)
     @test !isequal(TimeDag.Constant(1.0), TimeDag.Constant(1))
@@ -19,7 +20,7 @@ end
     @test n1 + n2 === constant(3)
     @test n1 - n2 === constant(-1)
 
-    @test TimeDag.lag(n1, 2) === constant(1)
+    @test lag(n1, 2) === constant(1)
 end
 
 @testset "evaluate" begin

@@ -66,17 +66,14 @@ This means that we do not introduce any new timestamps that do not appear in `x`
 we will not emit knots for the first `n` values that appear when evaluating `x`.
 """
 function lag(x::Node, n::Integer)
-    return if n == 0
-        # Optimisation.
-        x
-    elseif n < 0
-        throw(ArgumentError("Cannot lag by $n."))
-    elseif _is_constant(x)
-        # Constant nodes shouldn't be affected by lagging.
-        x
-    else
-        obtain_node((x,), Lag{value_type(x)}(n))
-    end
+    n < 0 && throw(ArgumentError("Cannot lag by $n."))
+    # Lagging by zero is a no-op.
+    n == 0 && return x
+    # Constant and empty nodes shouldn't be affected by lagging.
+    _is_constant(x) && return x
+    _is_empty(x) && return x
+
+    return obtain_node((x,), Lag{value_type(x)}(n))
 end
 
 """A node which lags its input by a fixed time duration."""
@@ -125,17 +122,14 @@ Construct a node which takes values from `x`, but lags them by period `w`.
 function lag(x::Node, w::TimePeriod)
     w = Millisecond(w)
 
-    return if w == Millisecond(0)
-        # Optimisation.
-        x
-    elseif w < Millisecond(0)
-        throw(ArgumentError("Cannot lag by $w."))
-    elseif _is_constant(x)
-        # Constant nodes shouldn't be affected by lagging.
-        x
-    else
-        obtain_node((x,), TLag{value_type(x)}(w))
-    end
+    w < Millisecond(0) && throw(ArgumentError("Cannot lag by $w."))
+    # Optimisation.
+    w == Millisecond(0) && return x
+    # Constant and empty nodes shouldn't be affected by lagging.
+    _is_constant(x) && return x
+    _is_empty(x) && return x
+
+    return obtain_node((x,), TLag{value_type(x)}(w))
 end
 
 """
