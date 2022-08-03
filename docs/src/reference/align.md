@@ -14,4 +14,5 @@ lag
 Base.diff
 count_knots
 Base.skip
+Base.merge
 ```
