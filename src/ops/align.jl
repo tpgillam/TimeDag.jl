@@ -311,18 +311,36 @@ function count_knots(x)
     return obtain_node((x,), CountKnots())
 end
 
-struct Skip{T} <: UnaryNodeOp{T}
+struct Skip{T} <: NodeOp{T}
     n::Int
 end
 
 mutable struct SkipState <: NodeEvaluationState
-    n::Int
-    SkipState() = new(1)
+    num_knots_left_to_skip::Int
 end
 
-create_operator_evaluation_state(::Tuple{Node}, ::Skip) = SkipState()
+create_evaluation_state(::Tuple{Node}, node_op::Skip) = SkipState(node_op.n)
 
 time_agnostic(::Skip) = true
+
+function run_node!(
+    ::Skip{T},
+    state::SkipState,
+    ::DateTime,
+    ::DateTime,
+    input::Block{T},
+) where {T}
+
+    # If state has already been skipped, just return the block.
+    state.num_knots_left_to_skip == 0 && return input
+
+    # Compute the number of knots we need to skip in this block and update state.
+    num_knots_to_skip = min(state.num_knots_left_to_skip, length(input))
+    state.num_knots_left_to_skip -= num_knots_to_skip
+
+    # Pull out required number of knots from input.
+    return input[num_knots_to_skip+1:end]
+end
 
 function operator!(op::Skip{T}, state::SkipState, x::T)::Maybe{T} where {T}
     if state.n <= op.n
