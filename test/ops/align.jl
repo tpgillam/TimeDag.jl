@@ -176,7 +176,7 @@ end
     @test skip(constant(5), 0) === constant(5)
     @test skip(n1, 1) === skip(n1, 1)
     @test skip(n1, 0) === n1
-    @test_broken skip(empty_node(Float64), 3) === empty_node(Float64)
+    @test skip(empty_node(Float64), 3) === empty_node(Float64)
     @test_throws ArgumentError skip(n1, -4)
 end
 
