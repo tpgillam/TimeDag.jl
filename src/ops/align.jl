@@ -319,8 +319,6 @@ mutable struct SkipState <: NodeEvaluationState
     num_knots_left_to_skip::Int
 end
 
-create_evaluation_state(::Tuple{Node}, node_op::Skip) = SkipState(node_op.n)
-
 function run_node!(
     ::Skip{T}, state::SkipState, ::DateTime, ::DateTime, input::Block{T}
 ) where {T}
