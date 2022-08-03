@@ -52,6 +52,80 @@ to use either [`TimeDag.UnaryNodeOp`](@ref) or [`TimeDag.BinaryNodeOp`](@ref).
 """
 abstract type NaryNodeOp{N,T,A<:Alignment} <: NodeOp{T} end
 
+# Specialised dispatches for cases where we know about alignment.
+# In this case we can also provide optimisations around empty nodes.
+function obtain_node(parents::Tuple{Node}, op::UnaryNodeOp{T}) where {T}
+    _is_empty(@inbounds(only(parents))) && return empty_node(T)
+    # Call the generic `obtain_node` implementation.
+    return invoke(obtain_node, Tuple{Tuple{Node},NodeOp}, parents, op)
+end
+
+"""
+    _get_constant_inputs(parents, op)
+
+For use *only* in the specialised `obtain_node`.
+
+It assumes that all `parents` are either constant or empty, and that at least one of
+`parents` is empty.
+"""
+function _get_constant_inputs(parents::Tuple{Node,Node}, op::BinaryNodeOp)
+    nl, nr = parents
+    return if _is_constant(nl)  # && _is_empty(nr)
+        (nl, constant(initial_right(op)))
+    else  # _is_empty(nl) && _is_constant(nr)
+        (constant(initial_left(op)), nr)
+    end
+end
+
+function _get_constant_inputs(parents::NTuple{N,Node}, op::NaryNodeOp{N}) where {N}
+    #! format: off
+    return Tuple(
+        _is_constant(parent) ? parent : constant(initial)
+        for (initial, parent) in zip(initial_values(op), parents)
+    )
+    #! format: on
+end
+
+function obtain_node(
+    parents::NTuple{N,Node}, op::Union{BinaryNodeOp{T,A},NaryNodeOp{M,T,A}}
+) where {N,T,M,A<:Alignment}
+    # If all inputs are empty, the output will definitely be empty.
+    all(_is_empty, parents) && return empty_node(T)
+
+    _is_const_or_empty(n) = _is_constant(n) || _is_empty(n)
+    if (
+        any(_is_empty, parents) &&
+        all(_is_const_or_empty, parents) &&
+        _can_propagate_constant(op)
+    )
+        # Some inputs are empty, and all are either constant or empty.
+        # The operator supports constant propagation.
+        # Therefore, the output will definitely either be a constant or empty.
+
+        # If we don't have initial values, the output will be empty.
+        isnothing(initial_values) && return empty_node(T)
+
+        # We can propagate constants if all the following are true:
+        #   * `initial_values` are provided
+        #   * alignment is either:
+        #       - UNION
+        #       - LEFT, so long as the first input is a constant (not empty)
+        return if (
+            has_initial_values(op) &&
+            (A == UnionAlignment || (A == LeftAlignment && _is_constant(first(parents))))
+        )
+            # Replace empty inputs with intial values and propagate.
+            constant(_propagate_constant_value(op, _get_constant_inputs(parents, op)))
+        else
+            # In all other cases here the output will be empty.
+            empty_node(T)
+        end
+    end
+
+    # No optimisations can be applied, fall back to generic `obtain_node` implementation.
+    return invoke(obtain_node, Tuple{NTuple{N,Node},NodeOp}, parents, op)
+end
+
 # A note on the design choice here, which is motivated by performance reasons & profiling.
 #
 # Options considered:
