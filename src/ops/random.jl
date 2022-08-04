@@ -18,7 +18,6 @@ value_agnostic(::Rand) = true
 # Note that we should never mutate the random state on the node op itself.
 create_operator_evaluation_state(::Tuple{Node}, op::Rand) = RandState(copy(op.rng))
 
-
 # See docstring below — Xoshiro only exists (and is the default) in Julia 1.7 and later.
 _make_rng() = VERSION < v"1.7.0" ? MersenneTwister() : Xoshiro()
 

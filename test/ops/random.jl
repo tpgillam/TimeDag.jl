@@ -51,7 +51,6 @@
                 @test n != rand(x, vals)
             end
         end
-
     end
 
     @testset "array" begin
