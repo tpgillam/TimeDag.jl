@@ -109,7 +109,7 @@ We return a new [`Block`](@ref) of output knots from this node.
         `[time_start, time_end)`.
     * **Consistency**: Calling `run_node!` over a single interval should give the same
         result as calling it multiple times over a decomposition of that same interval.
-        This is to ensures that the value returned by [`evaluate`](@ref) is invariant to the
+        This ensures that the value returned by [`evaluate`](@ref) is invariant to the
         `batch_interval` kwarg provided.
     * **Determinism**: `run_node!` should *always* be fully deterministic. If a
         pseudo-random number generator is required, it should be held on the evaluation
