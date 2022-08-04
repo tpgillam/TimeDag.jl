@@ -48,6 +48,7 @@ TimeDag.NodeEvaluationState
 TimeDag.EmptyNodeEvaluationState
 TimeDag.EMPTY_NODE_STATE
 TimeDag.create_evaluation_state
+TimeDag.stateless
 TimeDag.run_node!
 ```
 
