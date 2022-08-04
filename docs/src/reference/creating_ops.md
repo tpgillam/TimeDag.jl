@@ -19,7 +19,9 @@ In order to create a source — i.e. an op with zero inputs — one should use t
 
 ## Low-level API
 
-The most general way to create an op is to create a structure that inherits from [`TimeDag.NodeOp`](@ref), and implements [`TimeDag.run_node!`](@ref) and [`TimeDag.create_evaluation_state`](@ref).
+The most general way to create an op is to create a structure that inherits from [`TimeDag.NodeOp`](@ref), and implements both of:
+* [`TimeDag.run_node!`](@ref) 
+* [`TimeDag.create_evaluation_state`](@ref), OR defines [`TimeDag.stateless`](@ref) to be true.
 One must use this to implement source nodes, but in other cases it is typically preferable to use [Standard alignment behaviour](@ref).
 This is because there are number of rules that must be adhered to when implementing [`TimeDag.run_node!`](@ref), as noted in its docstring. 
 
