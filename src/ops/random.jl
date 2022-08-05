@@ -87,5 +87,9 @@ function _rand(rng::AbstractRNG, alignment::Node, args...)
     # `Core.Typeof(Int32) == Type{Int32}`, which is more specific, and hence more useful
     # here for value type inference.
     T = output_type(rand, typeof(rng), map(Core.Typeof, args)...)
+
+    # If `T` is the empty set, this implies that `rand` will not return a value. Almost
+    # certainly this means that one or more of the arguments provided are bad.
+    T == Union{} && throw(ArgumentError("Unsupported args in rand(rng=$rng, $(args...))"))
     return obtain_node((alignment,), Rand{T}(rng, args))
 end

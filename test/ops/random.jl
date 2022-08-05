@@ -123,4 +123,30 @@
             end
         end
     end
+
+    @testset "distributions" begin
+        d = Beta(2.0)
+        n = rand(x, d)
+        @test value_type(n) == Float64
+
+        # Verify that we get the same number from a TimeDag evaluation as using the same
+        # random state.
+        n = rand(rng, x, d)
+        block = _eval(n)
+        rng_copy = copy(rng)
+        @test first(block.values) == rand(rng_copy, d)
+    end
+
+    @testset "invalid arguments" begin
+        d = Beta(2.0)
+
+        # Construct an arbitrary call to rand which ought to fail.
+        @test_throws MethodError rand(x, d, d)
+        @test_throws MethodError rand(rng, x, d, d)
+        @test_throws MethodError rand(rng, x, d, d, 1, 2)
+        @test_throws MethodError rand(rng, x, d, d, ())
+
+        # If we provide an S which doesn't have a sampler, then we should fail early.
+        @test_throws ArgumentError rand(x, 2.0)
+    end
 end
