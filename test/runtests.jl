@@ -3,6 +3,7 @@ using Combinatorics
 using DataFrames
 using DataStructures
 using Dates
+using Distributions
 using LightGraphs
 using LinearAlgebra
 using Random

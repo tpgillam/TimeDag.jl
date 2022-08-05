@@ -1,36 +1,29 @@
-abstract type RandBase{T} <: UnaryNodeOp{T} end
+struct Rand{T} <: UnaryNodeOp{T}
+    rng::AbstractRNG
+    args::Tuple  # A tuple of arguments that will be passed to `Base.rand` when evaluating.
+end
 
-mutable struct RandState{RNG<:Random.AbstractRNG} <: NodeEvaluationState
+Base.hash(x::Rand{T}, h::UInt64) where {T} = foldr(hash, (:Rand, T, x.rng, x.args); init=h)
+Base.:(==)(x::Rand{T}, y::Rand{T}) where {T} = x.rng == y.rng && x.args == y.args
+
+mutable struct RandState{RNG<:AbstractRNG} <: NodeEvaluationState
     rng::RNG
 end
 
-always_ticks(::RandBase) = true
-time_agnostic(::RandBase) = true
-value_agnostic(::RandBase) = true
+operator!(op::Rand, state::RandState) = rand(state.rng, op.args...)
+
+always_ticks(::Rand) = true
+time_agnostic(::Rand) = true
+value_agnostic(::Rand) = true
 # Note that we should never mutate the random state on the node op itself.
-create_operator_evaluation_state(::Tuple{Node}, op::RandBase) = RandState(copy(op.rng))
-
-struct Rand{T<:Real} <: RandBase{T}
-    rng::Random.AbstractRNG
-end
-
-Base.hash(x::Rand, h::UInt64) = hash(x.rng, hash(:Rand, h))
-Base.:(==)(x::Rand{T}, y::Rand{T}) where {T} = x.rng == y.rng
-
-operator!(::Rand{T}, state::RandState) where {T} = rand(state.rng, T)
-
-struct RandArray{T,N} <: RandBase{Array{T,N}}
-    rng::Random.AbstractRNG
-    dims::Dims{N}
-end
-
-Base.hash(x::RandArray, h::UInt64) = hash(x.rng, hash(x.dims, hash(:RandArray, h)))
-Base.:(==)(x::RandArray{T}, y::RandArray{T}) where {T} = x.rng == y.rng && x.dims == y.dims
-
-operator!(op::RandArray{T}, state::RandState) where {T} = rand(state.rng, T, op.dims)
+create_operator_evaluation_state(::Tuple{Node}, op::Rand) = RandState(copy(op.rng))
 
 # See docstring below — Xoshiro only exists (and is the default) in Julia 1.7 and later.
 _make_rng() = VERSION < v"1.7.0" ? MersenneTwister() : Xoshiro()
+
+# This is the default data type used in `Random.jl`.
+# We will use this explicitly whenever `S` is not provided.
+const _RAND_T = Float64
 
 """
     rand([rng=...,] alignment::Node[, S, dims...])
@@ -38,7 +31,11 @@ _make_rng() = VERSION < v"1.7.0" ? MersenneTwister() : Xoshiro()
 Generate random numbers aligned to `alignment`, with the given `rng` if provided.
 
 Semantics are otherwise very similar to the usual `Base.rand`:
-* If specified, `S` will be the element type, and will default to `Float64` otherwise.
+* If specified, `S` will be one of
+    * the element type
+    * a set of values from which to select
+
+    `S` will default to `Float64` otherwise.
 * If specified, `dims` should be a tuple or vararg of integers representing the dimensions
     of an array.
 
@@ -54,24 +51,45 @@ Semantics are otherwise very similar to the usual `Base.rand`:
     If provided, `rng` will be copied before it is used. This is to ensure reproducability
     when evaluating a node multiple times.
 """
-Base.rand(alignment::Node) = rand(_make_rng(), alignment)
-Base.rand(rng::Random.AbstractRNG, alignment::Node) = rand(rng, alignment, Float64)
-function Base.rand(rng::Random.AbstractRNG, alignment::Node, ::Type{X}) where {X}
-    return obtain_node((alignment,), Rand{X}(copy(rng)))
-end
+Base.rand(x::Node, S, d::Dims) = rand(x, S, d...)
+Base.rand(rng::AbstractRNG, x::Node, S, d::Dims) = rand(rng, x, S, d...)
+# (comment applies to the above - necessary so docstring gets assigned to the function)
+# Anything involving `Dims` as a non-empty tuple is going to get remapped to a version with
+# splatted arguments. This ensures better subgraph elimination.
 
-Base.rand(alignment::Node, dims::Integer...) = rand(_make_rng(), alignment, Dims(dims))
-Base.rand(alignment::Node, dims::Dims) = rand(_make_rng(), alignment, dims)
-function Base.rand(rng::Random.AbstractRNG, alignment::Node, dims::Dims)
-    return rand(rng, alignment, Float64, dims)
-end
-function Base.rand(
-    rng::Random.AbstractRNG, alignment::Node, ::Type{X}, dims::Integer...
-) where {X}
-    return rand(rng, alignment, X, Dims(dims))
-end
-function Base.rand(
-    rng::Random.AbstractRNG, alignment::Node, ::Type{X}, dims::Dims
-) where {X}
-    return obtain_node((alignment,), RandArray{X,length(dims)}(copy(rng), dims))
+# The case of an _empty_ Dims tuple has to be handled separately, otherwise we end up
+# recursing.  We don't want to splat an empty tuple, since that would change behaviour (by
+# giving a scalar rather than a dimension-zero array).
+Base.rand(x::Node, S, d::Tuple{}) = _rand(x, S, d)
+Base.rand(rng::AbstractRNG, x::Node, S, d::Tuple{}) = _rand(copy(rng), x, S, d)
+
+# The following are defined to avoid ambiguities. In the case that `S` is not provided, we
+# replace it with the default random data type — this ensures better subgraph elimination.
+Base.rand(x::Node, d::Integer...) = _rand(x, _RAND_T, d...)
+Base.rand(x::Node, S, d::Integer...) = _rand(x, S, d...)
+Base.rand(rng::AbstractRNG, x::Node, d::Integer...) = _rand(copy(rng), x, _RAND_T, d...)
+Base.rand(rng::AbstractRNG, x::Node, S, d::Integer...) = _rand(copy(rng), x, S, d...)
+
+"""
+    _rand(alignment::Node, args...)
+    _rand(rng::AbstractRNG, alignment::Node, args...)
+
+Internal generation of a `Rand` node.
+
+!!! warning
+    If providing `rng` explicitly, a reference to it *must not* be kept by the caller.
+    This is because external mutation of `rng` will break repeatability of node evaluation.
+"""
+_rand(alignment::Node, args...) = _rand(_make_rng(), alignment, args...)
+function _rand(rng::AbstractRNG, alignment::Node, args...)
+    # Note: using `Core.typeof` rather than `typeof` here, since one of the arguments could
+    # itself be a type. In this case, e.g. `typeof(Int32) == DataType`, whereas
+    # `Core.Typeof(Int32) == Type{Int32}`, which is more specific, and hence more useful
+    # here for value type inference.
+    T = output_type(rand, typeof(rng), map(Core.Typeof, args)...)
+
+    # If `T` is the empty set, this implies that `rand` will not return a value. Almost
+    # certainly this means that one or more of the arguments provided are bad.
+    T == Union{} && throw(ArgumentError("Unsupported args in rand(rng=$rng, $(args...))"))
+    return obtain_node((alignment,), Rand{T}(rng, args))
 end
