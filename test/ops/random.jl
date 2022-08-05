@@ -4,6 +4,17 @@
     expected_times = _eval_fast(x).times
     rng = MersenneTwister()
 
+    # Some test values of `S` that we should be able to pass to `rand`
+    all_test_vals = (
+        (1, 2.0, 2.0 + 0im),
+        [1, 2],
+        [1 2; 3 4],
+        Set([1, 2, 3]),
+        Dict(1 => "1", 2 => "2", 3 => "3"),
+        1:3,
+        Beta(2.0),
+    )
+
     @testset "scalar" begin
         n = rand(x)
         @test value_type(n) == Float64
@@ -32,23 +43,34 @@
         @test value_type(n) == Int32
 
         @testset "collections of values" begin
-            for vals in (
-                (1, 2.0, 2.0 + 0im),
-                [1, 2],
-                [1 2; 3 4],
-                Set([1, 2, 3]),
-                Dict(1 => "1", 2 => "2", 3 => "3"),
-            )
-                n = rand(rng, x, vals)
-                @test n === rand(rng, x, vals)
-                @test value_type(n) <: foldl(Base.promote_typejoin, typeof.(collect(vals)))
+            for S in all_test_vals
+                n = rand(rng, x, S)
+                @test n === rand(rng, x, S)
+                eltypes = isa(S, Distribution) ? [eltype(S)] : typeof.(collect(S))
+                eltype_ = foldl(Base.promote_typejoin, eltypes)
+                # We want the value type of the node to be upper-bounded by the promotion
+                # we did above, and lower bounded by each of the individual element types.
+                # It is possible (but not necessary) that
+                #   value_type(n) == eltype_
+                # but in testing this was not, and need not be, the case.
+                @test value_type(n) <: eltype_
+                foreach(eltypes) do T_el
+                    @test value_type(n) >: T_el
+                end
 
                 block = _eval(n)
                 @test block.times == expected_times
-                @test all(in(vals), block.values)
+                @test all(block.values) do value
+                    isa(S, Distribution) ? insupport(S, value) : in(value, S)
+                end
 
-                n = rand(x, vals)
-                @test n != rand(x, vals)
+                # Verify that we get the same number from a TimeDag evaluation as using the
+                # same random state.
+                rng_copy = copy(rng)
+                @test block.values == [rand(rng_copy, S) for _ in 1:length(block)]
+
+                n = rand(x, S)
+                @test n != rand(x, S)
             end
         end
     end
@@ -92,49 +114,39 @@
         @test value_type(rand(x, Int32, (2, 3))) == Matrix{Int32}
 
         @testset "collections of values" begin
-            for vals in (
-                (1, 2.0, 2.0 + 0im),
-                [1, 2],
-                [1 2; 3 4],
-                Set([1, 2, 3]),
-                Dict(1 => "1", 2 => "2", 3 => "3"),
-            )
+            for S in all_test_vals
                 for size_ in ((2,), (2, 3), (2, 3, 4))
-                    n = rand(rng, x, vals, size_)
-                    @test n === rand(rng, x, vals, size_)
-                    @test n === rand(rng, x, vals, size_...)
-                    eltype = foldl(Base.promote_typejoin, typeof.(collect(vals)))
-                    @test value_type(n) == Array{eltype,length(size_)}
+                    n = rand(rng, x, S, size_)
+                    @test n === rand(rng, x, S, size_)
+                    @test n === rand(rng, x, S, size_...)
+                    eltypes = isa(S, Distribution) ? [eltype(S)] : typeof.(collect(S))
+                    eltype_ = foldl(Base.promote_typejoin, eltypes)
+                    @test value_type(n) == Array{eltype_,length(size_)}
 
                     block = _eval(n)
                     @test block.times == expected_times
                     foreach(block.values) do value
                         @test size(value) == size_
                         # Each value in the block is going to be an array.
-                        @test all(in(vals), value)
+                        @test all(value) do value_
+                            isa(S, Distribution) ? insupport(S, value_) : in(value_, S)
+                        end
                     end
 
+                    # Verify that we get the same number from a TimeDag evaluation as using
+                    # the same random state.
+                    rng_copy = copy(rng)
+                    @test block.values ==
+                        [rand(rng_copy, S, size_) for _ in 1:length(block)]
+
                     # Test without explicit rng
-                    n = rand(x, vals, size_)
-                    @test n != rand(x, vals, size_)
-                    n = rand(x, vals, size_...)
-                    @test n != rand(x, vals, size_...)
+                    n = rand(x, S, size_)
+                    @test n != rand(x, S, size_)
+                    n = rand(x, S, size_...)
+                    @test n != rand(x, S, size_...)
                 end
             end
         end
-    end
-
-    @testset "distributions" begin
-        d = Beta(2.0)
-        n = rand(x, d)
-        @test value_type(n) == Float64
-
-        # Verify that we get the same number from a TimeDag evaluation as using the same
-        # random state.
-        n = rand(rng, x, d)
-        block = _eval(n)
-        rng_copy = copy(rng)
-        @test first(block.values) == rand(rng_copy, d)
     end
 
     @testset "invalid arguments" begin
