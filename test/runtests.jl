@@ -27,23 +27,23 @@ using TimeDag: duplicate, evaluate_until!, start_at
 
     include("common.jl")
 
-    # @testset "block" begin include("block.jl") end
-    # @testset "constant" begin include("constant.jl") end
-    # @testset "empty" begin include("empty.jl") end
-    # @testset "maybe" begin include("maybe.jl") end
-    # @testset "output_type" begin include("output_type.jl") end
+    @testset "block" begin include("block.jl") end
+    @testset "constant" begin include("constant.jl") end
+    @testset "empty" begin include("empty.jl") end
+    @testset "maybe" begin include("maybe.jl") end
+    @testset "output_type" begin include("output_type.jl") end
 
     @testset "ops" begin
-        # @testset "align" begin include("ops/align.jl") end
-        # @testset "array" begin include("ops/array.jl") end
-        # @testset "common" begin include("ops/common.jl") end
-        # @testset "conditional" begin include("ops/conditional.jl") end
-        # @testset "history" begin include("ops/history.jl") end
-        # @testset "lagging" begin include("ops/lagging.jl") end
+        @testset "align" begin include("ops/align.jl") end
+        @testset "array" begin include("ops/array.jl") end
+        @testset "common" begin include("ops/common.jl") end
+        @testset "conditional" begin include("ops/conditional.jl") end
+        @testset "history" begin include("ops/history.jl") end
+        @testset "lagging" begin include("ops/lagging.jl") end
         @testset "random" begin include("ops/random.jl") end
-        # @testset "simple" begin include("ops/simple.jl") end
-        # @testset "sources" begin include("ops/sources.jl") end
-        # @testset "window" begin include("ops/window.jl") end
+        @testset "simple" begin include("ops/simple.jl") end
+        @testset "sources" begin include("ops/sources.jl") end
+        @testset "window" begin include("ops/window.jl") end
     end
 end
 
