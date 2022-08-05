@@ -2,6 +2,7 @@
     # Some arbitrary alignment
     x = iterdates()
     expected_times = _eval_fast(x).times
+    rng = MersenneTwister()
 
     @testset "scalar" begin
         n = rand(x)
@@ -10,7 +11,6 @@
         @test n != rand(x)
 
         # If we specify an explicit rng, then we should get identical nodes back.
-        rng = MersenneTwister()
         n = rand(rng, x)
         @test n === rand(rng, x)
 
@@ -54,11 +54,14 @@
     end
 
     @testset "array" begin
-        n = rand(x, Float64, ())
-        @test value_type(n) == Array{Float64,0}
+        @testset "size zero arrays" begin
+            n = rand(x, Float64, ())
+            @test value_type(n) == Array{Float64,0}
+            n = rand(rng, x, Float64, ())
+            @test value_type(n) == Array{Float64,0}
+        end
 
         # If we specify an explicit rng, then we should get identical nodes back.
-        rng = MersenneTwister()
         n = rand(rng, x, Float64, (2,))
         @test n === rand(rng, x, Float64, (2,))
         @test n != rand(rng, x, Float64, (3,))

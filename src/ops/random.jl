@@ -21,6 +21,10 @@ create_operator_evaluation_state(::Tuple{Node}, op::Rand) = RandState(copy(op.rn
 # See docstring below — Xoshiro only exists (and is the default) in Julia 1.7 and later.
 _make_rng() = VERSION < v"1.7.0" ? MersenneTwister() : Xoshiro()
 
+# This is the default data type used in `Random.jl`.
+# We will use this explicitly whenever `S` is not provided.
+const _RAND_T = Float64
+
 """
     rand([rng=...,] alignment::Node[, S, dims...])
 
@@ -47,29 +51,20 @@ Semantics are otherwise very similar to the usual `Base.rand`:
     If provided, `rng` will be copied before it is used. This is to ensure reproducability
     when evaluating a node multiple times.
 """
-# This is the default data type used in `Random.jl`.
-# We will use this explicitly whenever `S` is not provided.
-const _RAND_T = Float64
-
+Base.rand(x::Node, S, d::Dims) = rand(x, S, d...)
+Base.rand(rng::AbstractRNG, x::Node, S, d::Dims) = rand(rng, x, S, d...)
+# (comment applies to the above - necessary so docstring gets assigned to the function)
 # Anything involving `Dims` as a non-empty tuple is going to get remapped to a version with
 # splatted arguments. This ensures better subgraph elimination.
-Base.rand(x::Node, d::Dims) = rand(x, d...)
-Base.rand(x::Node, S, d::Dims) = rand(x, S, d...)
-Base.rand(rng::AbstractRNG, x::Node, d::Dims) = rand(rng, x, d...)
-Base.rand(rng::AbstractRNG, x::Node, S, d::Dims) = rand(rng, x, S, d...)
 
 # The case of an _empty_ Dims tuple has to be handled separately, otherwise we end up
 # recursing.  We don't want to splat an empty tuple, since that would change behaviour (by
 # giving a scalar rather than a dimension-zero array).
-Base.rand(x::Node, d::Tuple{}) = _rand(x, _RAND_T, d)
 Base.rand(x::Node, S, d::Tuple{}) = _rand(x, S, d)
-Base.rand(rng::AbstractRNG, x::Node, d::Tuple{}) = _rand(copy(rng), x, _RAND_T, d)
 Base.rand(rng::AbstractRNG, x::Node, S, d::Tuple{}) = _rand(copy(rng), x, S, d)
 
-# The following are defined to avoid ambiguities.
-# NB, here and below we have to use the weird `d1, d...` arg format to ensure that there is
-# at least one dimension provided. Otherwise this function ends up matching more than we
-# want.
+# The following are defined to avoid ambiguities. In the case that `S` is not provided, we
+# replace it with the default random data type — this ensures better subgraph elimination.
 Base.rand(x::Node, d::Integer...) = _rand(x, _RAND_T, d...)
 Base.rand(x::Node, S, d::Integer...) = _rand(x, S, d...)
 Base.rand(rng::AbstractRNG, x::Node, d::Integer...) = _rand(copy(rng), x, _RAND_T, d...)
