@@ -444,7 +444,9 @@ end
 Base.merge(x::Node) = x
 function Base.merge(x::Node, y::Node)
     x === y && return x
-    _is_constant(x) && _is_constant(y) && return y
     T = promote_type(value_type(x), value_type(y))
+    _is_empty(x) && return convert_value(T, y; upcast=true)
+    _is_empty(y) && return convert_value(T, x; upcast=true)
+    _is_constant(x) && _is_constant(y) && return convert_value(T, y; upcast=true)
     return obtain_node((x, y), Merge2{T}())
 end

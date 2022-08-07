@@ -197,6 +197,13 @@ end
     @test merge(constant(1), constant(2)) === constant(2)
     @test merge(constant(1), constant(2), constant(3)) === constant(3)
 
+    # Empty nodes should be skipped when merging.
+    empty = empty_node(Int64)
+    @test merge(empty) === empty
+    @test merge(constant(1), empty) === constant(1)
+    @test merge(empty, empty, constant(1), empty) === constant(1)
+    @test merge(empty, n2) === n2
+
     # If the times of the inputs are identically equal, we expect to not
     # allocate a new block in evaluation.
     b_new = Block(b1.times, 2 .* (1:length(b1.times)))
@@ -233,4 +240,16 @@ end
     rng = MersenneTwister()
     @test value_type(merge(n1, block_node(_get_rand_block(rng, 3)))) == Float64
     @test value_type(merge(n1, block_node(_get_rand_vec_block(rng, 3, 3)))) == Any
+
+    # Type promotion with constant and empty.
+    @test merge(constant(1.0), constant(2)) === constant(2.0)
+    @test merge(empty_node(Float64), constant(2)) === constant(2.0)
+    @test merge(empty_node(Int64), empty_node(Float64)) === empty_node(Float64)
+    @test merge(empty_node(Float64), empty_node(Int64)) === empty_node(Float64)
+    # In this case we promote to Any, but because we end up doing
+    #   convert(::Type{Any}, ::String)
+    # we just get back something of type String.
+    @test merge(empty_node(Float64), empty_node(String)) === empty_node(Any)
+    @test value_type(merge(empty_node(Float64), n1)) === Float64
+    @test value_type(merge(empty_node(String), n1)) === Any
 end
