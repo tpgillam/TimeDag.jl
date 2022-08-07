@@ -138,8 +138,8 @@ end
 Get a node which ticks with only the first knot of `x`, and then never ticks again.
 """
 function first_knot(node::Node{T}) where {T}
-    # This function should be idempotent for constant nodes.
-    _is_constant(node) && return node
+    # This function should be idempotent for constant & empty nodes.
+    (_is_constant(node) || _is_empty(node)) && return node
     return obtain_node((node,), FirstKnot{T}())
 end
 
@@ -150,6 +150,9 @@ Get a node of the number of the given `nodes` (at least one) which are active.
 """
 function active_count(x, x_rest...)
     nodes = map(_ensure_node, [x, x_rest...])
+
+    # Empty nodes are always inactive, so remove them from the set that we consider.
+    nodes = filter(!_is_empty, nodes)
 
     # Perform the same ordering optimisation that we use in coalign. This aims to give the
     # same node regardless of the order in which `nodes` were passed in.

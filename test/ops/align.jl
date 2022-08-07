@@ -95,7 +95,7 @@ end
 @testset "first_knot" begin
     @test _eval(first_knot(n4)) == b4[1:1]
     @test _eval(first_knot(n_boolean)) == b_boolean[1:1]
-    @test _eval(empty_node(Float64)) == Block{Float64}()
+    @test first_knot(empty_node(Float64)) === empty_node(Float64)
     @test first_knot(constant(42.0)) === constant(42.0)
 end
 
@@ -110,6 +110,10 @@ end
     @test active_count(n1, n2, n3) === active_count(n2, n1, n3)
     @test active_count(n1, n2, n3) === active_count(n3, n1, n2)
     @test active_count(n1, n2, n3) === active_count(n3, n2, n1)
+
+    n_empty = empty_node(Int64)
+    @test active_count(n1, n2, n_empty) === active_count(n2, n1)
+    @test active_count(n1, n_empty, n2, n_empty, n3, n_empty) === active_count(n3, n2, n1)
 end
 
 @testset "prepend" begin
@@ -198,11 +202,11 @@ end
     @test merge(constant(1), constant(2), constant(3)) === constant(3)
 
     # Empty nodes should be skipped when merging.
-    empty = empty_node(Int64)
-    @test merge(empty) === empty
-    @test merge(constant(1), empty) === constant(1)
-    @test merge(empty, empty, constant(1), empty) === constant(1)
-    @test merge(empty, n2) === n2
+    n_empty = empty_node(Int64)
+    @test merge(n_empty) === n_empty
+    @test merge(constant(1), n_empty) === constant(1)
+    @test merge(n_empty, n_empty, constant(1), n_empty) === constant(1)
+    @test merge(n_empty, n2) === n2
 
     # If the times of the inputs are identically equal, we expect to not
     # allocate a new block in evaluation.
