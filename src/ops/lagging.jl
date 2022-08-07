@@ -64,13 +64,21 @@ Construct a node which takes values from `x`, but lags them by `n` knots.
 
 This means that we do not introduce any new timestamps that do not appear in `x`, however
 we will not emit knots for the first `n` values that appear when evaluating `x`.
+
+!!! note
+    If `x` is a constant node, and `n > 0`, `lag(x, n)` will be an [`empty_node`](@ref) of
+    the same [`value_type`](@ref) as `x`.
+
+    Conceptually, this is consistent with the view that a constant is represented by a
+    single knot at the start of time.
 """
 function lag(x::Node, n::Integer)
     n < 0 && throw(ArgumentError("Cannot lag by $n."))
     # Lagging by zero is a no-op.
     n == 0 && return x
-    # Constant and empty nodes shouldn't be affected by lagging.
-    _is_constant(x) && return x
+    # Constant nodes become empty when lagged.
+    # Empty nodes shouldn't be affected by lagging.
+    _is_constant(x) && return empty_node(value_type(x))
     _is_empty(x) && return x
 
     return obtain_node((x,), Lag{value_type(x)}(n))
@@ -118,6 +126,11 @@ end
     lag(x::Node, w::TimePeriod)
 
 Construct a node which takes values from `x`, but lags them by period `w`.
+
+!!! note
+    For any constant, lagging by an amount of time is a no-op. This is because the constant
+    is represented as a single value at the start of time (which will later appear at the
+    start of the evaluation window).
 """
 function lag(x::Node, w::TimePeriod)
     w = Millisecond(w)
