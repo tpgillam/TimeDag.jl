@@ -33,7 +33,8 @@ function convert_value(::Type{Out}, x::Node{In}; upcast::Bool=false) where {Out,
     # But if Out = Float64, then we'll get T_ = Float64.
     T_ == Union{} && throw(ArgumentError("Cannot convert $In to type $Out"))
 
-    # It is possible that T_ <: T. The `upcast` argument determines to which value we
+    # It is possible that T_ <: Out. The `upcast` argument determines whether we should
+    # force use of `Out` rather than the subtype `T_`.
     T_Out = upcast ? Out : T_
 
     # If the conversion would be a no-op, then do not create a new node.
