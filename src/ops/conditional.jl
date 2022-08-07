@@ -11,7 +11,12 @@ Obtain a node that removes knots for which `f(value)` is false.
 
 The [`value_type`](@ref) of the returned node is the same as that for the input `x`.
 """
-Base.filter(f::Function, x::Node) = obtain_node((x,), Filter{f,value_type(x)}())
+function Base.filter(f::Function, x::Node)
+    _is_empty(x) && return x
+    T = value_type(x)
+    _is_constant(x) && return f(value(x)) ? x : empty_node(T)
+    return obtain_node((x,), Filter{f,T}())
+end
 
 struct SkipMissing{T} <: UnaryNodeOp{T} end
 
@@ -38,5 +43,8 @@ function Base.skipmissing(x::Node)
         # There are provably no missing values in the input, so return the same node.
         return x
     end
-    return obtain_node((x,), SkipMissing{nonmissingtype(value_type(x))}())
+    T = nonmissingtype(value_type(x))
+    _is_constant(x) && return ismissing(value(x)) ? empty_node(T) : constant(T, value(x))
+    _is_empty(x) && return empty_node(T)
+    return obtain_node((x,), SkipMissing{T}())
 end
