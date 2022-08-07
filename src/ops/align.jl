@@ -12,7 +12,10 @@ Construct a node that ticks according to `alignment` with the latest value of `x
 It is "left", in the sense of picking the left-hand of the two arguments `x` and `y`.
 """
 function left(x, y, alignment::Alignment=DEFAULT_ALIGNMENT; initial_values=nothing)
+    x = _ensure_node(x)
+    y = _ensure_node(y)
     x === y && return x
+    (_is_empty(x) || _is_empty(y)) && return empty_node(value_type(x))
     return apply(_left, x, y, alignment; initial_values)
 end
 
@@ -24,7 +27,10 @@ Construct a node that ticks according to `alignment` with the latest value of `y
 It is "right", in the sense of picking the right-hand of the two arguments `x` and `y`.
 """
 function right(x, y, alignment::Alignment=DEFAULT_ALIGNMENT; initial_values=nothing)
+    x = _ensure_node(x)
+    y = _ensure_node(y)
     x === y && return x
+    (_is_empty(x) || _is_empty(y)) && return empty_node(value_type(y))
     return apply(_right, x, y, alignment; initial_values)
 end
 
@@ -45,6 +51,9 @@ This means that the resulting node will tick at a subset of the times that `y` t
 function align_once(x, y)
     x = _ensure_node(x)
     y = _ensure_node(y)
+
+    (_is_empty(x) || _is_empty(y)) && return empty_node(value_type(x))
+    _is_constant(x) && _is_constant(y) && return x
 
     # Imagine the following scenario.
     #

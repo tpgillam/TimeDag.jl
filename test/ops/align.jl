@@ -1,11 +1,19 @@
 @testset "right" begin
     _test_binary_op(right, (x, y) -> y)
-    @test right(n1, n1) === n1
+    for alignment in (LEFT, UNION, INTERSECT)
+        @test right(n1, n1, alignment) === n1
+        @test right(empty_node(Float64), n1, alignment) === empty_node(Int64)
+        @test right(n1, empty_node(Float64), alignment) === empty_node(Float64)
+    end
 end
 
 @testset "left" begin
     _test_binary_op(left, (x, y) -> x)
-    @test left(n1, n1) === n1
+    for alignment in (LEFT, UNION, INTERSECT)
+        @test left(n1, n1, alignment) === n1
+        @test left(empty_node(Float64), n1, alignment) === empty_node(Float64)
+        @test left(n1, empty_node(Float64), alignment) === empty_node(Int64)
+    end
 end
 
 @testset "align" begin
@@ -38,6 +46,10 @@ end
         DateTime(2000, 1, 5) => 8
     ])
     #! format:on
+
+    @test align_once(1, 2) === constant(1)
+    @test align_once(n1, empty_node(Float64)) === empty_node(Int64)
+    @test align_once(empty_node(Float64), n1) === empty_node(Float64)
 end
 
 @testset "coalign" begin
