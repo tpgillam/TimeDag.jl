@@ -183,17 +183,26 @@ end
     @test _eval(throttle(n4, 2)) == b4[1:2:end]
     @test _eval(throttle(n4, 3)) == b4[1:3:end]
     @test _eval(throttle(n4, 4)) == b4[1:4:end]
+
+    # Check for optimisation
+    @test throttle(constant(42), 1) === constant(42)
+    @test throttle(constant(42), 5) === constant(42)
+    @test throttle(empty_node(Float64), 5) === empty_node(Float64)
+    @test throttle(empty_node(String), 5) === empty_node(String)
 end
 
 @testset "count_knots" begin
     _expected_count_knots(b::Block) = Block(b.times, 1:length(b))
     @test count_knots(n1) === count_knots(n1)
     @test _eval(count_knots(42)) == Block([_T_START], [1])
+
     # Check for optimisation
     @test count_knots(42) === constant(1)
     @test _eval(count_knots(n1)) == _expected_count_knots(b1)
     @test _eval(count_knots(n4)) == _expected_count_knots(b4)
     @test _eval(count_knots(n_boolean)) == _expected_count_knots(b_boolean)
+    @test count_knots(empty_node(Float64)) === empty_node(Int64)
+    @test count_knots(empty_node(String)) === empty_node(Int64)
 end
 
 @testset "skip" begin

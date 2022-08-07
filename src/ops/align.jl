@@ -49,12 +49,6 @@ Similar to `align(x, y)`, except knots from `x` will be emitted at most once.
 This means that the resulting node will tick at a subset of the times that `y` ticks.
 """
 function align_once(x, y)
-    x = _ensure_node(x)
-    y = _ensure_node(y)
-
-    (_is_empty(x) || _is_empty(y)) && return empty_node(value_type(x))
-    _is_constant(x) && _is_constant(y) && return x
-
     # Imagine the following scenario.
     #
     # x: 1  2  3     4  5
@@ -293,6 +287,7 @@ The first knot encountered on the input will always be emitted.
 function throttle(x::Node, n::Integer)
     n > 0 || throw(ArgumentError("n should be positive, got $n"))
     n == 1 && return x
+    (_is_constant(x) || _is_empty(x)) && return x
     return obtain_node((x,), ThrottleKnots{value_type(x)}(n))
 end
 
