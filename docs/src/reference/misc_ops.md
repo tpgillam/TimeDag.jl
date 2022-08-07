@@ -20,7 +20,7 @@ Base.filter
 Base.skipmissing
 ```
 
-## Type conversion
+## Type conversion
 
 ```@docs
 convert_value
