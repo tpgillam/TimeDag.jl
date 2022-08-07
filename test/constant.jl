@@ -5,6 +5,9 @@
 
     @test TimeDag.Constant(1.0) != TimeDag.Constant(1)
     @test !isequal(TimeDag.Constant(1.0), TimeDag.Constant(1))
+
+    @test TimeDag.Constant(1) == TimeDag.Constant{Int64}(1)
+    @test TimeDag.Constant{Number}(1) != TimeDag.Constant{Int64}(1)
 end
 
 @testset "constant propagation" begin
@@ -21,6 +24,14 @@ end
     @test n1 - n2 === constant(-1)
 
     @test lag(n1, 2) === constant(1)
+end
+
+@testset "explicit type specification" begin
+    @test constant(Int64, 1) === constant(1)
+    n = constant(Number, 1)
+    @test n === constant(Number, 1)
+    @test value_type(n) == Number
+    @test_throws MethodError constant(String, 1)
 end
 
 @testset "evaluate" begin

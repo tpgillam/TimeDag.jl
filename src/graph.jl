@@ -25,12 +25,12 @@ If all `parents` are constant nodes, and `op` has a well-defined operation on co
 inputs, we will immediately perform the computation and return a constant node wrapping the
 computed value.
 """
-function obtain_node(parents::NTuple{N,Node}, op::NodeOp) where {N}
+function obtain_node(parents::NTuple{N,Node}, op::NodeOp{T}) where {N,T}
     if !isempty(parents) && _can_propagate_constant(op) && all(_is_constant, parents)
         # Constant propagation, since all inputs are constants & the op supports it.
         # Note that `constant` does, itself, call through to `obtain_node`, so the node will
         # be correctly registered with the id_map.
-        return constant(_propagate_constant_value(op, parents))
+        return constant(T, _propagate_constant_value(op, parents))
     end
 
     return obtain_node!(global_identity_map(), parents, op)
