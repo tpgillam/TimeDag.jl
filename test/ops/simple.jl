@@ -43,14 +43,6 @@ const _UNARY_STUFF = [
         @test inv(inv(n1)) === n1
         @test !(!n_boolean) === n_boolean
     end
-
-    @testset "difference of DateTime" begin
-        block = Block(b4.times, b4.times)
-        n = block_node(block)
-        @test value_type(n) == DateTime
-        n_diff = n - n
-        @test value_type(n_diff) == Millisecond
-    end
 end
 
 # FIXME: really need extended tests (especially for dot) where we use vector inputs too.
@@ -62,5 +54,13 @@ const _BINARY_FUNCTIONS = [+, -, *, /, ^, min, max, >, <, >=, <=, dot]
             # Test evaluations with different alignments.
             _test_binary_op(f)
         end
+    end
+
+    @testset "difference of DateTime" begin
+        block = Block(b4.times, b4.times)
+        n = block_node(block)
+        @test value_type(n) == DateTime
+        n_diff = n - n
+        @test value_type(n_diff) == Millisecond
     end
 end
