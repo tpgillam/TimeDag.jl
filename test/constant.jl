@@ -22,8 +22,6 @@ end
 
     @test n1 + n2 === constant(3)
     @test n1 - n2 === constant(-1)
-
-    @test lag(n1, 2) === constant(1)
 end
 
 @testset "explicit type specification" begin
