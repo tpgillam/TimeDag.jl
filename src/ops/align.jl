@@ -235,10 +235,11 @@ function prepend(x, y)
     x = _ensure_node(x)
     y = _ensure_node(y)
 
-    # Constant propagation.
-    _is_constant(x) && _is_constant(y) && return y
-
+    x === y && return x
     T = promote_type(value_type(x), value_type(y))
+    _is_empty(x) && return convert_value(T, y; upcast=true)
+    _is_empty(y) && return convert_value(T, x; upcast=true)
+    _is_constant(x) && _is_constant(y) && return convert_value(T, y; upcast=true)
     return obtain_node((x, y), Prepend{T}())
 end
 

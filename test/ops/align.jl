@@ -120,7 +120,10 @@ end
     # The second argument should take over as soon as it is available. In the case that both
     # arguments are constants, that is immediately.
     @test prepend(1, 2) === constant(2)
-    @test prepend(1, "s") === constant("s")
+    @test prepend(1, 2.0) === constant(2.0)
+    @test prepend(1.0, 2) === constant(2.0)
+    @test prepend(constant(Number, 1), 2) === constant(Number, 2)
+    @test prepend(1, "s") === constant(Any, "s")
 
     # We should promote or widen types where applicable.
     @test value_type(prepend(1, n1)) == Int64
@@ -128,6 +131,7 @@ end
     @test value_type(prepend("s", n1)) == Any
     @test prepend(1, n2) === prepend(constant(1), n2)
     @test prepend(n1, n2) === prepend(n1, n2)
+    @test prepend(n1, n1) === n1
 
     @test _eval(prepend(42, n1)) == b1
     @test _eval(prepend(42, n2)) == Block([
@@ -152,6 +156,14 @@ end
         DateTime(2000, 1, 4) => 1,
         DateTime(2000, 1, 5) => 5,
     ])
+
+    # Test empty node prepending.
+    n_empty = empty_node(Int64)
+    @test prepend(n_empty, n1) === n1
+    @test prepend(n1, n_empty) === n1
+    @test prepend(n_empty, n_empty) === n_empty
+    @test prepend(empty_node(Float64), empty_node(Int64)) === empty_node(Float64)
+    @test prepend(empty_node(Float64), 1) === constant(1.0)
 end
 
 @testset "throttle" begin
