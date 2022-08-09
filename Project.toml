@@ -22,7 +22,7 @@ TimeZones = "f269a46b-ccf7-5d73-abea-4c690281aa53"
 
 [compat]
 AbstractTrees = "0.3, 0.4"
-AssociativeWindowAggregation = "0.2, 0.3"
+AssociativeWindowAggregation = "0.2, 0.3, 0.4"
 Bijections = "0.1"
 Combinatorics = "1"
 DataStructures = "0.18"
