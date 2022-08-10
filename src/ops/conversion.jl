@@ -1,14 +1,14 @@
 """
     convert_value(T, x::Node[; upcast=false]) -> Node
 
-Convert the node `x` to value type `T`, possibly generating a new value.
+Convert the values of node `x` to type `T`.
 
-If and only if `upcast` is `true`, we will always upcast the result of the conversion to
-`T` — the value type of the resulting node will always be `T` in this case.
+The value type of the resulting node is guaranteed to be `T` if and only if `upcast=true`.
+See further discussion in the note.
 
 !!! note
-    By default, this has similar semantics to `Base.convert`, which means that the
-    [`value_type`](@ref) of the returned node might be a subtype of `T`.
+    By default, `convert_value` has similar semantics to `Base.convert`, which means that
+    the [`value_type`](@ref) of the returned node might be a subtype of `T`.
 
     A concrete example:
     ```julia
