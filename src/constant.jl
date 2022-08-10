@@ -4,6 +4,8 @@ struct Constant{T} <: NodeOp{T}
 end
 
 Base.hash(x::Constant, h::UInt64) = hash(x.value, hash(:Constant, h))
+# Note that we do not permit Constant(1) == Constant(1.0), even though 1 == 1.0 in Julia.
+# This is by design — see discussion in the documentation in [`Low-level API`](@ref)
 function Base.:(==)(x::Constant{T}, y::Constant{T}) where {T}
     # Add short-circuit, in case Base.:(==)(::T, ::T) doesn't have one.
     x.value === y.value && return true

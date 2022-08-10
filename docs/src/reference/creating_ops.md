@@ -25,6 +25,14 @@ The most general way to create an op is to create a structure that inherits from
 One must use this to implement source nodes, but in other cases it is typically preferable to use [Standard alignment behaviour](@ref).
 This is because there are number of rules that must be adhered to when implementing [`TimeDag.run_node!`](@ref), as noted in its docstring. 
 
+!!! warning
+    Some care must be taken when implementing `==` for a new `NodeOp`.
+    We require that `==` means "produce identical output for the same inputs".
+    For example, two `NodeOp`s must never compare equal if they have different [`value_type`](@ref)s.
+
+    Failure to adhere to this will cause confusing behaviour in the [Identity map](@ref). 
+    This is because, if calling [`TimeDag.obtain_node`](@ref), it might think the node already exists, even though the `NodeOp`s aren't truly equivalent.
+
 ### Example: stateless source
 Here is stateless source node, which is effectively a simplified [`iterdates`](@ref):
 
