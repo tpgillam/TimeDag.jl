@@ -11,16 +11,18 @@ See further discussion in the note.
     the [`value_type`](@ref) of the returned node might be a subtype of `T`.
 
     A concrete example:
-    ```julia
+    ```jldoctest
     julia> x = convert_value(Any, constant("hello"));
+
     julia> value_type(x)
     String
     ```
     Note that the same thing would happen if calling `convert(Any, "hello")`.
 
     However, if we set `upcast=true`:
-    ```julia
+    ```jldoctest
     julia> x = convert_value(Any, constant("hello"); upcast=true);
+
     julia> value_type(x)
     Any
     ```
