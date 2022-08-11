@@ -65,4 +65,6 @@ include("ops/simple.jl")
 include("ops/sources.jl")
 include("ops/stats.jl")
 
+include("TestUtils/TestUtils.jl")
+
 end
