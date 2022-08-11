@@ -12,6 +12,12 @@
         DateTime(2000, 1, 3) => 3,
         DateTime(2000, 1, 4) => 4,
     ])
+
+    # Optimisations
+    @test filter(>(0), constant(1)) === constant(1)
+    @test filter(>(0), constant(-1)) === empty_node(Int64)
+    @test filter(>(0), empty_node(Float64)) === empty_node(Float64)
+    @test filter(>(0), empty_node(Int64)) === empty_node(Int64)
 end
 
 @testset "skipmissing" begin
@@ -20,9 +26,14 @@ end
     @test value_type(n) == Int64
     @test n === skipmissing(n)
 
-    # Constant semantics.
-    @test constant(1) === skipmissing(constant(1))
-    @test skipmissing(constant(missing)).op isa TimeDag.SkipMissing
+    # Constant and empty semantics.
+    @test skipmissing(constant(1)) === constant(1)
+    @test skipmissing(constant(Union{Missing,Int64}, 1)) === constant(1)
+    @test skipmissing(constant(missing)) === empty_node(Union{})
+    @test skipmissing(constant(Union{Float64,Missing}, missing)) === empty_node(Float64)
+    @test skipmissing(empty_node(Float64)) === empty_node(Float64)
+    @test skipmissing(empty_node(Union{Float64,Missing})) === empty_node(Float64)
+    @test skipmissing(empty_node(Missing)) === empty_node(Union{})
 
     # Standard case.
     n = block_node(

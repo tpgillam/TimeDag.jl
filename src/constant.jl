@@ -4,6 +4,8 @@ struct Constant{T} <: NodeOp{T}
 end
 
 Base.hash(x::Constant, h::UInt64) = hash(x.value, hash(:Constant, h))
+# Note that we do not permit Constant(1) == Constant(1.0), even though 1 == 1.0 in Julia.
+# This is by design — see discussion in the documentation in [`Low-level API`](@ref)
 function Base.:(==)(x::Constant{T}, y::Constant{T}) where {T}
     # Add short-circuit, in case Base.:(==)(::T, ::T) doesn't have one.
     x.value === y.value && return true
@@ -49,8 +51,13 @@ end
 
 """
     constant(value) -> Node
+    constant(T, value) -> Node{T}
 
 Explicitly wrap `value` into a `TimeDag` constant node, regardless of its type.
+
+If `T` is provided, this allows creation of a node with a [`value_type`](@ref) that is a
+supertype of the type of the `value` — otherwise the constant node will always just use the
+concrete type of `value`.
 
 In many cases this isn't required, since many `TimeDag` functions which expect nodes will
 automatically wrap non-node arguments into a constant node.
@@ -60,3 +67,4 @@ automatically wrap non-node arguments into a constant node.
     likely not what you want to do.
 """
 constant(value::T) where {T} = obtain_node((), Constant(value))
+constant(::Type{T}, value) where {T} = obtain_node((), Constant{T}(value))

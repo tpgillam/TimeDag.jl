@@ -27,8 +27,10 @@ export block_node, constant, empty_node, iterdates, pulse, tea_file
 # Alignment nodes.
 export active_count, align, align_once, coalign, count_knots, first_knot, lag, right, left
 export prepend, throttle
+# Type conversion
+export convert_value
 # Other nodes
-export history, ema
+export ema, history
 # Evaluation & other utilities.
 export evaluate, value_type
 
@@ -55,6 +57,7 @@ include("ops/window.jl")  # Common stuff for windowed ops.
 include("ops/align.jl")
 include("ops/array.jl")
 include("ops/conditional.jl")
+include("ops/conversion.jl")
 include("ops/history.jl")
 include("ops/lagging.jl")
 include("ops/random.jl")

@@ -115,7 +115,7 @@ function obtain_node(
             (A == UnionAlignment || (A == LeftAlignment && _is_constant(first(parents))))
         )
             # Replace empty inputs with intial values and propagate.
-            constant(_propagate_constant_value(op, _get_constant_inputs(parents, op)))
+            constant(T, _propagate_constant_value(op, _get_constant_inputs(parents, op)))
         else
             # In all other cases here the output will be empty.
             empty_node(T)

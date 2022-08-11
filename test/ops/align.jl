@@ -1,11 +1,19 @@
 @testset "right" begin
     _test_binary_op(right, (x, y) -> y)
-    @test right(n1, n1) === n1
+    for alignment in (LEFT, UNION, INTERSECT)
+        @test right(n1, n1, alignment) === n1
+        @test right(empty_node(Float64), n1, alignment) === empty_node(Int64)
+        @test right(n1, empty_node(Float64), alignment) === empty_node(Float64)
+    end
 end
 
 @testset "left" begin
     _test_binary_op(left, (x, y) -> x)
-    @test left(n1, n1) === n1
+    for alignment in (LEFT, UNION, INTERSECT)
+        @test left(n1, n1, alignment) === n1
+        @test left(empty_node(Float64), n1, alignment) === empty_node(Float64)
+        @test left(n1, empty_node(Float64), alignment) === empty_node(Int64)
+    end
 end
 
 @testset "align" begin
@@ -38,6 +46,10 @@ end
         DateTime(2000, 1, 5) => 8
     ])
     #! format:on
+
+    @test align_once(1, 2) === constant(1)
+    @test align_once(n1, empty_node(Float64)) === empty_node(Int64)
+    @test align_once(empty_node(Float64), n1) === empty_node(Float64)
 end
 
 @testset "coalign" begin
@@ -95,7 +107,7 @@ end
 @testset "first_knot" begin
     @test _eval(first_knot(n4)) == b4[1:1]
     @test _eval(first_knot(n_boolean)) == b_boolean[1:1]
-    @test _eval(empty_node(Float64)) == Block{Float64}()
+    @test first_knot(empty_node(Float64)) === empty_node(Float64)
     @test first_knot(constant(42.0)) === constant(42.0)
 end
 
@@ -110,13 +122,20 @@ end
     @test active_count(n1, n2, n3) === active_count(n2, n1, n3)
     @test active_count(n1, n2, n3) === active_count(n3, n1, n2)
     @test active_count(n1, n2, n3) === active_count(n3, n2, n1)
+
+    n_empty = empty_node(Int64)
+    @test active_count(n1, n2, n_empty) === active_count(n2, n1)
+    @test active_count(n1, n_empty, n2, n_empty, n3, n_empty) === active_count(n3, n2, n1)
 end
 
 @testset "prepend" begin
     # The second argument should take over as soon as it is available. In the case that both
     # arguments are constants, that is immediately.
     @test prepend(1, 2) === constant(2)
-    @test prepend(1, "s") === constant("s")
+    @test prepend(1, 2.0) === constant(2.0)
+    @test prepend(1.0, 2) === constant(2.0)
+    @test prepend(constant(Number, 1), 2) === constant(Number, 2)
+    @test prepend(1, "s") === constant(Any, "s")
 
     # We should promote or widen types where applicable.
     @test value_type(prepend(1, n1)) == Int64
@@ -124,6 +143,7 @@ end
     @test value_type(prepend("s", n1)) == Any
     @test prepend(1, n2) === prepend(constant(1), n2)
     @test prepend(n1, n2) === prepend(n1, n2)
+    @test prepend(n1, n1) === n1
 
     @test _eval(prepend(42, n1)) == b1
     @test _eval(prepend(42, n2)) == Block([
@@ -148,6 +168,14 @@ end
         DateTime(2000, 1, 4) => 1,
         DateTime(2000, 1, 5) => 5,
     ])
+
+    # Test empty node prepending.
+    n_empty = empty_node(Int64)
+    @test prepend(n_empty, n1) === n1
+    @test prepend(n1, n_empty) === n1
+    @test prepend(n_empty, n_empty) === n_empty
+    @test prepend(empty_node(Float64), empty_node(Int64)) === empty_node(Float64)
+    @test prepend(empty_node(Float64), 1) === constant(1.0)
 end
 
 @testset "throttle" begin
@@ -155,17 +183,26 @@ end
     @test _eval(throttle(n4, 2)) == b4[1:2:end]
     @test _eval(throttle(n4, 3)) == b4[1:3:end]
     @test _eval(throttle(n4, 4)) == b4[1:4:end]
+
+    # Check for optimisation
+    @test throttle(constant(42), 1) === constant(42)
+    @test throttle(constant(42), 5) === constant(42)
+    @test throttle(empty_node(Float64), 5) === empty_node(Float64)
+    @test throttle(empty_node(String), 5) === empty_node(String)
 end
 
 @testset "count_knots" begin
     _expected_count_knots(b::Block) = Block(b.times, 1:length(b))
     @test count_knots(n1) === count_knots(n1)
     @test _eval(count_knots(42)) == Block([_T_START], [1])
+
     # Check for optimisation
     @test count_knots(42) === constant(1)
     @test _eval(count_knots(n1)) == _expected_count_knots(b1)
     @test _eval(count_knots(n4)) == _expected_count_knots(b4)
     @test _eval(count_knots(n_boolean)) == _expected_count_knots(b_boolean)
+    @test count_knots(empty_node(Float64)) === empty_node(Int64)
+    @test count_knots(empty_node(String)) === empty_node(Int64)
 end
 
 @testset "skip" begin
@@ -196,6 +233,13 @@ end
     # Merging constants should give a constant.
     @test merge(constant(1), constant(2)) === constant(2)
     @test merge(constant(1), constant(2), constant(3)) === constant(3)
+
+    # Empty nodes should be skipped when merging.
+    n_empty = empty_node(Int64)
+    @test merge(n_empty) === n_empty
+    @test merge(constant(1), n_empty) === constant(1)
+    @test merge(n_empty, n_empty, constant(1), n_empty) === constant(1)
+    @test merge(n_empty, n2) === n2
 
     # If the times of the inputs are identically equal, we expect to not
     # allocate a new block in evaluation.
@@ -233,4 +277,16 @@ end
     rng = MersenneTwister()
     @test value_type(merge(n1, block_node(_get_rand_block(rng, 3)))) == Float64
     @test value_type(merge(n1, block_node(_get_rand_vec_block(rng, 3, 3)))) == Any
+
+    # Type promotion with constant and empty.
+    @test merge(constant(1.0), constant(2)) === constant(2.0)
+    @test merge(empty_node(Float64), constant(2)) === constant(2.0)
+    @test merge(empty_node(Int64), empty_node(Float64)) === empty_node(Float64)
+    @test merge(empty_node(Float64), empty_node(Int64)) === empty_node(Float64)
+    # In this case we promote to Any, but because we end up doing
+    #   convert(::Type{Any}, ::String)
+    # we just get back something of type String.
+    @test merge(empty_node(Float64), empty_node(String)) === empty_node(Any)
+    @test value_type(merge(empty_node(Float64), n1)) === Float64
+    @test value_type(merge(empty_node(String), n1)) === Any
 end

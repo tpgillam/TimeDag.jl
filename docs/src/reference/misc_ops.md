@@ -19,3 +19,9 @@ Base.rand
 Base.filter
 Base.skipmissing
 ```
+
+## Type conversion
+
+```@docs
+convert_value
+```

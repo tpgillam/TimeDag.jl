@@ -12,7 +12,10 @@ Construct a node that ticks according to `alignment` with the latest value of `x
 It is "left", in the sense of picking the left-hand of the two arguments `x` and `y`.
 """
 function left(x, y, alignment::Alignment=DEFAULT_ALIGNMENT; initial_values=nothing)
+    x = _ensure_node(x)
+    y = _ensure_node(y)
     x === y && return x
+    (_is_empty(x) || _is_empty(y)) && return empty_node(value_type(x))
     return apply(_left, x, y, alignment; initial_values)
 end
 
@@ -24,7 +27,10 @@ Construct a node that ticks according to `alignment` with the latest value of `y
 It is "right", in the sense of picking the right-hand of the two arguments `x` and `y`.
 """
 function right(x, y, alignment::Alignment=DEFAULT_ALIGNMENT; initial_values=nothing)
+    x = _ensure_node(x)
+    y = _ensure_node(y)
     x === y && return x
+    (_is_empty(x) || _is_empty(y)) && return empty_node(value_type(y))
     return apply(_right, x, y, alignment; initial_values)
 end
 
@@ -43,9 +49,6 @@ Similar to `align(x, y)`, except knots from `x` will be emitted at most once.
 This means that the resulting node will tick at a subset of the times that `y` ticks.
 """
 function align_once(x, y)
-    x = _ensure_node(x)
-    y = _ensure_node(y)
-
     # Imagine the following scenario.
     #
     # x: 1  2  3     4  5
@@ -138,8 +141,8 @@ end
 Get a node which ticks with only the first knot of `x`, and then never ticks again.
 """
 function first_knot(node::Node{T}) where {T}
-    # This function should be idempotent for constant nodes.
-    _is_constant(node) && return node
+    # This function should be idempotent for constant & empty nodes.
+    (_is_constant(node) || _is_empty(node)) && return node
     return obtain_node((node,), FirstKnot{T}())
 end
 
@@ -150,6 +153,9 @@ Get a node of the number of the given `nodes` (at least one) which are active.
 """
 function active_count(x, x_rest...)
     nodes = map(_ensure_node, [x, x_rest...])
+
+    # Empty nodes are always inactive, so remove them from the set that we consider.
+    nodes = filter(!_is_empty, nodes)
 
     # Perform the same ordering optimisation that we use in coalign. This aims to give the
     # same node regardless of the order in which `nodes` were passed in.
@@ -232,10 +238,11 @@ function prepend(x, y)
     x = _ensure_node(x)
     y = _ensure_node(y)
 
-    # Constant propagation.
-    _is_constant(x) && _is_constant(y) && return y
-
+    x === y && return x
     T = promote_type(value_type(x), value_type(y))
+    _is_empty(x) && return convert_value(T, y; upcast=true)
+    _is_empty(y) && return convert_value(T, x; upcast=true)
+    _is_constant(x) && _is_constant(y) && return convert_value(T, y; upcast=true)
     return obtain_node((x, y), Prepend{T}())
 end
 
@@ -280,6 +287,7 @@ The first knot encountered on the input will always be emitted.
 function throttle(x::Node, n::Integer)
     n > 0 || throw(ArgumentError("n should be positive, got $n"))
     n == 1 && return x
+    (_is_constant(x) || _is_empty(x)) && return x
     return obtain_node((x,), ThrottleKnots{value_type(x)}(n))
 end
 
@@ -444,7 +452,9 @@ end
 Base.merge(x::Node) = x
 function Base.merge(x::Node, y::Node)
     x === y && return x
-    _is_constant(x) && _is_constant(y) && return y
     T = promote_type(value_type(x), value_type(y))
+    _is_empty(x) && return convert_value(T, y; upcast=true)
+    _is_empty(y) && return convert_value(T, x; upcast=true)
+    _is_constant(x) && _is_constant(y) && return convert_value(T, y; upcast=true)
     return obtain_node((x, y), Merge2{T}())
 end

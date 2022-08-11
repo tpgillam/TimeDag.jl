@@ -37,8 +37,10 @@ end
 
     @testset "constant" begin
         n = constant(42.0)
-        @test lag(n, 1) === n
-        @test lag(n, Hour(1)) === n
+        @test lag(n, 0) === n
+        @test lag(n, Hour(0)) === n
+        @test lag(n, 1) === empty_node(Float64)
+        @test lag(n, Hour(1)) === n  # Lagging a constant by a _time_ interval is a no-op.
     end
 
     @testset "general" begin
