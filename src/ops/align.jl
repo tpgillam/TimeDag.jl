@@ -160,7 +160,7 @@ function active_count(x, x_rest...)
     # Perform the same ordering optimisation that we use in coalign. This aims to give the
     # same node regardless of the order in which `nodes` were passed in.
     sort!(nodes; by=objectid)
-    return reduce((x, y) -> +(x, y; initial_values=(0, 0)), align.(1, first_knot.(nodes)))
+    return foldl((x, y) -> +(x, y; initial_values=(0, 0)), align.(1, first_knot.(nodes)))
 end
 
 struct Prepend{T} <: NodeOp{T} end
