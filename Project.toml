@@ -1,7 +1,7 @@
 name = "TimeDag"
 uuid = "91963e24-6e66-4132-aeb8-436d9f37dbc7"
 authors = ["Invenia Technical Computing Corporation", "Tom Gillam <tpgillam@googlemail.com>"]
-version = "0.1.20"
+version = "0.1.21"
 
 [deps]
 AbstractTrees = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
