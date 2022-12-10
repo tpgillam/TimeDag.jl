@@ -79,7 +79,7 @@ parents(node::Node) = node.parents
 
 """
     create_evaluation_state(node::Node) -> NodeEvaluationState
-    create_evaluation_state(parents, node::NodeOp) -> NodeEvaluationState
+    create_evaluation_state(parents, op::NodeOp) -> NodeEvaluationState
 
 Create an empty evaluation state for the given node, when starting evaluation at the
 specified time.
