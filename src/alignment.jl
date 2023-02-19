@@ -917,9 +917,8 @@ relation `f : T × T → Bool`.
 
 Note that behaviour is undefined if `f` is non-transitive.
 """
-function equivalence_classes(
-    f::Function, x::Union{AbstractVector{T},Tuple{Vararg{T}}}
-) where {T}
+function equivalence_classes(f::Function, x)
+    T = eltype(x)
     result = Vector{Vector{T}}()
     isempty(x) && return result
 
