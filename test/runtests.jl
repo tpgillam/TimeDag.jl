@@ -27,6 +27,7 @@ using TimeDag: duplicate, evaluate_until!, start_at
 
     include("common.jl")
 
+    @testset "alignment" begin include("alignment.jl") end
     @testset "block" begin include("block.jl") end
     @testset "constant" begin include("constant.jl") end
     @testset "empty" begin include("empty.jl") end
