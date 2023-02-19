@@ -75,9 +75,22 @@ function start_at(nodes, time_start::DateTime)::EvaluationState
 end
 
 """
+    evaluate_until(state::EvaluationState, time_end::DateTime) -> EvaluationState
+
+Perform an evaluation of the given `state` until `time_end`, and return the new state.
+"""
+function evaluate_until(state::EvaluationState, time_end::DateTime)
+    return evaluate_until(duplicate(state), time_end)
+end
+
+"""
     evaluate_until!(state::EvaluationState, time_end::DateTime)
 
 Update the evaluation state by performing the evalution for each node.
+
+!!! Note
+    `state` is mutated in this call; users may prefer to use [`evaluate_until`](@ref), which
+    ensures that arguments are not mutated.
 """
 function evaluate_until!(state::EvaluationState, time_end::DateTime)::EvaluationState
     # TODO Could we use dagger here to solve this & parallelism for us? I think the problem

@@ -280,7 +280,7 @@ end
 #   if we allow stateful things?
 
 """
-    wrap(f::Function; time_agnostic=true)
+    wrap(f::Function; time_agnostic=true, value_agnostic=false)
 
 Return a callable object that acts on nodes, and returns a node.
 
@@ -291,13 +291,15 @@ must always return a valid output value.
 Iff `time_agnostic` is `false`, `f` will be passed the time of the current knot as the first
 argument, followed by the value of every input.
 
+If `value_agnostic` is `true`, no values will be passed to `f`.
+
 If the object is called with more than one node, alignment will be performed.
 If an alignment other than the default should be used, provide it as the final argument.
 
 Internally this will call `TimeDag.apply(f, args...; kwargs...)`; see there for further
 details.
 """
-wrap(f::Function; time_agnostic::Bool=true) = Wrapped{f}(time_agnostic)
+wrap(f::Function; time_agnostic::Bool=true, value_agnostic::Bool=false) = Wrapped{f}(time_agnostic, value_agnostic)
 
 """
     wrapb(f::Function; time_agnostic=true)
