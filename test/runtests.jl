@@ -4,7 +4,7 @@ using DataFrames
 using DataStructures
 using Dates
 using Distributions
-using LightGraphs
+using Graphs
 using LinearAlgebra
 using Random
 using StaticArrays
