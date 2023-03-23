@@ -5,7 +5,7 @@ using AssociativeWindowAggregation
 using Bijections
 using DataStructures
 using Dates
-using LightGraphs
+using Graphs
 using LinearAlgebra
 using PrettyTables
 using Random

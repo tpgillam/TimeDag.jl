@@ -110,7 +110,7 @@ Get a list of all nodes in the graph defined by `nodes`, including all parents.
     * The parents of any vertex will always come before the vertex itself.
 """
 function ancestors(nodes::AbstractVector{<:Node})
-    # Construct a LightGraphs representation of the whole node graph.
+    # Construct a Graphs representation of the whole node graph.
     node_to_vertex = Bijection(Dict(n => i for (i, n) in enumerate(iternodes(nodes))))
 
     # Initialising a SimpleDiGraph via an edge list is more efficient than calling add_edge!
