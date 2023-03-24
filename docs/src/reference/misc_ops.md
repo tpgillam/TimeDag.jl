@@ -18,6 +18,7 @@ Base.rand
 ```@docs
 Base.filter
 Base.skipmissing
+zap_until
 ```
 
 ## Type conversion
