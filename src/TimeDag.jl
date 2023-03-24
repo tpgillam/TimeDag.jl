@@ -27,6 +27,8 @@ export block_node, constant, empty_node, iterdates, pulse, tea_file
 # Alignment nodes.
 export active_count, align, align_once, coalign, count_knots, first_knot, lag, right, left
 export prepend, throttle
+# Conditional nodes.
+export zap_until
 # Type conversion
 export convert_value
 # Other nodes

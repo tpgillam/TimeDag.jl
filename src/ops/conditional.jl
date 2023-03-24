@@ -48,3 +48,21 @@ function Base.skipmissing(x::Node)
     _is_empty(x) && return empty_node(T)
     return obtain_node((x,), SkipMissing{T}())
 end
+
+# TODO a more efficient implementation for this would simply slice blocks as required,
+#   rather than evaluate the condition knotwise.
+struct ZapUntil{T} <: UnaryNodeOp{T}
+    time::DateTime
+end
+stateless_operator(::ZapUntil) = true
+operator!(op::ZapUntil{T}, t::DateTime, x) where {T} = t < op.time ? Maybe{T}() : Maybe(x)
+
+"""
+    zap_until(x::Node, t) -> Node
+
+Given a node `x`, return a node in which all knots strictly before `t` are omitted.
+"""
+function zap_until(x::Node{T}, t::DateTime) where {T}
+    _is_empty(x) && return x
+    return obtain_node((x,), ZapUntil{T}(t))
+end
