@@ -56,4 +56,15 @@ end
     ])
 end
 
+@testset "zap_until" begin
+    n = empty_node(Int64)
+    @test zap_until(n, DateTime(2000)) === n
+
+    @test _eval(zap_until(n1, DateTime(2000, 1, 3))) ==
+        Block([
+            DateTime(2000, 1, 3) => 3,
+            DateTime(2000, 1, 4) => 4
+        ])
+end
+
 #! format: on
