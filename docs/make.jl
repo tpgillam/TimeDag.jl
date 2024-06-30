@@ -39,7 +39,6 @@ withenv("GKSwstype" => "nul") do
             ],
         ],
         checkdocs=:exports,
-        strict=true,
     )
 end
 
